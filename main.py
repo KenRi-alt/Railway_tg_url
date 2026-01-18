@@ -608,7 +608,7 @@ async def ping_command(message: Message):
     
     log_command(message.from_user.id, "ping", "", True, response_time)
 
-# ========== /LOGS COMMAND ==========
+# ========== /LOGS COMMAND - FIXED SQL SYNTAX ==========
 @dp.message(Command("logs"))
 async def logs_command(message: Message):
     """Send logs as .txt file only"""
@@ -628,12 +628,13 @@ async def logs_command(message: Message):
     cursor = conn.cursor()
     
     if log_type == "commands":
+        # FIXED SQL QUERY
         cursor.execute('''
             SELECT timestamp, user_id, command, args, success, response_time
             FROM command_logs 
-            WHERE date(timestamp) >= date('now', '-? day')
+            WHERE DATE(timestamp) >= DATE('now', ?)
             ORDER BY timestamp DESC
-        ''', (days,))
+        ''', (f'-{days} days',))
         
         logs = cursor.fetchall()
         
@@ -654,12 +655,13 @@ async def logs_command(message: Message):
             log_content += "\n\n"
     
     elif log_type == "errors":
+        # FIXED SQL QUERY
         cursor.execute('''
             SELECT timestamp, user_id, command, error_type, error_message
             FROM error_logs 
-            WHERE date(timestamp) >= date('now', '-? day')
+            WHERE DATE(timestamp) >= DATE('now', ?)
             ORDER BY timestamp DESC
-        ''', (days,))
+        ''', (f'-{days} days',))
         
         logs = cursor.fetchall()
         
@@ -675,14 +677,14 @@ async def logs_command(message: Message):
             log_content += f"   📝 {error_preview}\n\n"
     
     else:
-        # Summary
-        cursor.execute('SELECT COUNT(*) FROM command_logs WHERE date(timestamp) >= date('now', '-? day')', (days,))
+        # Summary - FIXED SQL QUERIES
+        cursor.execute("SELECT COUNT(*) FROM command_logs WHERE DATE(timestamp) >= DATE('now', ?)", (f'-{days} days',))
         total_cmds = cursor.fetchone()[0] or 0
         
-        cursor.execute('SELECT COUNT(*) FROM error_logs WHERE date(timestamp) >= date('now', '-? day')', (days,))
+        cursor.execute("SELECT COUNT(*) FROM error_logs WHERE DATE(timestamp) >= DATE('now', ?)", (f'-{days} days',))
         total_errors = cursor.fetchone()[0] or 0
         
-        cursor.execute('SELECT COUNT(DISTINCT user_id) FROM command_logs WHERE date(timestamp) >= date('now', '-? day')', (days,))
+        cursor.execute("SELECT COUNT(DISTINCT user_id) FROM command_logs WHERE DATE(timestamp) >= DATE('now', ?)", (f'-{days} days',))
         unique_users = cursor.fetchone()[0] or 0
         
         log_content = f"""
