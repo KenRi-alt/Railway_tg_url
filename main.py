@@ -3,36 +3,48 @@ import asyncio
 import logging
 import time
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 import sqlite3
 from pathlib import Path
 import aiohttp
 import sys
+import json
+import httpx
+from io import BytesIO
+import html
+import base64
+import mimetypes
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import (
+    Message, InlineKeyboardMarkup, InlineKeyboardButton,
+    CallbackQuery, ReplyKeyboardMarkup, KeyboardButton,
+    FSInputFile
+)
 from aiogram.enums import ParseMode
 
-# Print startup info
-print("=" * 50)
-print("🎯 FORTUNE WISH BOT - Starting...")
-print(f"Python version: {sys.version}")
-print("=" * 50)
+print("=" * 70)
+print("🤖 ULTIMATE MEDIA BOT v6.0 - Starting...")
+print(f"🐍 Python: {sys.version.split()[0]}")
+print("=" * 70)
 
 # ========== CONFIGURATION ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAFVRZytQIWAq6S3r6NXM-CvPbt_agGMk4Y")
 OWNER_ID = int(os.getenv("OWNER_ID", "6108185460"))
+CATBOX_API = "https://catbox.moe/user/api.php"
 
 # Create directories
 Path("data").mkdir(exist_ok=True)
-Path("logs").mkdir(exist_ok=True)
+Path("temp").mkdir(exist_ok=True)
 
 # Initialize bot
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Global start time
+# Global states
+bot_active = True
+bot_speed = "normal"
 start_time = time.time()
 
 # ========== DATABASE ==========
@@ -46,10 +58,25 @@ def init_db():
             user_id INTEGER PRIMARY KEY,
             username TEXT,
             first_name TEXT,
+            last_name TEXT,
             joined_date TEXT,
-            wishes_made INTEGER DEFAULT 0,
-            avg_luck REAL DEFAULT 0,
-            last_active TEXT
+            last_active TEXT,
+            total_uploads INTEGER DEFAULT 0,
+            is_banned INTEGER DEFAULT 0,
+            is_admin INTEGER DEFAULT 0
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS uploads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            timestamp TEXT,
+            file_type TEXT,
+            file_size INTEGER,
+            catbox_url TEXT,
+            telegram_url TEXT,
+            views INTEGER DEFAULT 0
         )
     ''')
     
@@ -60,7 +87,8 @@ def init_db():
             timestamp TEXT,
             wish_text TEXT,
             luck_percentage INTEGER,
-            stars TEXT
+            stars TEXT,
+            result TEXT
         )
     ''')
     
@@ -70,557 +98,642 @@ def init_db():
 
 init_db()
 
-# ========== UPDATE USER ==========
-def update_user(user: types.User):
-    """Update or create user"""
+# ========== CATBOX UPLOAD FUNCTION ==========
+async def upload_to_catbox(file_data: bytes, filename: str) -> dict:
+    """
+    Upload any file to Catbox.moe using proper API
+    Returns: {'success': bool, 'url': str, 'error': str}
+    """
+    try:
+        # Prepare multipart form data
+        files = {
+            'reqtype': (None, 'fileupload'),
+            'fileToUpload': (filename, file_data),
+        }
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                CATBOX_API,
+                files=files,
+                headers=headers
+            )
+            
+        if response.status_code == 200 and response.text:
+            url = response.text.strip()
+            if url.startswith('http'):
+                return {
+                    'success': True,
+                    'url': url,
+                    'filename': filename,
+                    'size': len(file_data)
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'Invalid response from Catbox',
+                    'details': response.text[:100]
+                }
+        else:
+            return {
+                'success': False,
+                'error': f'HTTP {response.status_code}',
+                'details': response.text[:100] if response.text else 'No response'
+            }
+            
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e),
+            'details': 'Upload failed'
+        }
+
+# ========== DOWNLOAD TELEGRAM FILE ==========
+async def download_telegram_file(file_id: str) -> tuple:
+    """
+    Download file from Telegram and return (data, filename, file_type)
+    """
+    try:
+        # Get file info
+        file = await bot.get_file(file_id)
+        file_path = file.file_path
+        
+        # Generate filename
+        filename = file_path.split('/')[-1] if '/' in file_path else f"file_{file_id}"
+        
+        # Download file
+        file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.get(file_url)
+            
+        if response.status_code == 200:
+            return (response.content, filename, file_path)
+        else:
+            return (None, None, None)
+            
+    except Exception as e:
+        print(f"❌ Download error: {e}")
+        return (None, None, None)
+
+# ========== ENHANCED /LINK COMMAND WITH CATBOX ==========
+@dp.message(Command("link"))
+async def enhanced_link_command(message: Message):
+    """Upload any media to Catbox.moe and provide links"""
+    user = message.from_user
+    
+    # Update user
     conn = sqlite3.connect("data/bot.db")
     cursor = conn.cursor()
-    
     cursor.execute('''
         INSERT OR REPLACE INTO users 
-        (user_id, username, first_name, joined_date, last_active, wishes_made, avg_luck)
-        VALUES (?, ?, ?, COALESCE((SELECT joined_date FROM users WHERE user_id = ?), ?), 
-                ?, COALESCE((SELECT wishes_made FROM users WHERE user_id = ?), 0),
-                COALESCE((SELECT avg_luck FROM users WHERE user_id = ?), 0))
-    ''', (
-        user.id, user.username, user.first_name, 
-        user.id, datetime.now().isoformat(),
-        datetime.now().isoformat(),
-        user.id, user.id
-    ))
-    
+        (user_id, username, first_name, last_name, joined_date, last_active)
+        VALUES (?, ?, ?, ?, COALESCE((SELECT joined_date FROM users WHERE user_id = ?), ?), ?)
+    ''', (user.id, user.username, user.first_name, user.last_name,
+          user.id, datetime.now().isoformat(), datetime.now().isoformat()))
     conn.commit()
     conn.close()
+    
+    # Check for media
+    media_types = {
+        'photo': (message.photo, "📸 Photo"),
+        'video': (message.video, "🎥 Video"),
+        'audio': (message.audio, "🎵 Audio"),
+        'document': (message.document, "📄 Document"),
+        'voice': (message.voice, "🎤 Voice"),
+        'sticker': (message.sticker, "😀 Sticker"),
+        'video_note': (message.video_note, "⭕ Video Note"),
+        'animation': (message.animation, "🎬 Animation"),
+    }
+    
+    # Find which media type is present
+    file_id = None
+    file_type_display = "File"
+    file_emoji = "📁"
+    file_details = {}
+    
+    for media_type, (media, display_name) in media_types.items():
+        if media:
+            if media_type == 'photo':
+                file_id = media[-1].file_id
+                file_type_display = display_name
+                file_emoji = "📸"
+                file_details = {
+                    'width': media[-1].width,
+                    'height': media[-1].height,
+                    'size': media[-1].file_size
+                }
+            else:
+                file_id = media.file_id
+                file_type_display = display_name
+                file_emoji = "📸🎥🎵📄🎤😀⭕🎬"["photo video audio document voice sticker video_note animation".split().index(media_type)]
+                
+                if media_type == 'video' and hasattr(media, 'duration'):
+                    file_details['duration'] = f"{media.duration // 60}:{media.duration % 60:02d}"
+                if media_type == 'audio' and hasattr(media, 'duration'):
+                    file_details['duration'] = f"{media.duration // 60}:{media.duration % 60:02d}"
+                if hasattr(media, 'file_size'):
+                    file_details['size'] = media.file_size
+                if hasattr(media, 'file_name'):
+                    file_details['name'] = media.file_name
+                if hasattr(media, 'mime_type'):
+                    file_details['mime'] = media.mime_type
+            break
+    
+    if not file_id:
+        # Send help message
+        await message.answer(
+            "📁 <b>MEDIA UPLOADER TO CATBOX.MOE</b>\n\n"
+            "📸 <b>Supported Files:</b>\n"
+            "• Photos (JPG, PNG, GIF, etc.)\n"
+            "• Videos (MP4, MOV, AVI, etc.)\n"
+            "• Audio files (MP3, WAV, etc.)\n"
+            "• Documents (PDF, DOC, XLS, etc.)\n"
+            "• Voice messages\n"
+            "• Stickers\n"
+            "• Video Notes\n"
+            "• Animations (GIFs)\n\n"
+            "🚀 <b>How to use:</b>\n"
+            "1. Type <code>/link</code>\n"
+            "2. Send any file\n"
+            "3. Get Catbox.moe link\n\n"
+            "⚡ <b>Features:</b>\n"
+            "• Direct Catbox links\n"
+            "• No expiration\n"
+            "• High speed\n"
+            "• Bypass Telegram limits\n\n"
+            "⚠️ <i>Max file size: 200MB (Catbox limit)</i>",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    
+    # Send processing message
+    processing_msg = await message.answer(
+        f"🔄 <b>Processing {file_type_display}...</b>\n"
+        f"⏳ Downloading from Telegram...",
+        parse_mode=ParseMode.HTML
+    )
+    
+    try:
+        # Step 1: Download from Telegram
+        await processing_msg.edit_text(
+            f"🔄 <b>Processing {file_type_display}...</b>\n"
+            f"📥 Downloading from Telegram servers...",
+            parse_mode=ParseMode.HTML
+        )
+        
+        file_data, original_filename, file_path = await download_telegram_file(file_id)
+        
+        if not file_data:
+            await processing_msg.edit_text(
+                "❌ <b>Failed to download file from Telegram!</b>\n"
+                "Please try again with a smaller file.",
+                parse_mode=ParseMode.HTML
+            )
+            return
+        
+        # Step 2: Upload to Catbox
+        await processing_msg.edit_text(
+            f"🔄 <b>Processing {file_type_display}...</b>\n"
+            f"☁️ Uploading to Catbox.moe...",
+            parse_mode=ParseMode.HTML
+        )
+        
+        # Generate filename
+        file_ext = original_filename.split('.')[-1] if '.' in original_filename else 'bin'
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        catbox_filename = f"file_{timestamp}.{file_ext}"
+        
+        # Upload to Catbox
+        upload_result = await upload_to_catbox(file_data, catbox_filename)
+        
+        if not upload_result['success']:
+            await processing_msg.edit_text(
+                f"❌ <b>Upload to Catbox failed!</b>\n"
+                f"Error: {upload_result.get('error', 'Unknown error')}",
+                parse_mode=ParseMode.HTML
+            )
+            return
+        
+        catbox_url = upload_result['url']
+        file_size_mb = len(file_data) / (1024 * 1024)
+        
+        # Step 3: Generate Telegram link
+        bot_info = await bot.get_me()
+        telegram_url = f"https://t.me/{bot_info.username}?start=file_{file_id}"
+        
+        # Step 4: Save to database
+        conn = sqlite3.connect("data/bot.db")
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE users SET total_uploads = total_uploads + 1 
+            WHERE user_id = ?
+        ''', (user.id,))
+        
+        cursor.execute('''
+            INSERT INTO uploads 
+            (user_id, timestamp, file_type, file_size, catbox_url, telegram_url, views)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            user.id,
+            datetime.now().isoformat(),
+            file_type_display,
+            len(file_data),
+            catbox_url,
+            telegram_url,
+            0
+        ))
+        
+        conn.commit()
+        
+        # Get user stats
+        cursor.execute('SELECT total_uploads FROM users WHERE user_id = ?', (user.id,))
+        user_stats = cursor.fetchone()
+        total_uploads = user_stats[0] if user_stats else 1
+        
+        conn.close()
+        
+        # Step 5: Create response
+        # Format file size
+        if file_size_mb < 1:
+            size_display = f"{len(file_data) / 1024:.1f} KB"
+        else:
+            size_display = f"{file_size_mb:.1f} MB"
+        
+        # Build details string
+        details_lines = []
+        if 'width' in file_details and 'height' in file_details:
+            details_lines.append(f"📐 Resolution: {file_details['width']}x{file_details['height']}")
+        if 'duration' in file_details:
+            details_lines.append(f"⏱️ Duration: {file_details['duration']}")
+        if 'name' in file_details:
+            details_lines.append(f"📝 Name: {file_details['name']}")
+        if 'mime' in file_details:
+            details_lines.append(f"📄 Type: {file_details['mime']}")
+        
+        details_lines.append(f"💾 Size: {size_display}")
+        details_lines.append(f"📅 Uploaded: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        details_text = "\n".join(details_lines)
+        
+        response = f"""
+🔗 <b>✨ FILE UPLOADED SUCCESSFULLY! ✨</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-# ========== WISH COMMAND ==========
+{file_emoji} <b>File Type:</b> {file_type_display}
+👤 <b>Uploaded by:</b> {user.first_name}
+🆔 <b>User ID:</b> <code>{user.id}</code>
+
+📋 <b>File Details:</b>
+{details_text}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+🔗 <b>Catbox.moe Link:</b>
+<code>{catbox_url}</code>
+
+🔗 <b>Telegram Link:</b>
+<code>{telegram_url}</code>
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 <b>Your Upload Stats:</b>
+• Total Uploads: {total_uploads}
+• This File: #{total_uploads}
+• Storage: Catbox.moe ☁️
+
+⚡ <b>Download Options:</b>
+1. <b>Catbox Link</b> - Direct download, no expiration
+2. <b>Telegram Link</b> - Works within Telegram
+
+💡 <b>Tips:</b>
+• Catbox links never expire
+• Share with anyone
+• High speed downloads
+━━━━━━━━━━━━━━━━━━━━━━━━
+✅ <i>Upload completed in {time.time() - start_time:.1f}s</i>
+"""
+        
+        # Create keyboard with actions
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🔗 Copy Catbox Link", callback_data=f"copy_catbox_{catbox_url[-10:]}"),
+                InlineKeyboardButton(text="📤 Share", callback_data=f"share_{catbox_url[-10:]}")
+            ],
+            [
+                InlineKeyboardButton(text="📊 View Stats", callback_data="upload_stats"),
+                InlineKeyboardButton(text="🔄 Upload Another", callback_data="upload_another")
+            ]
+        ])
+        
+        await processing_msg.delete()
+        await message.answer(response, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+        
+        print(f"✅ File uploaded by {user.id}: {file_type_display} → {catbox_url}")
+        
+    except Exception as e:
+        await processing_msg.edit_text(
+            f"❌ <b>Error processing file!</b>\n"
+            f"Error: {str(e)}",
+            parse_mode=ParseMode.HTML
+        )
+        print(f"❌ Upload error: {e}")
+
+# ========== /WISH COMMAND ==========
 @dp.message(Command("wish"))
 async def wish_command(message: Message):
     """Wish command with 1-100% success rate"""
     user = message.from_user
-    update_user(user)
     
-    # Get wish text
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
         await message.answer(
-            "✨ <b>Please add your wish!</b>\n\n"
-            "📝 <b>Example:</b>\n"
+            "✨ <b>How to use /wish:</b>\n\n"
             "<code>/wish I will pass my exam</code>\n"
             "<code>/wish I want to be rich</code>\n"
-            "<code>/wish I will find true love</code>",
+            "<code>/wish I will find true love</code>\n\n"
+            "🎯 <i>Be specific for better results!</i>",
             parse_mode=ParseMode.HTML
         )
         return
     
     wish_text = args[1]
     
-    # Send loading animation
-    loading_msg = await message.answer("✨ <b>Gathering cosmic energies...</b> 🌟", 
-                                       parse_mode=ParseMode.HTML)
+    # Animated loading
+    loading_msg = await message.answer("✨ <b>Consulting the cosmic oracle...</b>")
     
-    # Animated loading sequence
-    animations = [
-        "🌠 <b>Consulting the stars...</b> 🌠",
-        "🌟 <b>Reading cosmic vibrations...</b> 🌟", 
-        "⭐ <b>Calculating your destiny...</b> ⭐",
-        "💫 <b>Aligning with the universe...</b> 💫",
-        "✨ <b>Finalizing your fortune...</b> ✨"
-    ]
-    
-    for anim_text in animations:
-        await loading_msg.edit_text(anim_text, parse_mode=ParseMode.HTML)
+    animations = ["🌠", "🌟", "⭐", "💫", "✨", "☄️", "🌌"]
+    for emoji in animations:
+        await loading_msg.edit_text(f"{emoji} <b>Reading your destiny...</b> {emoji}", parse_mode=ParseMode.HTML)
         await asyncio.sleep(0.3)
     
-    # Generate luck percentage (1-100)
+    # Generate luck
     luck = random.randint(1, 100)
-    
-    # Create stars visualization
-    full_stars = luck // 10
-    empty_stars = 10 - full_stars
-    stars = "⭐" * full_stars + "☆" * empty_stars
+    stars = "⭐" * (luck // 10) + "☆" * (10 - (luck // 10))
     
     # Determine result
     if luck >= 90:
         result = "🎊 EXCELLENT! Your wish will definitely come true!"
-        emoji_result = "🎉"
-        advice = "Cosmic alignment perfect! The universe fully supports your wish!"
+        advice = "The universe fully supports you! Take action now!"
     elif luck >= 70:
         result = "😊 VERY GOOD! High chances of success!"
-        emoji_result = "🌟"
-        advice = "Strong positive energy detected! Minor obstacles may appear but you'll overcome them!"
+        advice = "Stay positive and work towards your goal!"
     elif luck >= 50:
         result = "👍 GOOD! Your wish has potential!"
-        emoji_result = "✨"
-        advice = "Balanced energy detected. Outcome depends on your actions and determination!"
+        advice = "Be consistent and patient!"
     elif luck >= 30:
-        result = "🤔 AVERAGE - Might need some extra effort"
-        emoji_result = "💪"
-        advice = "Energy slightly unstable. You'll need to work harder and stay patient!"
+        result = "🤔 AVERAGE - Might need some effort"
+        advice = "Consider refining your approach!"
     elif luck >= 10:
         result = "😟 LOW - Consider making another wish"
-        emoji_result = "🌧️"
-        advice = "The universe suggests revising your approach. Try with different energy!"
+        advice = "The universe suggests trying again later!"
     else:
-        result = "💀 VERY LOW - The universe suggests trying again"
-        emoji_result = "🌀"
-        advice = "Cosmic interference detected. Wait for better timing or refine your wish!"
+        result = "💀 VERY LOW - Cosmic interference detected"
+        advice = "Wait for better timing!"
     
     # Save to database
     conn = sqlite3.connect("data/bot.db")
     cursor = conn.cursor()
-    
-    # Update user's wish stats
-    cursor.execute('SELECT wishes_made, avg_luck FROM users WHERE user_id = ?', (user.id,))
-    user_data = cursor.fetchone()
-    
-    if user_data:
-        old_wishes, old_avg = user_data
-        new_wishes = old_wishes + 1
-        new_avg = ((old_avg * old_wishes) + luck) / new_wishes
-        
-        cursor.execute('''
-            UPDATE users SET 
-            wishes_made = ?,
-            avg_luck = ?,
-            last_active = ?
-            WHERE user_id = ?
-        ''', (new_wishes, new_avg, datetime.now().isoformat(), user.id))
-    else:
-        cursor.execute('''
-            UPDATE users SET 
-            wishes_made = 1,
-            avg_luck = ?,
-            last_active = ?
-            WHERE user_id = ?
-        ''', (luck, datetime.now().isoformat(), user.id))
-    
-    # Save wish
     cursor.execute('''
-        INSERT INTO wishes (user_id, timestamp, wish_text, luck_percentage, stars)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (user.id, datetime.now().isoformat(), wish_text, luck, stars))
-    
+        INSERT INTO wishes (user_id, timestamp, wish_text, luck_percentage, stars, result)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (user.id, datetime.now().isoformat(), wish_text, luck, stars, result))
     conn.commit()
-    
-    # Get updated stats
-    cursor.execute('SELECT wishes_made, avg_luck FROM users WHERE user_id = ?', (user.id,))
-    stats = cursor.fetchone()
     conn.close()
     
-    # Create beautiful response
     response = f"""
-🎯 <b>✨ WISH FORTUNE TELLER ✨</b>
+🎯 <b>✨ WISH FORTUNE ✨</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
 ✨ <b>Your Wish:</b>
 <code>{wish_text}</code>
 
 🎰 <b>Luck Percentage:</b>
-<code>{stars} {luck}%</code>
+{stars} <code>{luck}%</code>
 
 📊 <b>Result:</b>
-{emoji_result} <b>{result}</b>
+{result}
 
 💫 <b>Cosmic Advice:</b>
 {advice}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
-📅 <i>Wished on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</i>
+📅 <i>{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</i>
 🎲 <i>Wish ID: W{random.randint(1000, 9999)}</i>
-"""
-    
-    # Add user stats if available
-    if stats:
-        response += f"""
 ━━━━━━━━━━━━━━━━━━━━━━━━
-📊 <b>Your Wish Statistics:</b>
-• Total Wishes Made: {stats[0]}
-• Average Luck Score: {stats[1]:.1f}%
-• Current Wish: #{stats[0]}
 """
-    
-    # Add random tip
-    tips = [
-        "💡 <i>Tip: Wish with positive energy for better results!</i>",
-        "💡 <i>Tip: Make wishes during full moon for enhanced power!</i>",
-        "💡 <i>Tip: Be specific with your wishes for clearer guidance!</i>",
-        "💡 <i>Tip: Visualize your wish coming true while making it!</i>"
-    ]
-    response += f"\n{random.choice(tips)}"
-    
-    # Create interactive buttons
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="🎯 Make Another Wish", callback_data="new_wish"),
-            InlineKeyboardButton(text="📊 My Stats", callback_data="my_stats")
-        ],
-        [
-            InlineKeyboardButton(text="🌟 Share Result", callback_data=f"share_{luck}"),
-            InlineKeyboardButton(text="📈 Leaderboard", callback_data="leaderboard")
-        ]
-    ])
     
     await loading_msg.delete()
-    await message.answer(response, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-    print(f"✅ Wish processed for user {user.id}: {luck}% luck")
+    await message.answer(response, parse_mode=ParseMode.HTML)
 
-# ========== START COMMAND ==========
-@dp.message(CommandStart())
-async def start_command(message: Message):
-    """Start command with beautiful UI"""
-    user = message.from_user
-    update_user(user)
-    
-    welcome = f"""
-🌟 <b>✨ WELCOME {user.first_name.upper()} ✨</b> 🌟
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-🎯 <b>I'm your Fortune Wish Bot!</b>
-Powered by advanced cosmic algorithms ✨
-
-🚀 <b>Main Features:</b>
-• ✨ <b>/wish</b> - Check wish success rate (1-100%)
-• 🔗 <b>/link</b> - Convert media to shareable links  
-• 📊 <b>/stats</b> - View your wish statistics
-• 🏓 <b>/ping</b> - Check bot status & latency
-• 📚 <b>/help</b> - Show all available commands
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-🎰 <b>Quick Start:</b>
-<code>/wish I will achieve my dreams</code>
-
-🚄 <b>Hosted on Railway</b> | ⚡ <b>Always Online</b>
-🔄 <b>Auto-Healing</b> | 🔒 <b>Never Sleeps</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
-"""
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="✨ Make a Wish", callback_data="make_wish"),
-            InlineKeyboardButton(text="📚 Commands", callback_data="show_help")
-        ],
-        [
-            InlineKeyboardButton(text="📊 Bot Status", callback_data="show_status"),
-            InlineKeyboardButton(text="🌟 Donate", url="https://t.me/donate")
-        ]
-    ])
-    
-    await message.answer(welcome, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-    print(f"✅ User {user.id} started the bot")
-
-# ========== HELP COMMAND ==========
-@dp.message(Command("help"))
-async def help_command(message: Message):
-    """Help command with detailed info"""
-    help_text = f"""
-🤖 <b>✨ FORTUNE WISH BOT ✨</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-🎯 <b>WISH COMMANDS:</b>
-• <code>/wish [your wish]</code> - Check luck percentage (1-100%)
-  <i>Example: /wish I will pass my exam</i>
-  <i>Example: /wish I want financial freedom</i>
-  <i>Example: /wish I will find true love</i>
-
-🛠️ <b>UTILITY COMMANDS:</b>
-• <code>/link</code> - Convert media to shareable links
-  <i>Send a photo/video/audio after this command</i>
-• <code>/ping</code> - Check bot status & latency
-• <code>/stats</code> - View your wish statistics
-• <code>/start</code> - Show welcome message
-• <code>/help</code> - Show this help message
-
-👑 <b>ADMIN COMMANDS:</b>
-• <code>/bcast [message]</code> - Broadcast to all users
-• <code>/botstats</code> - View overall bot statistics
-• <code>/users</code> - List all registered users
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-🚄 <b>HOSTING INFORMATION:</b>
-• Platform: Railway 🚄
-• Status: Always Online ⚡
-• Uptime: {int(time.time() - start_time)} seconds
-• Version: 3.0 Enhanced
-• Features: Never Sleeps, Auto-Scaling
-
-💡 <b>TIPS:</b>
-• Wish with positive energy for better results
-• Be specific with your wishes
-• Try at different times for varied results
-• Share results with friends for fun!
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-📞 <b>Support:</b> Contact @admin for help
-"""
-    
-    await message.answer(help_text, parse_mode=ParseMode.HTML)
-
-# ========== PING COMMAND ==========
+# ========== /PING WITH CATBOX ==========
 @dp.message(Command("ping"))
 async def ping_command(message: Message):
-    """Check bot status with detailed info"""
+    """Ping command with Catbox upload"""
     start_ping = time.time()
-    msg = await message.answer("🏓 <b>Pinging cosmic servers...</b>", parse_mode=ParseMode.HTML)
     
-    # Get database stats
+    # Get bot stats
     conn = sqlite3.connect("data/bot.db")
     cursor = conn.cursor()
     
     cursor.execute("SELECT COUNT(*) FROM users")
     total_users = cursor.fetchone()[0] or 0
     
+    cursor.execute("SELECT COUNT(*) FROM uploads")
+    total_uploads = cursor.fetchone()[0] or 0
+    
     cursor.execute("SELECT COUNT(*) FROM wishes")
     total_wishes = cursor.fetchone()[0] or 0
     
-    cursor.execute("SELECT AVG(luck_percentage) FROM wishes")
-    avg_luck = cursor.fetchone()[0] or 0
-    
-    cursor.execute("SELECT COUNT(*) FROM users WHERE DATE(last_active) = DATE('now')")
-    active_today = cursor.fetchone()[0] or 0
+    cursor.execute("SELECT SUM(file_size) FROM uploads")
+    total_storage = cursor.fetchone()[0] or 0
     
     conn.close()
+    
+    # Create detailed report
+    report = f"""
+╔══════════════════════════════════════════════╗
+║           🤖 BOT STATUS REPORT               ║
+╠══════════════════════════════════════════════╣
+║ 📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+║ 🚄 Host: Railway
+║ 🐍 Python: {sys.version.split()[0]}
+║ 🔧 Version: 6.0 Catbox Edition
+╠══════════════════════════════════════════════╣
+║ 📊 STATISTICS:
+║ • Total Users: {total_users}
+║ • Total Uploads: {total_uploads}
+║ • Total Wishes: {total_wishes}
+║ • Storage Used: {total_storage / (1024*1024):.1f} MB
+║ • Bot Uptime: {int(time.time() - start_time)}s
+╠══════════════════════════════════════════════╣
+║ ⚡ PERFORMANCE:
+║ • Status: {'🟢 ACTIVE' if bot_active else '🔴 PAUSED'}
+║ • Speed Mode: {bot_speed.upper()}
+║ • Platform: Railway
+║ • Memory: Stable
+╠══════════════════════════════════════════════╣
+║ 🌟 FEATURES:
+║ • Catbox.moe Uploads
+║ • Wish Fortune System
+║ • Admin Controls
+║ • Always Online
+╚══════════════════════════════════════════════╝
+    """
+    
+    # Upload to Catbox
+    ping_msg = await message.answer("🏓 <b>Generating status report...</b>", parse_mode=ParseMode.HTML)
+    
+    catbox_result = await upload_to_catbox(
+        report.encode('utf-8'),
+        f"bot_status_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    )
     
     end_ping = time.time()
     latency = round((end_ping - start_ping) * 1000, 2)
     
-    # Get current time in different timezones
-    from datetime import timezone, timedelta
-    now_utc = datetime.now(timezone.utc)
-    now_est = now_utc - timedelta(hours=5)
-    now_ist = now_utc + timedelta(hours=5, minutes=30)
-    
-    response = f"""
-🏓 <b>✨ COSMIC STATUS REPORT ✨</b>
+    if catbox_result['success']:
+        response = f"""
+🏓 <b>✨ PONG! ✨</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
-⚡ <b>Performance:</b>
-• Bot Latency: <code>{latency}ms</code> ⚡
-• Uptime: {int(time.time() - start_time)} seconds
-• Status: 🟢 <b>OPERATIONAL</b>
-• Platform: Railway 🚄
+⚡ <b>Latency:</b> <code>{latency}ms</code>
+🚄 <b>Host:</b> Railway
+🕒 <b>Time:</b> {datetime.now().strftime('%H:%M:%S')}
+
+📊 <b>Quick Stats:</b>
+• Users: {total_users}
+• Uploads: {total_uploads}
+• Wishes: {total_wishes}
+• Storage: {total_storage / (1024*1024):.1f} MB
+
+📄 <b>Detailed Report:</b>
+🔗 <a href="{catbox_result['url']}">View Full Report on Catbox</a>
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+✅ <i>All systems operational!</i>
+"""
+    else:
+        response = f"""
+🏓 <b>✨ PONG! ✨</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ <b>Latency:</b> <code>{latency}ms</code>
+🚄 <b>Host:</b> Railway
 
 📊 <b>Statistics:</b>
-• Total Users: {total_users} 👥
-• Total Wishes: {total_wishes} 🌟
-• Average Luck: {avg_luck:.1f}% 🎰
-• Active Today: {active_today} 📈
+• Total Users: {total_users}
+• Total Uploads: {total_uploads}
+• Total Wishes: {total_wishes}
 
-🌐 <b>Time Zones:</b>
-• UTC: {now_utc.strftime('%H:%M:%S')}
-• EST: {now_est.strftime('%H:%M:%S')}
-• IST: {now_ist.strftime('%H:%M:%S')}
+❌ <i>Catbox upload failed, showing text report:</i>
 
-✅ <b>All Systems:</b> 🟢 OPERATIONAL
-🔧 <b>Version:</b> 3.0 Enhanced
-📅 <b>Date:</b> {datetime.now().strftime('%Y-%m-%d')}
-━━━━━━━━━━━━━━━━━━━━━━━━
-💬 <i>"The universe is responding perfectly!"</i>
+{report[:1500]}...
 """
     
-    await msg.edit_text(response, parse_mode=ParseMode.HTML)
+    await ping_msg.edit_text(response, parse_mode=ParseMode.HTML)
 
-# ========== LINK COMMAND ==========
-@dp.message(Command("link"))
-async def link_command(message: Message):
-    """Convert media to links"""
-    user = message.from_user
-    update_user(user)
+# ========== /PRO COMMAND ==========
+@dp.message(Command("pro"))
+async def pro_command(message: Message):
+    """Give admin rights to user"""
+    if message.from_user.id != OWNER_ID:
+        await message.answer("🚫 <b>Owner only command!</b>", parse_mode=ParseMode.HTML)
+        return
     
-    # Check if media is attached
-    if not (message.photo or message.video or message.audio or message.document):
+    args = message.text.split()
+    if len(args) < 2 or not args[1].isdigit():
         await message.answer(
-            "📸 <b>How to use /link command:</b>\n\n"
-            "1. Type <code>/link</code>\n"
-            "2. Send a photo, video, audio, or document\n"
-            "3. Get a shareable link instantly!\n\n"
-            "💡 <i>The link will work for anyone, even if they haven't started the bot!</i>",
+            "👑 <b>Usage:</b> <code>/pro user_id</code>\n\n"
+            "💡 <i>Gives admin rights to the user</i>",
             parse_mode=ParseMode.HTML
         )
         return
     
-    # Get file info
-    if message.photo:
-        file_id = message.photo[-1].file_id
-        file_type = "📸 Photo"
-        emoji = "🖼️"
-    elif message.video:
-        file_id = message.video.file_id
-        file_type = "🎥 Video"
-        emoji = "📹"
-    elif message.audio:
-        file_id = message.audio.file_id
-        file_type = "🎵 Audio"
-        emoji = "🎧"
-    elif message.document:
-        file_id = message.document.file_id
-        file_type = "📄 Document"
-        emoji = "📎"
-    else:
-        file_id = None
-        file_type = "File"
-        emoji = "📁"
-    
-    if file_id:
-        bot_info = await bot.get_me()
-        link = f"https://t.me/{bot_info.username}?start=file_{file_id}"
-        
-        response = f"""
-🔗 <b>✨ MEDIA LINK GENERATED ✨</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-{emoji} <b>Type:</b> {file_type}
-👤 <b>Uploaded by:</b> {user.first_name}
-🕒 <b>Time:</b> {datetime.now().strftime('%H:%M:%S')}
-
-🔗 <b>Shareable Link:</b>
-<code>{link}</code>
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-💡 <b>How to use:</b>
-1. Copy the link above
-2. Share with anyone on Telegram
-3. They can download it instantly!
-4. No need to start the bot first
-
-⚠️ <b>Note:</b> Links expire after 48 hours
-📊 <b>Storage:</b> Secure Telegram servers
-━━━━━━━━━━━━━━━━━━━━━━━━
-✅ <i>Link generated successfully!</i>
-"""
-        
-        await message.answer(response, parse_mode=ParseMode.HTML)
-        print(f"✅ Link generated for user {user.id}: {file_type}")
-    else:
-        await message.answer("❌ <b>Failed to generate link. Please try again.</b>", 
-                           parse_mode=ParseMode.HTML)
-
-# ========== STATS COMMAND ==========
-@dp.message(Command("stats"))
-async def stats_command(message: Message):
-    """Show user's wish statistics"""
-    user = message.from_user
+    user_id = int(args[1])
     
     conn = sqlite3.connect("data/bot.db")
     cursor = conn.cursor()
+    cursor.execute('UPDATE users SET is_admin = 1 WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
     
-    cursor.execute('''
-        SELECT wishes_made, avg_luck, joined_date 
-        FROM users WHERE user_id = ?
-    ''', (user.id,))
+    await message.answer(f"✅ <b>User {user_id} is now an admin!</b>", parse_mode=ParseMode.HTML)
+
+# ========== /TOGGLE COMMAND ==========
+@dp.message(Command("toggle"))
+async def toggle_command(message: Message):
+    """Toggle bot speed"""
+    global bot_speed
     
-    user_data = cursor.fetchone()
+    if message.from_user.id != OWNER_ID:
+        await message.answer("🚫 <b>Owner only!</b>", parse_mode=ParseMode.HTML)
+        return
     
-    if not user_data:
+    bot_speed = "slow" if bot_speed == "normal" else "normal"
+    await message.answer(f"⚡ <b>Bot speed set to: {bot_speed.upper()}</b>", parse_mode=ParseMode.HTML)
+
+# ========== CRITICAL OWNER COMMANDS ==========
+@dp.message(Command("emergency_stop"))
+async def emergency_stop(message: Message):
+    """Emergency stop bot"""
+    if message.from_user.id != OWNER_ID:
+        return
+    
+    global bot_active
+    bot_active = False
+    await message.answer("🛑 <b>BOT EMERGENCY STOPPED!</b>", parse_mode=ParseMode.HTML)
+
+@dp.message(Command("restart"))
+async def restart_command(message: Message):
+    """Restart bot functionality"""
+    if message.from_user.id != OWNER_ID:
+        return
+    
+    global bot_active, start_time
+    bot_active = True
+    start_time = time.time()
+    await message.answer("🔄 <b>Bot restarted successfully!</b>", parse_mode=ParseMode.HTML)
+
+@dp.message(Command("wipe"))
+async def wipe_command(message: Message):
+    """Wipe all data (DANGEROUS)"""
+    if message.from_user.id != OWNER_ID:
+        return
+    
+    args = message.text.split()
+    if len(args) < 2 or args[1] != "CONFIRM":
         await message.answer(
-            "📊 <b>You haven't made any wishes yet!</b>\n\n"
-            "Start by typing:\n"
-            "<code>/wish I will be successful</code>",
+            "⚠️ <b>DANGER: This will delete ALL data!</b>\n\n"
+            "To confirm, type:\n"
+            "<code>/wipe CONFIRM</code>",
             parse_mode=ParseMode.HTML
         )
         return
     
-    wishes_made, avg_luck, joined_date = user_data
+    # Backup first
+    import shutil
+    shutil.copy2("data/bot.db", f"data/bot_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db")
     
-    # Get recent wishes
-    cursor.execute('''
-        SELECT luck_percentage, timestamp 
-        FROM wishes 
-        WHERE user_id = ? 
-        ORDER BY timestamp DESC 
-        LIMIT 5
-    ''', (user.id,))
+    # Recreate database
+    init_db()
     
-    recent_wishes = cursor.fetchall()
-    
-    # Get best and worst wishes
-    cursor.execute('''
-        SELECT MAX(luck_percentage), MIN(luck_percentage) 
-        FROM wishes WHERE user_id = ?
-    ''', (user.id,))
-    
-    best_worst = cursor.fetchone()
-    best_luck = best_worst[0] or 0
-    worst_luck = best_worst[1] or 0
-    
-    conn.close()
-    
-    # Calculate days since joining
-    from datetime import datetime as dt
-    join_date = dt.fromisoformat(joined_date)
-    days_since = (dt.now() - join_date).days
-    
-    response = f"""
-📊 <b>✨ YOUR WISH STATISTICS ✨</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
+    await message.answer("🧹 <b>All data wiped! Fresh start.</b>", parse_mode=ParseMode.HTML)
 
-👤 <b>User:</b> {user.first_name}
-🆔 <b>ID:</b> <code>{user.id}</code>
-📅 <b>Joined:</b> {join_date.strftime('%Y-%m-%d')}
-⏳ <b>Days active:</b> {days_since} days
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-🌟 <b>Wish Overview:</b>
-• Total Wishes Made: {wishes_made} ✨
-• Average Luck Score: {avg_luck:.1f}% 🎰
-• Best Wish Ever: {best_luck}% 🏆
-• Worst Wish Ever: {worst_luck}% 📉
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-📈 <b>Recent Wishes:</b>
-"""
-    
-    for i, (luck, timestamp) in enumerate(recent_wishes, 1):
-        wish_time = dt.fromisoformat(timestamp).strftime('%H:%M')
-        stars = "⭐" * (luck // 10) + "☆" * (10 - (luck // 10))
-        response += f"{i}. {stars} {luck}% ({wish_time})\n"
-    
-    # Add ranking
-    if avg_luck >= 80:
-        rank = "🎖️ Cosmic Master"
-    elif avg_luck >= 60:
-        rank = "🌟 Star Aligner"
-    elif avg_luck >= 40:
-        rank = "✨ Wish Maker"
-    elif avg_luck >= 20:
-        rank = "🌙 Dreamer"
-    else:
-        rank = "☁️ Beginner"
-    
-    response += f"""
-━━━━━━━━━━━━━━━━━━━━━━━━
-🏆 <b>Your Rank:</b> {rank}
-💡 <b>Tip:</b> Wish regularly to improve your average!
-━━━━━━━━━━━━━━━━━━━━━━━━
-"""
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="🎯 Make New Wish", callback_data="new_wish"),
-            InlineKeyboardButton(text="📈 View All", callback_data="view_all_wishes")
-        ]
-    ])
-    
-    await message.answer(response, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-
-# ========== ADMIN COMMANDS ==========
-@dp.message(Command("bcast"))
+@dp.message(Command("broadcast"))
 async def broadcast_command(message: Message):
-    """Broadcast message to all users (Admin only)"""
+    """Broadcast to all users"""
     if message.from_user.id != OWNER_ID:
-        await message.answer("🚫 <b>This command is for admin only!</b>", parse_mode=ParseMode.HTML)
         return
     
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
-        await message.answer(
-            "📢 <b>Usage:</b> <code>/bcast your message here</code>\n\n"
-            "💡 <i>This will send to all registered users</i>",
-            parse_mode=ParseMode.HTML
-        )
+        await message.answer("📢 <b>Usage:</b> <code>/broadcast message</code>", parse_mode=ParseMode.HTML)
         return
     
     broadcast_msg = args[1]
-    
     conn = sqlite3.connect("data/bot.db")
     cursor = conn.cursor()
     cursor.execute("SELECT user_id FROM users")
@@ -628,228 +741,171 @@ async def broadcast_command(message: Message):
     conn.close()
     
     total = len(users)
-    if total == 0:
-        await message.answer("❌ <b>No users found in database!</b>", parse_mode=ParseMode.HTML)
-        return
-    
-    status_msg = await message.answer(
-        f"📢 <b>Starting broadcast to {total} users...</b>\n"
-        f"✅ Sent: 0/{total}\n"
-        f"⏳ Estimated time: {total * 0.1:.1f} seconds",
-        parse_mode=ParseMode.HTML
-    )
-    
     success = 0
-    failed = 0
     
-    for i, (user_id,) in enumerate(users, 1):
+    status = await message.answer(f"📢 Broadcasting to {total} users...")
+    
+    for user_id, in users:
         try:
             await bot.send_message(
                 user_id,
-                f"📢 <b>ANNOUNCEMENT</b>\n\n"
-                f"{broadcast_msg}\n\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💬 <i>This is a broadcast message from admin</i>\n"
-                f"🕒 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                f"📢 <b>BROADCAST</b>\n\n{broadcast_msg}",
                 parse_mode=ParseMode.HTML
             )
             success += 1
-            
-            # Update status every 10 messages
-            if i % 10 == 0 or i == total:
-                await status_msg.edit_text(
-                    f"📢 <b>Broadcasting...</b>\n"
-                    f"✅ Sent: {i}/{total}\n"
-                    f"🎯 Success: {success} | ❌ Failed: {failed}",
-                    parse_mode=ParseMode.HTML
-                )
-            
-        except Exception as e:
-            failed += 1
-            print(f"Failed to send to user {user_id}: {e}")
+        except:
+            pass
         
-        # Rate limiting to avoid flood
+        if success % 10 == 0:
+            await status.edit_text(f"📢 Sent: {success}/{total}")
         await asyncio.sleep(0.1)
     
-    final_msg = (
-        f"✅ <b>BROADCAST COMPLETE!</b>\n\n"
-        f"📊 <b>Statistics:</b>\n"
-        f"• Total Users: {total}\n"
-        f"• Successfully Sent: {success} ✅\n"
-        f"• Failed: {failed} ❌\n"
-        f"• Success Rate: {(success/total*100):.1f}%\n\n"
-        f"⏱️ <i>Completed in {(total * 0.1):.1f} seconds</i>"
-    )
-    
-    await status_msg.edit_text(final_msg, parse_mode=ParseMode.HTML)
+    await status.edit_text(f"✅ Broadcast complete! Sent to {success}/{total} users")
 
-@dp.message(Command("botstats"))
-async def botstats_command(message: Message):
-    """Show overall bot statistics (Admin only)"""
+@dp.message(Command("stats"))
+async def stats_command(message: Message):
+    """Detailed bot statistics"""
     if message.from_user.id != OWNER_ID:
-        await message.answer("🚫 <b>Admin only command!</b>", parse_mode=ParseMode.HTML)
         return
     
     conn = sqlite3.connect("data/bot.db")
     cursor = conn.cursor()
     
-    # Get all stats
     cursor.execute("SELECT COUNT(*) FROM users")
-    total_users = cursor.fetchone()[0] or 0
+    users = cursor.fetchone()[0] or 0
+    
+    cursor.execute("SELECT COUNT(*) FROM uploads")
+    uploads = cursor.fetchone()[0] or 0
     
     cursor.execute("SELECT COUNT(*) FROM wishes")
-    total_wishes = cursor.fetchone()[0] or 0
+    wishes = cursor.fetchone()[0] or 0
     
-    cursor.execute("SELECT AVG(luck_percentage) FROM wishes")
-    avg_luck = cursor.fetchone()[0] or 0
+    cursor.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1")
+    admins = cursor.fetchone()[0] or 0
     
     cursor.execute("SELECT COUNT(*) FROM users WHERE DATE(last_active) = DATE('now')")
     active_today = cursor.fetchone()[0] or 0
     
-    cursor.execute("SELECT COUNT(*) FROM users WHERE DATE(joined_date) = DATE('now')")
-    new_today = cursor.fetchone()[0] or 0
-    
-    cursor.execute('''
-        SELECT strftime('%Y-%m-%d', timestamp), COUNT(*) 
-        FROM wishes 
-        GROUP BY strftime('%Y-%m-%d', timestamp) 
-        ORDER BY COUNT(*) DESC 
-        LIMIT 1
-    ''')
-    busiest_day = cursor.fetchone() or ("None", 0)
-    
-    cursor.execute("SELECT MAX(luck_percentage) FROM wishes")
-    highest_luck = cursor.fetchone()[0] or 0
-    
-    cursor.execute("SELECT MIN(luck_percentage) FROM wishes")
-    lowest_luck = cursor.fetchone()[0] or 0
-    
     conn.close()
     
     response = f"""
-📊 <b>✨ BOT STATISTICS DASHBOARD ✨</b>
+📊 <b>BOT STATISTICS</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
-👥 <b>User Statistics:</b>
-• Total Registered Users: {total_users}
-• Active Today: {active_today}
-• New Users Today: {new_today}
-• Growth Rate: {((new_today/total_users*100) if total_users > 0 else 0):.1f}%
+👥 <b>Users:</b> {users}
+📈 <b>Active Today:</b> {active_today}
+👑 <b>Admins:</b> {admins}
 
-🌟 <b>Wish Statistics:</b>
-• Total Wishes Made: {total_wishes}
-• Average Luck Score: {avg_luck:.1f}%
-• Highest Luck Ever: {highest_luck}% 🏆
-• Lowest Luck Ever: {lowest_luck}% 📉
+📁 <b>Uploads:</b> {uploads}
+🌟 <b>Wishes:</b> {wishes}
 
-📈 <b>Performance:</b>
-• Busiest Day: {busiest_day[0]} ({busiest_day[1]} wishes)
-• Wishes per User: {(total_wishes/total_users if total_users > 0 else 0):.1f}
-• Bot Uptime: {int(time.time() - start_time)} seconds
+⚡ <b>Performance:</b>
+• Uptime: {int(time.time() - start_time)}s
+• Speed: {bot_speed.upper()}
+• Status: {'🟢 ACTIVE' if bot_active else '🔴 PAUSED'}
 
-💾 <b>System Info:</b>
-• Platform: Railway 🚄
-• Status: 🟢 OPERATIONAL
-• Version: 3.0 Enhanced
-• Database: SQLite (bot.db)
-
+🚄 <b>Host:</b> Railway
+🔧 <b>Version:</b> 6.0
 ━━━━━━━━━━━━━━━━━━━━━━━━
-📅 <i>Report generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</i>
 """
     
     await message.answer(response, parse_mode=ParseMode.HTML)
 
-# ========== CALLBACK HANDLERS ==========
-@dp.callback_query(lambda c: c.data == "new_wish")
-async def new_wish_callback(callback_query: types.CallbackQuery):
-    """Handle new wish button"""
-    await callback_query.message.answer(
-        "🎯 <b>What would you like to wish for?</b>\n\n"
-        "Type your wish after /wish command:\n"
-        "<code>/wish I will achieve my goals</code>\n"
-        "<code>/wish I want good health</code>\n"
-        "<code>/wish I will find happiness</code>",
-        parse_mode=ParseMode.HTML
-    )
-    await callback_query.answer()
+# ========== START COMMAND ==========
+@dp.message(CommandStart())
+async def start_command(message: Message):
+    """Start command"""
+    user = message.from_user
+    
+    welcome = f"""
+🌟 <b>Welcome {user.first_name}!</b> 🌟
 
-@dp.callback_query(lambda c: c.data == "make_wish")
-async def make_wish_callback(callback_query: types.CallbackQuery):
-    """Handle make wish button from start"""
-    await new_wish_callback(callback_query)
+🤖 <b>ULTIMATE MEDIA BOT</b>
+Version 6.0 | Catbox.moe Edition
 
-@dp.callback_query(lambda c: c.data == "show_help")
-async def show_help_callback(callback_query: types.CallbackQuery):
-    """Handle help button"""
-    await help_command(callback_query.message)
-    await callback_query.answer()
+🚀 <b>Features:</b>
+• Upload any file to Catbox.moe
+• Wish fortune teller (1-100%)
+• Admin controls
+• Always online
 
-@dp.callback_query(lambda c: c.data == "show_status")
-async def show_status_callback(callback_query: types.CallbackQuery):
-    """Handle status button"""
-    await ping_command(callback_query.message)
-    await callback_query.answer()
+🎯 <b>Commands:</b>
+• /link - Upload files to Catbox
+• /wish - Check luck percentage
+• /help - Show all commands
 
-@dp.callback_query(lambda c: c.data.startswith("share_"))
-async def share_callback(callback_query: types.CallbackQuery):
-    """Handle share button"""
-    luck = callback_query.data.split("_")[1]
-    await callback_query.answer(
-        f"✨ Your {luck}% luck result is ready to share!",
-        show_alert=True
-    )
+💡 <b>Quick Start:</b>
+1. Send a file with /link
+2. Get Catbox download link
+3. Share with anyone!
 
-# ========== KEEP-ALIVE TASK ==========
+🚄 <b>Hosted on Railway</b>
+⚡ Always Online | 🔒 Secure
+"""
+    
+    await message.answer(welcome, parse_mode=ParseMode.HTML)
+
+# ========== HELP COMMAND ==========
+@dp.message(Command("help"))
+async def help_command(message: Message):
+    """Help command"""
+    help_text = """
+📚 <b>BOT COMMANDS</b>
+
+🔗 <b>Media Commands:</b>
+/link - Upload any file to Catbox.moe
+  <i>Send a file after this command</i>
+
+🌟 <b>Wish Commands:</b>
+/wish [your wish] - Check luck (1-100%)
+  <i>Example: /wish I will be successful</i>
+
+👑 <b>Owner Commands:</b>
+/pro [user_id] - Make someone admin
+/toggle - Toggle bot speed
+/broadcast - Send message to all users
+/stats - View bot statistics
+/restart - Restart bot
+/emergency_stop - Stop bot
+/wipe - Delete all data (dangerous)
+
+🛠️ <b>Utility Commands:</b>
+/ping - Check bot status with Catbox
+/start - Show welcome message
+/help - Show this help
+
+🚄 <b>Powered by:</b>
+• Catbox.moe for file hosting
+• Railway for 24/7 hosting
+• Python + aiogram
+"""
+    
+    await message.answer(help_text, parse_mode=ParseMode.HTML)
+
+# ========== KEEP-ALIVE ==========
 async def keep_alive():
-    """Send periodic pings to keep Railway alive"""
+    """Keep Railway from sleeping"""
     while True:
-        await asyncio.sleep(60)  # Ping every minute
-        print(f"🕒 Keep-alive ping at {datetime.now().strftime('%H:%M:%S')}")
+        await asyncio.sleep(300)  # 5 minutes
+        print(f"💓 Keep-alive at {datetime.now().strftime('%H:%M:%S')}")
 
 # ========== MAIN ==========
 async def main():
-    """Main function to run the bot"""
+    """Main function"""
     print("🚀 Starting bot with polling...")
     
-    # Start keep-alive task
+    # Start keep-alive
     asyncio.create_task(keep_alive())
     
-    # Send startup notification
-    try:
-        await bot.send_message(
-            OWNER_ID,
-            f"🚀 <b>Bot Started Successfully!</b>\n\n"
-            f"🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"🚄 Host: Railway (Polling Mode)\n"
-            f"✨ Version: 3.0 Enhanced\n"
-            f"🎯 Features: Wish System, Media Links, Stats\n"
-            f"⚡ Status: Polling active\n"
-            f"📊 Ready to receive commands!",
-            parse_mode=ParseMode.HTML
-        )
-        print("✅ Startup notification sent to owner")
-    except Exception as e:
-        print(f"⚠️ Could not send startup notification: {e}")
-    
     # Start polling
-    print("🔄 Starting polling...")
-    print("✅ Bot is now running! Press Ctrl+C to stop")
-    print("=" * 50)
-    
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    logging.basicConfig(level=logging.INFO)
     
-    # Run the bot
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n🛑 Bot stopped by user")
+        print("\n🛑 Bot stopped")
     except Exception as e:
         print(f"❌ Bot crashed: {e}")
-        raise
