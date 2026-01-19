@@ -218,7 +218,7 @@ async def start_cmd(message: Message):
     )
     log_command(message.from_user.id, message.chat.type, "start")
 
-# ========== /HELP ==========
+# ========== /HELP - FIXED ==========
 @dp.message(Command("help"))
 async def help_cmd(message: Message):
     update_user(message.from_user)
@@ -244,7 +244,7 @@ async def help_cmd(message: Message):
 👑 <b>Admin:</b>
 <code>/ping</code> - System status
 <code>/logs [days]</code> - View logs (.txt)
-<code>/stats</b> - Statistics with dead users/groups
+<code>/stats</code> - Statistics with dead users/groups
 <code>/users</code> - User list (.txt)
 
 ⚡ <b>Owner:</b>
@@ -545,7 +545,7 @@ async def ping_cmd(message: Message):
     )
     log_command(message.from_user.id, message.chat.type, "ping")
 
-# ========== /LOGS - FIXED SQL ==========
+# ========== /LOGS ==========
 @dp.message(Command("logs"))
 async def logs_cmd(message: Message):
     if not await is_admin(message.from_user.id):
@@ -564,12 +564,12 @@ async def logs_cmd(message: Message):
     # Calculate date threshold
     threshold_date = (datetime.now() - timedelta(days=days)).isoformat()
     
-    # Get command logs - FIXED SQL
+    # Get command logs
     c.execute("SELECT timestamp, user_id, chat_type, command, success FROM command_logs WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 500", 
               (threshold_date,))
     cmd_logs = c.fetchall()
     
-    # Get error logs - FIXED SQL
+    # Get error logs
     c.execute("SELECT timestamp, user_id, command, error FROM error_logs WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 200", 
               (threshold_date,))
     err_logs = c.fetchall()
@@ -620,7 +620,7 @@ async def logs_cmd(message: Message):
     
     log_command(message.from_user.id, message.chat.type, f"logs {days}")
 
-# ========== /STATS - UPDATED ==========
+# ========== /STATS ==========
 @dp.message(Command("stats"))
 async def stats_cmd(message: Message):
     if not await is_admin(message.from_user.id):
