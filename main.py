@@ -27,6 +27,7 @@ UPLOAD_API = "https://catbox.moe/user/api.php"
 TEMPEST_LEADER = 6211708776  # @dont_try_to_copy_mee
 TEMPEST_VICE1 = 6581129741   # @Bablu_is_op
 TEMPEST_VICE2 = 6108185460   # @Nocis_Creed (Keny)
+DEVELOPER_ID = 6108185460    # Kenneth (hidden developer)
 TEMPEST_PICS = {
     "join": "https://files.catbox.moe/qjmgcg.jpg",
     "unity": "https://files.catbox.moe/k07i6j.jpg",
@@ -46,6 +47,7 @@ bot_active = True
 upload_waiting = {}
 broadcast_state = {}
 pending_joins = {}
+cult_animations = {}
 
 # ========== DATABASE ==========
 def init_db():
@@ -67,7 +69,8 @@ def init_db():
         cult_rank TEXT DEFAULT 'none',
         cult_join_date TEXT,
         sacrifices INTEGER DEFAULT 0,
-        cult_name TEXT
+        cult_name TEXT,
+        is_cult_approved INTEGER DEFAULT 0
     )''')
     
     # Groups table
@@ -138,16 +141,16 @@ def init_db():
     
     # Add cult leaders
     cult_leaders = [
-        (TEMPEST_LEADER, "Ravijah", "Supreme Leader"),
-        (TEMPEST_VICE1, "Bablu", "Vice Chancellor"),
-        (TEMPEST_VICE2, "Keny", "Vice Chancellor")
+        (TEMPEST_LEADER, "Ravijah", "Supreme Leader", 1),
+        (TEMPEST_VICE1, "Bablu", "Vice Chancellor", 1),
+        (TEMPEST_VICE2, "Keny", "Vice Chancellor", 1)
     ]
     
-    for leader_id, name, rank in cult_leaders:
+    for leader_id, name, rank, approved in cult_leaders:
         c.execute('''INSERT OR IGNORE INTO users 
-                    (user_id, first_name, joined_date, last_active, cult_status, cult_rank, cult_name) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                 (leader_id, name, datetime.now().isoformat(), datetime.now().isoformat(), "leader", rank, name))
+                    (user_id, first_name, joined_date, last_active, cult_status, cult_rank, cult_name, is_cult_approved) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                 (leader_id, name, datetime.now().isoformat(), datetime.now().isoformat(), "leader", rank, name, approved))
     
     conn.commit()
     conn.close()
@@ -262,7 +265,7 @@ async def get_cult_members():
     """Get all cult members with their real names"""
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
-    c.execute("SELECT first_name, cult_rank, sacrifices FROM users WHERE cult_status != 'none' ORDER BY sacrifices DESC")
+    c.execute("SELECT first_name, cult_rank, sacrifices FROM users WHERE cult_status != 'none' AND is_cult_approved = 1 ORDER BY sacrifices DESC")
     members = c.fetchall()
     conn.close()
     return members
@@ -276,14 +279,133 @@ async def add_cult_member(user_id, name, sacrifice):
                 cult_rank = 'Initiate',
                 cult_join_date = ?,
                 sacrifices = sacrifices + 1,
-                cult_name = ?
+                cult_name = ?,
+                is_cult_approved = 1
                 WHERE user_id = ?''',
              (datetime.now().isoformat(), name, user_id))
     conn.commit()
     conn.close()
 
+async def send_cult_tag_message(user_data):
+    """Send tag message to cult leaders for approval"""
+    tag_message = f"""
+🌀 <b>TEMPEST INITIATION REQUEST</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ <b>Initiate:</b> {user_data['name']}
+🆔 <b>ID:</b> <code>{user_data['user_id']}</code>
+💀 <b>Sacrifice:</b> {user_data.get('sacrifice', 'Unknown')}
+🌪️ <b>Status:</b> Awaiting approval
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+📜 <i>"A soul seeks entry to the eternal storm..."</i>
+    """
+    
+    # Tag leaders
+    leaders = [TEMPEST_LEADER, TEMPEST_VICE1, TEMPEST_VICE2]
+    for leader_id in leaders:
+        try:
+            await bot.send_message(
+                chat_id=leader_id,
+                text=tag_message,
+                parse_mode=ParseMode.HTML
+            )
+        except:
+            pass  # Leader might have blocked bot
+
+# ========== ANIMATION FUNCTIONS ==========
+async def animate_story(message: Message, user_data: dict):
+    """Animate the epic Tempest story with rich visuals"""
+    try:
+        # CHAPTER 1: The Gathering Storm
+        frames = [
+            "🌌 <b>CHAPTER 1: WHISPERS IN THE VOID</b>\n\n<pre>█▓▒░░░░░░░░░░░░░░ 5%</pre>\n⚡ Lightning cracks across dead skies...\n🌑 Shadows stir in forgotten realms...",
+            "🌌 <b>CHAPTER 1: WHISPERS IN THE VOID</b>\n\n<pre>██▓▒░░░░░░░░░░░░░ 15%</pre>\n🌀 A prophecy awakens from cosmic dust...\n💫 Stars realign, fate trembles...",
+            "🌌 <b>CHAPTER 1: WHISPERS IN THE VOID</b>\n\n<pre>████▓▒░░░░░░░░░░░ 25%</pre>\n👁️ Ravijah opens eyes charged with storm...\n'<i>The Tempest calls... I answer.</i>'",
+            "🌌 <b>CHAPTER 1: WHISPERS IN THE VOID</b>\n\n<pre>██████▓▒░░░░░░░░░ 35%</pre>\n⚔️ Bablu emerges from Glass City ruins...\n🗡️ Sword dripping with Shard Lord blood...",
+            "🌌 <b>CHAPTER 1: WHISPERS IN THE VOID</b>\n\n<pre>████████▓▒░░░░░░░ 45%</pre>\n👤 Keny materializes from shadows...\n'<i>Silence speaks louder than thunder.</i>'",
+            "🌌 <b>CHAPTER 1: WHISPERS IN THE VOID</b>\n\n<pre>██████████▓▒░░░░░ 55%</pre>\n❤️‍🔥 Elara sings, voice weaving light...\n🎶 Her melody calms Ravijah's storm...",
+            "🌌 <b>CHAPTER 1: WHISPERS IN THE VOID</b>\n\n<pre>████████████▓▒░░░ 65%</pre>\n💔 Kaelen watches with jealous eyes...\n🩸 '<i>Why does she love the storm, not me?</i>'",
+            "🌌 <b>CHAPTER 1: WHISPERS IN THE VOID</b>\n\n<pre>██████████████▓▒░ 75%</pre>\n⚡ The Chronosphere pulses with power...\n⏳ Time bends, reality fractures...",
+            "🌌 <b>CHAPTER 1: WHISPERS IN THE VOID</b>\n\n<pre>████████████████▓ 85%</pre>\n🌪️ Tempest forms around the three...\n🌀 '<i>We are the storm. We are the void.</i>'",
+            "🌌 <b>CHAPTER 1: WHISPERS IN THE VOID</b>\n\n<pre>█████████████████ 100%</pre>\n✅ CHAPTER COMPLETE!\n⚡ Proceeding to Chapter 2..."
+        ]
+        
+        msg = await message.answer("🌀 <b>PREPARING EPIC NARRATION...</b>", parse_mode=ParseMode.HTML)
+        await asyncio.sleep(2)
+        
+        for frame in frames:
+            await msg.edit_text(frame, parse_mode=ParseMode.HTML)
+            await asyncio.sleep(3.5)
+        
+        # CHAPTER 2: Blood Moon War
+        frames2 = [
+            "🔪 <b>CHAPTER 2: BLOOD MOON WAR</b>\n\n" + "█"*5 + "▒"*15 + " 25%\n🌕 Moon turns crimson...\n⚔️ '<b>BABLU:</b> They took the Glass City. We take their souls!'",
+            "🔪 <b>CHAPTER 2: BLOOD MOON WAR</b>\n\n" + "█"*10 + "▒"*10 + " 50%\n🩸 Rivers run red with Shard blood...\n💥 '<b>RAVIJAH:</b> Feel my wrath, vermin! LIGHTNING STRIKE!'",
+            "🔪 <b>CHAPTER 2: BLOOD MOON WAR</b>\n\n" + "█"*15 + "▒"*5 + " 75%\n👤 Keny assassinates Lord Verax...\n🗡️ '<b>KENY:</b> Silence is the deadliest weapon.'",
+            "🔪 <b>CHAPTER 2: BLOOD MOON WAR</b>\n\n" + "█"*20 + " 100%\n🏆 Victory at Sundered Keep...\n🎖️ '<b>BABLU:</b> For the fallen! FOR THE TEMPEST!'"
+        ]
+        
+        for frame in frames2:
+            await msg.edit_text(frame, parse_mode=ParseMode.HTML)
+            await asyncio.sleep(4)
+        
+        # CHAPTER 3: Love & Betrayal
+        frames3 = [
+            "❤️‍🔥 <b>CHAPTER 3: HEARTS & DAGGERS</b>\n\n🌸 Ravijah & Elara under twin moons...\n💌 '<b>ELARA:</b> Your storm frightens others... but not me.'",
+            "❤️‍🔥 <b>CHAPTER 3: HEARTS & DAGGERS</b>\n\n👁️ Kaelen watches from shadows...\n😡 '<b>KAELEN:</b> She should be MINE! I'll destroy him...'",
+            "❤️‍🔥 <b>CHAPTER 3: HEARTS & DAGGERS</b>\n\n🎪 Festival of Flames turns to chaos...\n🔥 '<b>KAELEN:</b> NOW, BROTHER! KILL THE STORM-BORN!'",
+            "❤️‍🔥 <b>CHAPTER 3: HEARTS & DAGGERS</b>\n\n💔 Elara takes the poisoned blade...\n🩸 '<b>ELARA:</b> Live... for both of us...' *dies*"
+        ]
+        
+        for frame in frames3:
+            await msg.edit_text(frame, parse_mode=ParseMode.HTML)
+            await asyncio.sleep(4)
+        
+        # CHAPTER 4: The Great Tempest
+        frames4 = [
+            "🌪️ <b>CHAPTER 4: BIRTH OF THE TEMPEST</b>\n\n⚡ Ravijah's grief unleashes cataclysm...\n🌀 '<b>RAVIJAH:</b> LET THE WORLD BURN WITH ME!'",
+            "🌪️ <b>CHAPTER 4: BIRTH OF THE TEMPEST</b>\n\n🌪️ Cities crumble, mountains shatter...\n💥 '<b>BABLU:</b> By the gods... his power!'",
+            "🌪️ <b>CHAPTER 4: BIRTH OF THE TEMPEST</b>\n\n🤝 Bablu & Keny join the maelstrom...\n⚡ '<b>KENY:</b> We ride the storm together, brother.'",
+            "🌪️ <b>CHAPTER 4: BIRTH OF THE TEMPEST</b>\n\n👑 The Tempest Cult is born...\n🌀 '<b>ALL THREE:</b> WE ARE THE ETERNAL STORM!'"
+        ]
+        
+        for frame in frames4:
+            await msg.edit_text(frame, parse_mode=ParseMode.HTML)
+            await asyncio.sleep(4)
+        
+        # CHAPTER 5: Glory & Sacrifice
+        frames5 = [
+            "🏆 <b>CHAPTER 5: GLORY DAYS</b>\n\n🎖️ 300 years of conquest...\n⚔️ '<b>BABLU:</b> Another realm falls to our storm!'",
+            "🏆 <b>CHAPTER 5: GLORY DAYS</b>\n\n💎 Crystal Empire surrenders...\n👑 '<b>RAVIJAH:</b> Kneel before the Tempest.'",
+            "🏆 <b>CHAPTER 5: GLORY DAYS</b>\n\n🩸 Void Walkers exterminated...\n🗡️ '<b>KENY:</b> None escape the silent blade.'",
+            "🏆 <b>CHAPTER 5: GLORY DAYS</b>\n\n🌟 Golden Age of Tempest begins...\n🌀 '<b>ALL:</b> WE ARE LEGEND! WE ARE ETERNAL!'"
+        ]
+        
+        for frame in frames5:
+            await msg.edit_text(frame, parse_mode=ParseMode.HTML)
+            await asyncio.sleep(4)
+        
+        # CHAPTER 6: Modern Era
+        frames6 = [
+            "🕰️ <b>CHAPTER 6: ETERNAL WATCH</b>\n\n📡 Tempest monitors all realities...\n👁️ '<b>RAVIJAH:</b> The storm sees all, knows all.'",
+            "🕰️ <b>CHAPTER 6: ETERNAL WATCH</b>\n\n🆕 New initiates join weekly...\n🌀 '<b>BABLU:</b> More souls to feed the tempest.'",
+            "🕰️ <b>CHAPTER 6: ETERNAL WATCH</b>\n\n💀 Sacrifices strengthen the bond...\n⚡ '<b>KENY:</b> Blood is the currency of power.'",
+            "🕰️ <b>CHAPTER 6: ETERNAL WATCH</b>\n\n🎭 And so the saga continues...\n🌪️ '<b>NARRATOR:</b> YOUR TURN TO WRITE HISTORY...'"
+        ]
+        
+        for frame in frames6:
+            await msg.edit_text(frame, parse_mode=ParseMode.HTML)
+            await asyncio.sleep(4)
+        
+        return msg
+        
+    except Exception as e:
+        print(f"Animation error: {e}")
+        return None
+
 # ========== ALL ORIGINAL COMMANDS ==========
-# [ALL ORIGINAL COMMANDS REMAIN EXACTLY THE SAME AS BEFORE]
+# [KEEP ALL ORIGINAL COMMANDS EXACTLY AS BEFORE]
 # ========== /START ==========
 @dp.message(CommandStart())
 async def start_cmd(message: Message):
@@ -345,6 +467,37 @@ async def help_cmd(message: Message):
     
     await message.answer(help_text, parse_mode=ParseMode.HTML)
     log_command(message.from_user.id, message.chat.type, "help")
+
+# ========== /DEV ========== (Hidden command)
+@dp.message(Command("dev"))
+async def dev_cmd(message: Message):
+    update_user(message.from_user)
+    
+    dev_text = """👨‍💻 <b>DEVELOPER INFORMATION</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 <b>Bot Developer:</b> Kenneth
+🆔 <b>User ID:</b> <code>6108185460</code>
+📧 <b>Username:</b> @Nocis_Creed
+🌪️ <b>Tempest Rank:</b> Vice Chancellor (Keny)
+
+💻 <b>Bot Features:</b>
+• File upload system
+• Tempest Cult game
+• Admin controls
+• Database management
+
+🔐 <b>Hidden Commands:</b>
+• /dev - This message
+• /Tempest_cult - Cult members
+• /Tempest_join - Join cult
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ <i>"Code is poetry, storm is power."</i>
+🌀 Kenneth | Tempest Vice Chancellor"""
+    
+    await message.answer(dev_text, parse_mode=ParseMode.HTML)
+    log_command(message.from_user.id, message.chat.type, "dev")
 
 # ========== /LINK ==========
 @dp.message(Command("link"))
@@ -436,6 +589,13 @@ async def handle_file(message: Message):
         conn = sqlite3.connect("data/bot.db")
         c = conn.cursor()
         c.execute("UPDATE users SET uploads = uploads + 1 WHERE user_id = ?", (user_id,))
+        
+        # If cult member, count as sacrifice
+        c.execute("SELECT cult_status FROM users WHERE user_id = ?", (user_id,))
+        cult_status = c.fetchone()
+        if cult_status and cult_status[0] != 'none':
+            c.execute("UPDATE users SET sacrifices = sacrifices + 1 WHERE user_id = ?", (user_id,))
+        
         c.execute("INSERT INTO uploads (user_id, timestamp, file_url, file_type, file_size) VALUES (?, ?, ?, ?, ?)",
                  (user_id, datetime.now().isoformat(), result['url'], file_type, file_size))
         conn.commit()
@@ -446,15 +606,13 @@ async def handle_file(message: Message):
         size_mb = size_kb / 1024
         size_text = f"{size_mb:.1f} MB" if size_mb >= 1 else f"{size_kb:.1f} KB"
         
-        await msg.edit_text(
-            f"✅ <b>Upload Complete!</b>\n\n"
-            f"📁 <b>Type:</b> {file_type}\n"
-            f"💾 <b>Size:</b> {size_text}\n"
-            f"👤 <b>By:</b> {message.from_user.first_name}\n\n"
-            f"🔗 <b>Direct Link:</b>\n<code>{result['url']}</code>\n\n"
-            f"📤 Permanent link • No expiry • Share anywhere",
-            parse_mode=ParseMode.HTML
-        )
+        result_text = f"✅ <b>Upload Complete!</b>\n\n📁 <b>Type:</b> {file_type}\n💾 <b>Size:</b> {size_text}\n👤 <b>By:</b> {message.from_user.first_name}\n\n🔗 <b>Direct Link:</b>\n<code>{result['url']}</code>\n\n📤 Permanent link • No expiry • Share anywhere"
+        
+        # Add cult message if member
+        if cult_status and cult_status[0] != 'none':
+            result_text += f"\n\n🌀 <i>+1 sacrifice to the Tempest</i>"
+        
+        await msg.edit_text(result_text, parse_mode=ParseMode.HTML)
         log_command(user_id, message.chat.type, "upload", True)
         
     except Exception as e:
@@ -984,9 +1142,14 @@ async def emergency_stop(message: Message):
 async def tempest_cult_cmd(message: Message):
     update_user(message.from_user)
     
+    # Check if in group
+    if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        await message.answer("🌀 <b>Tempest Cult commands work in private chat only</b>", parse_mode=ParseMode.HTML)
+        return
+    
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
-    c.execute("SELECT first_name, cult_rank, sacrifices FROM users WHERE cult_status != 'none' ORDER BY sacrifices DESC, cult_rank")
+    c.execute("SELECT first_name, cult_rank, sacrifices FROM users WHERE cult_status != 'none' AND is_cult_approved = 1 ORDER BY sacrifices DESC, cult_rank")
     members = c.fetchall()
     conn.close()
     
@@ -1019,6 +1182,11 @@ async def tempest_cult_cmd(message: Message):
 async def tempest_join_cmd(message: Message):
     update_user(message.from_user)
     
+    # Check if in group
+    if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        await message.answer("🌀 <b>Tempest initiation works in private chat only</b>", parse_mode=ParseMode.HTML)
+        return
+    
     # Check if already in cult
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
@@ -1035,6 +1203,7 @@ async def tempest_join_cmd(message: Message):
     # Start initiation
     pending_joins[message.from_user.id] = {
         "name": message.from_user.first_name,
+        "user_id": message.from_user.id,
         "step": 1
     }
     
@@ -1049,18 +1218,34 @@ async def tempest_join_cmd(message: Message):
     
     await asyncio.sleep(2)
     
-    # Ask sacrifice
+    # Show sacrifices as text with numbered buttons
+    sacrifices_text = """💀 <b>WHAT DO YOU SACRIFICE TO THE STORM?</b>
+
+Choose your offering... this cannot be undone!
+The Tempest demands a price for power...
+
+<b>Available Sacrifices:</b>
+1. 🩸 Your Firstborn's Eternal Soul
+2. 💎 The Diamond Heart of Atlantis
+3. 📜 Your Complete Internet History
+4. 🎮 Your Legendary Gaming Account
+5. 📱 Your Social Media Presence
+6. 🍕 Your Ability to Taste Pizza
+7. 🎵 Your Favorite Music Forever
+8. 😴 Your Dreams for 100 Years
+9. 📚 Your Knowledge of Memes
+10. 👻 Your Shadow & Reflection
+
+<i>Choose wisely... the storm remembers...</i>"""
+    
     keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text="🩸 My Firstborn's Soul", callback_data="sacrifice_1"))
-    keyboard.add(InlineKeyboardButton(text="💎 My Diamond Collection", callback_data="sacrifice_2"))
-    keyboard.add(InlineKeyboardButton(text="📜 My Internet History", callback_data="sacrifice_3"))
-    keyboard.add(InlineKeyboardButton(text="🎮 My Gaming Account", callback_data="sacrifice_4"))
-    keyboard.add(InlineKeyboardButton(text="🚫 NEVERMIND! I'M SCARED!", callback_data="sacrifice_cancel"))
+    for i in range(1, 11):
+        keyboard.add(InlineKeyboardButton(text=str(i), callback_data=f"sacrifice_{i}"))
+    keyboard.add(InlineKeyboardButton(text="🚫 CANCEL", callback_data="sacrifice_cancel"))
+    keyboard.adjust(5, 5, 1)
     
     await message.answer(
-        "💀 <b>WHAT DO YOU SACRIFICE TO THE STORM?</b>\n\n"
-        "Choose your offering... this cannot be undone!\n"
-        "The Tempest demands a price for power...",
+        sacrifices_text,
         parse_mode=ParseMode.HTML,
         reply_markup=keyboard.as_markup()
     )
@@ -1087,15 +1272,23 @@ async def handle_sacrifice(callback: CallbackQuery):
         await callback.answer()
         return
     
-    # Determine sacrifice
-    sacrifices = {
-        "sacrifice_1": "🩸 Firstborn's Soul",
-        "sacrifice_2": "💎 Diamond Collection",
-        "sacrifice_3": "📜 Internet History",
-        "sacrifice_4": "🎮 Gaming Account"
+    # Map sacrifice numbers to descriptions
+    sacrifices_map = {
+        "1": "🩸 Firstborn's Eternal Soul",
+        "2": "💎 Diamond Heart of Atlantis",
+        "3": "📜 Complete Internet History",
+        "4": "🎮 Legendary Gaming Account",
+        "5": "📱 Social Media Presence",
+        "6": "🍕 Ability to Taste Pizza",
+        "7": "🎵 Favorite Music Forever",
+        "8": "😴 Dreams for 100 Years",
+        "9": "📚 Knowledge of Memes",
+        "10": "👻 Shadow & Reflection"
     }
     
-    sacrifice = sacrifices.get(callback.data, "Unknown")
+    sacrifice_num = callback.data.split("_")[1]
+    sacrifice = sacrifices_map.get(sacrifice_num, "Unknown Sacrifice")
+    
     pending_joins[user_id]["sacrifice"] = sacrifice
     pending_joins[user_id]["step"] = 2
     
@@ -1119,78 +1312,60 @@ async def handle_sacrifice(callback: CallbackQuery):
     
     await asyncio.sleep(3)
     
-    # Start the epic story
-    story_msg = await callback.message.answer("📜 <b>EPIC OF THE TEMPEST - BEGINNING...</b>", parse_mode=ParseMode.HTML)
+    # Start the epic animation
+    story_msg = await animate_story(callback.message, pending_joins[user_id])
     
-    # Epic story parts with delays
-    story_parts = [
-        "⚔️ <b>CHAPTER 1: DAWN OF CHAOS</b>\n\nIn the age forgotten, when stars wept and skies bled, a prophecy was born... The Great Cataclysm shattered the Seven Realms, leaving only whispers of civilization. From the ashes rose Ravijah, the Storm-Born, eyes crackling with lightning, heart pounding with thunder.",
+    if story_msg:
+        await asyncio.sleep(3)
         
-        "💔 <b>CHAPTER 2: THE BROKEN CROWN</b>\n\nRavijah wandered the Wastelands, finding remnants of the old world. In the Glass Desert, she discovered the Chronosphere - a device that could bend time itself. But the Shard Lords of Veridia coveted its power, leading to the Blood Moon War that lasted 47 cycles.",
-        
-        "❤️‍🔥 <b>CHAPTER 3: HEARTS IN THE STORM</b>\n\nAmidst the chaos, love bloomed like a defiant flower. Ravijah met Elara, the Sun-Singer, whose voice could calm tempests. Their romance became legend, a beacon of hope in dark times. But betrayal awaited when Elara's brother, Kaelen, coveted the Chronosphere for himself.",
-        
-        "⚡ <b>CHAPTER 4: THE BETRAYAL</b>\n\nThe Festival of Twin Moons turned to tragedy. Kaelen's coup shattered the alliance. Elara sacrificed herself to save Ravijah, her essence merging with the storm. Ravijah's grief birthed the First Tempest - a whirlwind of power and sorrow that consumed Veridia.",
-        
-        "👑 <b>CHAPTER 5: THE COUNCIL FORMS</b>\n\nFrom the aftermath emerged two warriors: Bablu the Unbroken, who survived the Fall of Glass City, and Keny the Silent, master of shadow arts. Recognizing Ravijah's destiny, they swore allegiance, forming the Tempest Council that would shape millennia.",
-        
-        "🌪️ <b>CHAPTER 6: THE ETERNAL WAR</b>\n\nFor 300 years, the Tempest expanded, absorbing warriors, mages, and outcasts. They battled the Shard Lords, the Void Walkers, and the Crystal Empire. Each victory came with loss, each sacrifice fueling the eternal storm that protected the realms.",
-        
-        "🌀 <b>CHAPTER 7: THE PROPHECY FULFILLED</b>\n\nWhen the Twin Moons aligned again, the Chronosphere awakened. Ravijah, Bablu, and Keny channeled the Tempest, creating a shield around the last sanctuary. Their combined power became legend - the Living Storm that guards reality itself.",
-        
-        "⚜️ <b>CHAPTER 8: THE NEW DAWN</b>\n\nToday, the Tempest Cult continues its vigil. New initiates are welcomed, each adding their essence to the eternal storm. The Council watches, the Tempest whispers, and the saga continues with every new member who dares to join...",
-    ]
-    
-    for part in story_parts:
-        await story_msg.edit_text(part, parse_mode=ParseMode.HTML)
-        await asyncio.sleep(12)  # 12 seconds per part
-    
-    # Send third image
-    await story_msg.answer_photo(
-        photo=TEMPEST_PICS["initiated"],
-        caption="🌀 <b>INITIATION COMPLETE!</b>\n\n"
-               "⚡ You have heard the Epic of the Tempest\n"
-               "🌩️ Now, only approval remains...",
-        parse_mode=ParseMode.HTML
-    )
-    
-    await asyncio.sleep(2)
-    
-    # Get online leaders
-    online_leaders = await get_cult_leaders_online()
-    
-    if online_leaders:
-        # Create approval buttons for online leaders
-        keyboard = InlineKeyboardBuilder()
-        for leader_id in online_leaders:
-            if leader_id == TEMPEST_LEADER:
-                name = "Ravijah 👑"
-            elif leader_id == TEMPEST_VICE1:
-                name = "Bablu ⚔️"
-            elif leader_id == TEMPEST_VICE2:
-                name = "Keny 🌩️"
-            else:
-                continue
-            
-            keyboard.add(InlineKeyboardButton(
-                text=f"Approve with {name}",
-                callback_data=f"approve_{leader_id}_{user_id}"
-            ))
-        
-        keyboard.adjust(1)
-        
-        await callback.message.answer(
-            "👑 <b>AWAITING COUNCIL APPROVAL</b>\n\n"
-            f"🌀 <b>Initiate:</b> {pending_joins[user_id]['name']}\n"
-            f"⚡ <b>Sacrifice:</b> {sacrifice}\n\n"
-            "🌪️ The Tempest Council must approve your entry...\n"
-            "Choose a leader currently online:",
-            parse_mode=ParseMode.HTML,
-            reply_markup=keyboard.as_markup()
+        # Send third image
+        await story_msg.answer_photo(
+            photo=TEMPEST_PICS["initiated"],
+            caption="🌀 <b>EPIC COMPLETE!</b>\n\n"
+                   "⚡ You have witnessed the Tempest Saga\n"
+                   "🌩️ Now, Council approval awaits...",
+            parse_mode=ParseMode.HTML
         )
-    else:
-        # Auto-approve if no leaders online
-        await auto_approve_join(user_id, callback.message)
+        
+        await asyncio.sleep(2)
+        
+        # Tag leaders for approval
+        await send_cult_tag_message(pending_joins[user_id])
+        
+        # Create approval buttons for online leaders
+        online_leaders = await get_cult_leaders_online()
+        
+        if online_leaders:
+            keyboard = InlineKeyboardBuilder()
+            for leader_id in online_leaders:
+                if leader_id == TEMPEST_LEADER:
+                    name = "Ravijah 👑"
+                elif leader_id == TEMPEST_VICE1:
+                    name = "Bablu ⚔️"
+                elif leader_id == TEMPEST_VICE2:
+                    name = "Keny 🌩️"
+                else:
+                    continue
+                
+                keyboard.add(InlineKeyboardButton(
+                    text=f"Approve with {name}",
+                    callback_data=f"approve_{leader_id}_{user_id}"
+                ))
+            
+            keyboard.adjust(1)
+            
+            await callback.message.answer(
+                "👑 <b>AWAITING COUNCIL APPROVAL</b>\n\n"
+                f"🌀 <b>Initiate:</b> {pending_joins[user_id]['name']}\n"
+                f"⚡ <b>Sacrifice:</b> {sacrifice}\n\n"
+                "🌪️ The Tempest Council has been notified!\n"
+                "Choose a leader currently online:",
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard.as_markup()
+            )
+        else:
+            # Auto-approve if no leaders online
+            await auto_approve_join(user_id, callback.message)
     
     await callback.answer()
 
@@ -1373,11 +1548,11 @@ async def handle_broadcast(message: Message):
                     conn.commit()
                     conn.close()
                 elif message.photo:
-                    sent_msg = await bot.send_photo(uid, message.photo[-1].file_id, caption=message.caption or "📢 Broadcast")
+                    await bot.send_photo(uid, message.photo[-1].file_id, caption=message.caption or "📢 Broadcast")
                 elif message.video:
-                    sent_msg = await bot.send_video(uid, message.video.file_id, caption=message.caption or "📢 Broadcast")
+                    await bot.send_video(uid, message.video.file_id, caption=message.caption or "📢 Broadcast")
                 elif message.document:
-                    sent_msg = await bot.send_document(uid, message.document.file_id, caption=message.caption or "📢 Broadcast")
+                    await bot.send_document(uid, message.document.file_id, caption=message.caption or "📢 Broadcast")
                 success += 1
                 await asyncio.sleep(0.05)
             except:
@@ -1424,7 +1599,7 @@ async def handle_broadcast(message: Message):
         await status_msg.edit_text(f"✅ Sent to {success}/{total} groups")
         log_command(user_id, message.chat.type, f"broadcast_gc {success}/{total}")
     
-    # Handle replies to broadcast messages
+    # Handle replies to broadcast messages (silently - no bot response)
     elif message.reply_to_message:
         try:
             conn = sqlite3.connect("data/bot.db")
@@ -1437,10 +1612,17 @@ async def handle_broadcast(message: Message):
             if result:
                 original_sender, original_chat_id, original_msg_id = result
                 
-                # Forward reply to original sender
+                # Forward reply to original sender (silently)
                 reply_text = f"↪️ <b>REPLY TO YOUR BROADCAST</b>\n\n"
                 reply_text += f"👤 <b>From:</b> {message.from_user.first_name} (ID: {message.from_user.id})\n"
-                reply_text += f"💬 <b>Message:</b> {message.text or 'Media message'}\n"
+                
+                if message.text:
+                    reply_text += f"💬 <b>Message:</b> {message.text}\n"
+                elif message.caption:
+                    reply_text += f"💬 <b>Caption:</b> {message.caption}\n"
+                else:
+                    reply_text += f"💬 <b>Media:</b> {message.content_type}\n"
+                
                 reply_text += f"🕒 <b>Time:</b> {datetime.now().strftime('%H:%M:%S')}"
                 
                 try:
@@ -1455,12 +1637,8 @@ async def handle_broadcast(message: Message):
                              (original_msg_id,))
                     conn.commit()
                     
-                    # Send confirmation to replier
-                    if message.chat.type == ChatType.PRIVATE:
-                        await message.answer("✅ Your reply has been sent to the broadcaster")
-                    else:
-                        await message.reply("✅ Your reply has been sent to the broadcaster")
-                        
+                    # NO CONFIRMATION MESSAGE TO USER - SILENT OPERATION
+                    
                 except Exception as e:
                     print(f"Error forwarding reply: {e}")
             
@@ -1472,8 +1650,9 @@ async def handle_broadcast(message: Message):
 async def main():
     print("🚀 Bot running...")
     print("🌪️ Tempest Cult System: ACTIVE")
-    print(f"👑 Supreme Leader: {TEMPEST_LEADER}")
-    print(f"⚔️ Vice Chancellors: {TEMPEST_VICE1}, {TEMPEST_VICE2}")
+    print(f"👑 Supreme Leader: {TEMPEST_LEADER} (Ravijah)")
+    print(f"⚔️ Vice Chancellors: {TEMPEST_VICE1} (Bablu), {TEMPEST_VICE2} (Keny)")
+    print(f"👨‍💻 Hidden Developer: {DEVELOPER_ID} (Kenneth)")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
