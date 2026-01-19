@@ -6,6 +6,7 @@ import sqlite3
 import json
 import httpx
 import shutil
+import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -122,50 +123,61 @@ def log_command(user_id, chat_type, command, success=True):
     conn.commit()
     conn.close()
 
-def log_error(user_id, command, error, traceback=""):
+def log_error(user_id, command, error):
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
+    error_str = str(error)[:200]
+    traceback_str = traceback.format_exc()[:500]
     c.execute("INSERT INTO error_logs (timestamp, user_id, command, error, traceback) VALUES (?, ?, ?, ?, ?)",
-              (datetime.now().isoformat(), user_id, command, str(error)[:200], traceback[:500]))
+              (datetime.now().isoformat(), user_id, command, error_str, traceback_str))
     conn.commit()
     conn.close()
 
 def update_user(user):
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("SELECT user_id FROM users WHERE user_id = ?", (user.id,))
-    if not c.fetchone():
-        c.execute("INSERT INTO users (user_id, username, first_name, joined_date, last_active) VALUES (?, ?, ?, ?, ?)",
-                 (user.id, user.username, user.first_name, datetime.now().isoformat(), datetime.now().isoformat()))
-    else:
-        c.execute("UPDATE users SET last_active = ?, username = ?, first_name = ? WHERE user_id = ?",
-                 (datetime.now().isoformat(), user.username, user.first_name, user.id))
-    conn.commit()
-    conn.close()
-
-def update_group(chat):
-    if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+    try:
         conn = sqlite3.connect("data/bot.db")
         c = conn.cursor()
-        c.execute("SELECT group_id FROM groups WHERE group_id = ?", (chat.id,))
+        c.execute("SELECT user_id FROM users WHERE user_id = ?", (user.id,))
         if not c.fetchone():
-            c.execute("INSERT INTO groups (group_id, title, username, joined_date, last_active) VALUES (?, ?, ?, ?, ?)",
-                     (chat.id, chat.title, chat.username, datetime.now().isoformat(), datetime.now().isoformat()))
+            c.execute("INSERT INTO users (user_id, username, first_name, joined_date, last_active) VALUES (?, ?, ?, ?, ?)",
+                     (user.id, user.username, user.first_name, datetime.now().isoformat(), datetime.now().isoformat()))
         else:
-            c.execute("UPDATE groups SET last_active = ?, title = ?, username = ? WHERE group_id = ?",
-                     (datetime.now().isoformat(), chat.title, chat.username, chat.id))
+            c.execute("UPDATE users SET last_active = ?, username = ?, first_name = ? WHERE user_id = ?",
+                     (datetime.now().isoformat(), user.username, user.first_name, user.id))
         conn.commit()
         conn.close()
+    except Exception as e:
+        print(f"Error updating user: {e}")
+
+def update_group(chat):
+    try:
+        if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+            conn = sqlite3.connect("data/bot.db")
+            c = conn.cursor()
+            c.execute("SELECT group_id FROM groups WHERE group_id = ?", (chat.id,))
+            if not c.fetchone():
+                c.execute("INSERT INTO groups (group_id, title, username, joined_date, last_active) VALUES (?, ?, ?, ?, ?)",
+                         (chat.id, chat.title, chat.username, datetime.now().isoformat(), datetime.now().isoformat()))
+            else:
+                c.execute("UPDATE groups SET last_active = ?, title = ?, username = ? WHERE group_id = ?",
+                         (datetime.now().isoformat(), chat.title, chat.username, chat.id))
+            conn.commit()
+            conn.close()
+    except Exception as e:
+        print(f"Error updating group: {e}")
 
 async def is_admin(user_id):
     if user_id == OWNER_ID:
         return True
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("SELECT is_admin FROM users WHERE user_id = ?", (user_id,))
-    result = c.fetchone()
-    conn.close()
-    return result and result[0] == 1
+    try:
+        conn = sqlite3.connect("data/bot.db")
+        c = conn.cursor()
+        c.execute("SELECT is_admin FROM users WHERE user_id = ?", (user_id,))
+        result = c.fetchone()
+        conn.close()
+        return result and result[0] == 1
+    except:
+        return False
 
 async def upload_to_catbox(file_data, filename):
     try:
@@ -187,11 +199,9 @@ async def upload_to_catbox(file_data, filename):
 # ========== /START ==========
 @dp.message(CommandStart())
 async def start_cmd(message: Message):
-    if message.chat.type in [ChatType.PRIVATE]:
-        update_user(message.from_user)
-    elif message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+    update_user(message.from_user)
+    if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
         update_group(message.chat)
-        update_user(message.from_user)
     
     await message.answer(
         f"✨ <b>Hey {message.from_user.first_name}!</b>\n\n"
@@ -234,7 +244,7 @@ async def help_cmd(message: Message):
 👑 <b>Admin:</b>
 <code>/ping</code> - System status
 <code>/logs [days]</code> - View logs (.txt)
-<code>/stats</code> - Statistics with dead users/groups
+<code>/stats</b> - Statistics with dead users/groups
 <code>/users</code> - User list (.txt)
 
 ⚡ <b>Owner:</b>
@@ -361,7 +371,7 @@ async def handle_file(message: Message):
         
     except Exception as e:
         await msg.edit_text("❌ Error uploading file")
-        log_error(user_id, "upload", e, str(e))
+        log_error(user_id, "upload", e)
 
 # ========== /CANCEL ==========
 @dp.message(Command("cancel"))
@@ -535,7 +545,7 @@ async def ping_cmd(message: Message):
     )
     log_command(message.from_user.id, message.chat.type, "ping")
 
-# ========== /LOGS - FIXED ==========
+# ========== /LOGS - FIXED SQL ==========
 @dp.message(Command("logs"))
 async def logs_cmd(message: Message):
     if not await is_admin(message.from_user.id):
@@ -551,14 +561,17 @@ async def logs_cmd(message: Message):
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
     
+    # Calculate date threshold
+    threshold_date = (datetime.now() - timedelta(days=days)).isoformat()
+    
     # Get command logs - FIXED SQL
-    c.execute("SELECT timestamp, user_id, chat_type, command, success FROM command_logs WHERE DATE(timestamp) >= DATE('now', ?) ORDER BY timestamp DESC LIMIT 500", 
-              (f'-{days} days',))
+    c.execute("SELECT timestamp, user_id, chat_type, command, success FROM command_logs WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 500", 
+              (threshold_date,))
     cmd_logs = c.fetchall()
     
     # Get error logs - FIXED SQL
-    c.execute("SELECT timestamp, user_id, command, error FROM error_logs WHERE DATE(timestamp) >= DATE('now', ?) ORDER BY timestamp DESC LIMIT 200", 
-              (f'-{days} days',))
+    c.execute("SELECT timestamp, user_id, command, error FROM error_logs WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 200", 
+              (threshold_date,))
     err_logs = c.fetchall()
     
     conn.close()
@@ -573,7 +586,10 @@ async def logs_cmd(message: Message):
     log_content += "📝 COMMAND LOGS:\n"
     log_content += "-" * 30 + "\n"
     for ts, uid, chat_type, cmd, succ in cmd_logs[:100]:
-        time_str = datetime.fromisoformat(ts).strftime("%m/%d %H:%M")
+        try:
+            time_str = datetime.fromisoformat(ts).strftime("%m/%d %H:%M")
+        except:
+            time_str = ts[:16]
         status = "✅" if succ else "❌"
         chat = {"private": "PRV", "group": "GRP", "supergroup": "SGR"}.get(chat_type, "UNK")
         log_content += f"[{time_str}] {chat} {uid} {status} {cmd}\n"
@@ -581,7 +597,10 @@ async def logs_cmd(message: Message):
     log_content += "\n\n❌ ERROR LOGS:\n"
     log_content += "-" * 30 + "\n"
     for ts, uid, cmd, err in err_logs[:50]:
-        time_str = datetime.fromisoformat(ts).strftime("%m/%d %H:%M")
+        try:
+            time_str = datetime.fromisoformat(ts).strftime("%m/%d %H:%M")
+        except:
+            time_str = ts[:16]
         log_content += f"[{time_str}] {uid} {cmd}: {err}\n"
     
     # Save and send file
@@ -624,29 +643,37 @@ async def stats_cmd(message: Message):
     total_wishes = c.fetchone()[0] or 0
     
     # Active users (last 7 days)
-    c.execute("SELECT COUNT(*) FROM users WHERE DATE(last_active) >= DATE('now', '-7 days')")
+    week_ago = (datetime.now() - timedelta(days=7)).isoformat()
+    c.execute("SELECT COUNT(*) FROM users WHERE last_active >= ?", (week_ago,))
     active_users = c.fetchone()[0] or 0
     
     # Dead users (inactive 30+ days)
-    c.execute("SELECT COUNT(*) FROM users WHERE DATE(last_active) < DATE('now', '-30 days')")
+    month_ago = (datetime.now() - timedelta(days=30)).isoformat()
+    c.execute("SELECT COUNT(*) FROM users WHERE last_active < ?", (month_ago,))
     dead_users = c.fetchone()[0] or 0
     
     # Active groups (last 7 days)
-    c.execute("SELECT COUNT(*) FROM groups WHERE DATE(last_active) >= DATE('now', '-7 days')")
+    c.execute("SELECT COUNT(*) FROM groups WHERE last_active >= ?", (week_ago,))
     active_groups = c.fetchone()[0] or 0
     
     # Dead groups (inactive 30+ days)
-    c.execute("SELECT COUNT(*) FROM groups WHERE DATE(last_active) < DATE('now', '-30 days')")
+    c.execute("SELECT COUNT(*) FROM groups WHERE last_active < ?", (month_ago,))
     dead_groups = c.fetchone()[0] or 0
     
     # Today's activity
-    c.execute("SELECT COUNT(*) FROM command_logs WHERE DATE(timestamp) = DATE('now')")
+    today = datetime.now().strftime("%Y-%m-%d")
+    c.execute("SELECT COUNT(*) FROM command_logs WHERE DATE(timestamp) = DATE(?)", (today,))
     today_commands = c.fetchone()[0] or 0
     
-    c.execute("SELECT COUNT(DISTINCT user_id) FROM command_logs WHERE DATE(timestamp) = DATE('now')")
+    c.execute("SELECT COUNT(DISTINCT user_id) FROM command_logs WHERE DATE(timestamp) = DATE(?)", (today,))
     active_today = c.fetchone()[0] or 0
     
     conn.close()
+    
+    # Calculate percentages
+    user_percent = (active_users / total_users * 100) if total_users > 0 else 0
+    group_percent = (active_groups / total_groups * 100) if total_groups > 0 else 0
+    dead_user_percent = (dead_users / total_users * 100) if total_users > 0 else 0
     
     stats_text = f"""
 📊 <b>COMPLETE BOT STATISTICS</b>
@@ -678,9 +705,9 @@ async def stats_cmd(message: Message):
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 📈 <b>PERCENTAGES:</b>
-• Active Users: {(active_users/total_users*100) if total_users > 0 else 0:.1f}%
-• Active Groups: {(active_groups/total_groups*100) if total_groups > 0 else 0:.1f}%
-• Dead Users: {(dead_users/total_users*100) if total_users > 0 else 0:.1f}%
+• Active Users: {user_percent:.1f}%
+• Active Groups: {group_percent:.1f}%
+• Dead Users: {dead_user_percent:.1f}%
 ━━━━━━━━━━━━━━━━━━━━━━━━
 """
     
@@ -707,11 +734,12 @@ async def users_cmd(message: Message):
         try:
             last_date = datetime.fromisoformat(last_active)
             days_ago = (datetime.now() - last_date).days
-            activity = f"{days_ago}d ago"
             if days_ago == 0:
                 activity = "Today"
             elif days_ago == 1:
                 activity = "Yesterday"
+            else:
+                activity = f"{days_ago}d ago"
         except:
             activity = "Unknown"
         
@@ -793,11 +821,16 @@ async def backup_cmd(message: Message):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_file = f"backups/backup_{timestamp}.db"
     
-    shutil.copy2("data/bot.db", backup_file)
-    await message.answer_document(
-        FSInputFile(backup_file),
-        caption=f"💾 Backup {timestamp}"
-    )
+    try:
+        shutil.copy2("data/bot.db", backup_file)
+        await message.answer_document(
+            FSInputFile(backup_file),
+            caption=f"💾 Backup {timestamp}"
+        )
+    except Exception as e:
+        await message.answer(f"❌ Backup failed: {str(e)}")
+        log_error(message.from_user.id, "backup", e)
+    
     log_command(message.from_user.id, message.chat.type, "backup")
 
 # ========== /RESTART ==========
@@ -811,8 +844,11 @@ async def restart_cmd(message: Message):
         "user_id": message.from_user.id
     }
     
-    with open("data/restart.json", "w") as f:
-        json.dump(restart_data, f)
+    try:
+        with open("data/restart.json", "w") as f:
+            json.dump(restart_data, f)
+    except:
+        pass
     
     await message.answer("🔄 <b>Restarting bot...</b>", parse_mode=ParseMode.HTML)
     log_command(message.from_user.id, message.chat.type, "restart")
@@ -840,7 +876,7 @@ async def handle_broadcast(message: Message):
         
         conn = sqlite3.connect("data/bot.db")
         c = conn.cursor()
-        c.execute("SELECT user_id FROM users")
+        c.execute("SELECT user_id FROM users WHERE is_banned = 0")
         users = [row[0] for row in c.fetchall()]
         conn.close()
         
@@ -878,3 +914,4 @@ if __name__ == "__main__":
         print("\n🛑 Bot stopped")
     except Exception as e:
         print(f"❌ Error: {e}")
+        traceback.print_exc()
