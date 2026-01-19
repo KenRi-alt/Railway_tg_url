@@ -10,7 +10,7 @@ import sys
 import json
 import httpx
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, F  # ADDED F HERE!
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.enums import ParseMode
@@ -66,6 +66,16 @@ def init_db():
             catbox_url TEXT,
             file_type TEXT,
             file_size INTEGER
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS wishes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            timestamp TEXT,
+            wish_text TEXT,
+            luck_percentage INTEGER
         )
     ''')
     
@@ -521,6 +531,39 @@ async def dice_command(message: Message):
     
     await msg.edit_text(response, parse_mode=ParseMode.HTML)
 
+# ========== /FLIP COMMAND ==========
+@dp.message(Command("flip"))
+async def flip_command(message: Message):
+    """Flip coin command"""
+    user = message.from_user
+    update_user(user)
+    
+    msg = await message.answer("🪙 <b>Flipping coin...</b>", parse_mode=ParseMode.HTML)
+    
+    # Animation
+    for i in range(5):
+        await msg.edit_text(f"🪙 <b>Flipping...</b> {'HEADS' if i % 2 == 0 else 'TAILS'}", parse_mode=ParseMode.HTML)
+        await asyncio.sleep(0.2)
+    
+    result = random.choice(["HEADS", "TAILS"])
+    emoji = "🟡" if result == "HEADS" else "🟤"
+    
+    response = f"""
+{emoji} <b>COIN FLIP RESULT</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+<b>Result:</b> <code>{result}</code>
+
+📊 <b>Analysis:</b>
+• 50/50 Chance
+• {'🟡 Heads wins!' if result == 'HEADS' else '🟤 Tails wins!'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+🎮 <i>Flip again with /flip</i>
+"""
+    
+    await msg.edit_text(response, parse_mode=ParseMode.HTML)
+
 # ========== /PROFILE COMMAND ==========
 @dp.message(Command("profile"))
 async def profile_command(message: Message):
@@ -544,6 +587,10 @@ async def profile_command(message: Message):
     cursor.execute('SELECT COUNT(*) FROM uploads WHERE user_id = ?', (user.id,))
     total_uploads = cursor.fetchone()[0] or 0
     
+    # Count user wishes
+    cursor.execute('SELECT COUNT(*) FROM wishes WHERE user_id = ?', (user.id,))
+    total_wishes = cursor.fetchone()[0] or 0
+    
     conn.close()
     
     # Format join date
@@ -558,7 +605,7 @@ async def profile_command(message: Message):
 
 📊 <b>Statistics:</b>
 • 📁 Uploads: {total_uploads}
-• ✨ Wishes: {wishes}
+• ✨ Wishes: {total_wishes}
 • 🔧 Commands: {commands}
 
 📅 <b>Joined:</b> {join_date}
@@ -627,7 +674,59 @@ async def logs_command(message: Message):
         await message.answer("🚫 <b>Admin only!</b>", parse_mode=ParseMode.HTML)
         return
     
-    await message.answer("📊 <b>Logs system ready</b>\n\nUse: <code>/logs 1</code> for 1 day logs\n<code>/logs 7</code> for 7 days", parse_mode=ParseMode.HTML)
+    args = message.text.split()
+    days = 1
+    if len(args) > 1 and args[1].isdigit():
+        days = int(args[1])
+        if days > 30:
+            days = 30
+    
+    conn = sqlite3.connect("data/bot.db")
+    cursor = conn.cursor()
+    
+    # Get recent uploads
+    cursor.execute('''
+        SELECT COUNT(*) FROM uploads 
+        WHERE DATE(timestamp) >= DATE('now', ?)
+    ''', (f'-{days} days',))
+    recent_uploads = cursor.fetchone()[0] or 0
+    
+    # Get recent wishes
+    cursor.execute('''
+        SELECT COUNT(*) FROM wishes 
+        WHERE DATE(timestamp) >= DATE('now', ?)
+    ''', (f'-{days} days',))
+    recent_wishes = cursor.fetchone()[0] or 0
+    
+    # Get new users
+    cursor.execute('''
+        SELECT COUNT(*) FROM users 
+        WHERE DATE(joined_date) >= DATE('now', ?)
+    ''', (f'-{days} days',))
+    new_users = cursor.fetchone()[0] or 0
+    
+    conn.close()
+    
+    response = f"""
+📊 <b>LOGS SUMMARY - Last {days} day(s)</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📁 <b>Uploads:</b> {recent_uploads}
+🌟 <b>Wishes:</b> {recent_wishes}
+👥 <b>New Users:</b> {new_users}
+
+📈 <b>Daily Average:</b>
+• Uploads/day: {recent_uploads // max(1, days)}
+• Wishes/day: {recent_wishes // max(1, days)}
+
+🕒 <b>Period:</b> Last {days} day(s)
+📅 <b>Date:</b> {datetime.now().strftime('%Y-%m-%d')}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+📋 <i>Detailed logs available in database</i>
+"""
+    
+    await message.answer(response, parse_mode=ParseMode.HTML)
 
 # ========== /STATS COMMAND ==========
 @dp.message(Command("stats"))
@@ -677,6 +776,34 @@ async def stats_command(message: Message):
 """
     
     await message.answer(response, parse_mode=ParseMode.HTML)
+
+# ========== /USERS COMMAND ==========
+@dp.message(Command("users"))
+async def users_command(message: Message):
+    """List users - admin only"""
+    if not await is_admin(message.from_user.id):
+        await message.answer("🚫 <b>Admin only!</b>", parse_mode=ParseMode.HTML)
+        return
+    
+    conn = sqlite3.connect("data/bot.db")
+    cursor = conn.cursor()
+    cursor.execute('SELECT user_id, first_name, username FROM users ORDER BY joined_date DESC LIMIT 50')
+    users = cursor.fetchall()
+    conn.close()
+    
+    if not users:
+        await message.answer("📭 <b>No users found</b>", parse_mode=ParseMode.HTML)
+        return
+    
+    user_list = "👥 <b>RECENT USERS (Last 50)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    
+    for idx, (user_id, first_name, username) in enumerate(users[:25], 1):
+        username_display = f"@{username}" if username else "No username"
+        user_list += f"{idx}. {first_name}\n   🆔 {user_id}\n   📧 {username_display}\n\n"
+    
+    user_list += f"\n📊 <b>Total Users:</b> {len(users)}"
+    
+    await message.answer(user_list, parse_mode=ParseMode.HTML)
 
 # ========== MAIN FUNCTION ==========
 async def main():
