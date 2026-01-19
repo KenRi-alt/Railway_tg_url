@@ -28,6 +28,15 @@ TEMPEST_LEADER = 6211708776  # @dont_try_to_copy_mee
 TEMPEST_VICE1 = 6581129741   # @Bablu_is_op
 TEMPEST_VICE2 = 6108185460   # @Nocis_Creed (Developer)
 
+# TEMPEST PICTURES
+TEMPEST_PICS = [
+    "https://files.catbox.moe/qjmgcg.jpg",  # Join
+    "https://files.catbox.moe/k07i6j.jpg",  # Unity  
+    "https://files.catbox.moe/d9qnw5.jpg",  # Initiated
+    "https://files.catbox.moe/4h9p8x.jpg",  # Storm
+    "https://files.catbox.moe/7b2v1y.jpg",  # Council
+]
+
 # Create directories
 Path("data").mkdir(exist_ok=True)
 Path("temp").mkdir(exist_ok=True)
@@ -236,73 +245,187 @@ async def delete_story_messages(chat_id):
             pass
     story_messages.clear()
 
-# ========== STORY SYSTEM ==========
-async def tell_tempest_story(chat_id: int, user_name: str):
-    """Tell the Tempest story with auto-deleting messages"""
+# ========== SCAN FUNCTION ==========
+async def scan_users_and_groups():
+    """Scan database to update user and group information"""
     try:
-        # Clear any previous story messages
+        conn = sqlite3.connect("data/bot.db")
+        c = conn.cursor()
+        
+        # Get all unique user IDs from command logs
+        c.execute("SELECT DISTINCT user_id FROM command_logs")
+        user_ids = [row[0] for row in c.fetchall()]
+        
+        updated_users = 0
+        for user_id in user_ids:
+            try:
+                # Get user info from Telegram
+                chat = await bot.get_chat(user_id)
+                c.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
+                if not c.fetchone():
+                    # User not in database, add them
+                    c.execute("INSERT INTO users (user_id, username, first_name, joined_date, last_active) VALUES (?, ?, ?, ?, ?)",
+                             (user_id, chat.username, chat.first_name, datetime.now().isoformat(), datetime.now().isoformat()))
+                    updated_users += 1
+                else:
+                    # Update existing user
+                    c.execute("UPDATE users SET username = ?, first_name = ?, last_active = ? WHERE user_id = ?",
+                             (chat.username, chat.first_name, datetime.now().isoformat(), user_id))
+                    updated_users += 1
+            except Exception as e:
+                # Can't access user (blocked bot, etc.)
+                continue
+        
+        # Get groups from command logs
+        c.execute("SELECT DISTINCT user_id FROM command_logs WHERE chat_type IN ('group', 'supergroup')")
+        group_ids = [row[0] for row in c.fetchall()]
+        
+        updated_groups = 0
+        for group_id in group_ids:
+            try:
+                chat = await bot.get_chat(group_id)
+                if chat.type in ['group', 'supergroup']:
+                    c.execute("SELECT group_id FROM groups WHERE group_id = ?", (group_id,))
+                    if not c.fetchone():
+                        c.execute("INSERT INTO groups (group_id, title, username, joined_date, last_active) VALUES (?, ?, ?, ?, ?)",
+                                 (group_id, chat.title, chat.username, datetime.now().isoformat(), datetime.now().isoformat()))
+                        updated_groups += 1
+                    else:
+                        c.execute("UPDATE groups SET title = ?, username = ?, last_active = ? WHERE group_id = ?",
+                                 (chat.title, chat.username, datetime.now().isoformat(), group_id))
+                        updated_groups += 1
+            except:
+                continue
+        
+        conn.commit()
+        conn.close()
+        
+        return f"✅ Scan complete!\n👥 Updated users: {updated_users}\n👥 Updated groups: {updated_groups}"
+        
+    except Exception as e:
+        return f"❌ Scan error: {str(e)[:100]}"
+
+# ========== ANIMATED STORY SYSTEM ==========
+async def animate_tempest_story(chat_id: int, user_name: str):
+    """Show animated story with pictures and auto-deletion"""
+    try:
+        # Clear previous story messages
         await delete_story_messages(chat_id)
         
-        # CHAPTER 1
-        msg1 = await bot.send_message(
-            chat_id,
-            "🌌 <b>THE TEMPEST SAGA - CHAPTER 1</b>\n\n"
-            "⚡ Ravijah: 'The silence... it's deafening. This world needs a storm.'\n\n"
-            "🌑 Narrator: Ravijah wandered the shattered realms, power crackling at his fingertips...",
+        # CHAPTER 1: The Beginning
+        msg1 = await bot.send_photo(
+            chat_id=chat_id,
+            photo=TEMPEST_PICS[0],  # Join picture
+            caption="""🌌 <b>THE TEMPEST SAGA BEGINS...</b>
+
+⚡ <b>RAVIJAH:</b> "The silence... it's deafening. This world needs a storm."
+
+🌑 <i>Year 0 - The Void Era</i>
+
+Ravijah wandered the shattered realms, power crackling at his fingertips. The Great Calm had lasted centuries, but change was coming...
+
+🌀 <i>The eternal storm awakens...</i>""",
             parse_mode=ParseMode.HTML
         )
         story_messages.append(msg1.message_id)
         await asyncio.sleep(8)
         
-        # CHAPTER 2
-        msg2 = await bot.send_message(
-            chat_id,
-            "🔥 <b>CHAPTER 2 - BLOOD MOON RITUAL</b>\n\n"
-            "❤️‍🔥 Elara: 'Your eyes hold entire storms, Ravijah...'\n\n"
-            "⚡ Ravijah: 'Stay close tonight. Kaelen grows jealous...'",
+        # CHAPTER 2: The Council Forms
+        msg2 = await bot.send_photo(
+            chat_id=chat_id,
+            photo=TEMPEST_PICS[4],  # Council picture
+            caption="""🔥 <b>CHAPTER 2: COUNCIL OF STORMS</b>
+
+🗡️ <b>BABLU:</b> "Another village fallen to the Shard Lords. When do we fight back?"
+
+👤 <b>KENY:</b> *materializes from shadows* "Patience. The right moment comes."
+
+⚡ <b>RAVIJAH:</b> "Then we prepare. Gather the worthy. The Tempest begins."
+
+❤️‍🔥 <b>ELARA:</b> "Your eyes hold entire storms... it's beautiful and terrifying."
+
+🌪️ <i>The first ritual begins under the Blood Moon...</i>""",
             parse_mode=ParseMode.HTML
         )
         story_messages.append(msg2.message_id)
         await asyncio.sleep(8)
         
-        # CHAPTER 3
-        msg3 = await bot.send_message(
-            chat_id,
-            "💔 <b>CHAPTER 3 - THE BETRAYAL</b>\n\n"
-            "🔪 Kaelen: 'NOW! KILL THE STORM-BORN!'\n\n"
-            "🩸 Elara: *takes the blade* 'Live... for both of us...'",
+        # CHAPTER 3: Betrayal & Sacrifice
+        msg3 = await bot.send_photo(
+            chat_id=chat_id,
+            photo=TEMPEST_PICS[1],  # Unity picture
+            caption="""💔 <b>CHAPTER 3: THE BETRAYAL</b>
+
+🎪 <i>The Festival of Twin Moons</i>
+
+🔪 <b>KAELEN:</b> "NOW! KILL THE STORM-BORN!"
+
+⚡ <b>RAVIJAH:</b> "ELARA, NO—!"
+
+🩸 <b>ELARA:</b> *takes the poisoned blade* "Live... for both of us... promise me..."
+
+🌪️ <b>RAVIJAH:</b> *scream echoes through reality* "LET THE WORLD BURN WITH ME!"
+
+🌀 <i>And so, the First Tempest was born from grief...</i>""",
             parse_mode=ParseMode.HTML
         )
         story_messages.append(msg3.message_id)
         await asyncio.sleep(8)
         
-        # CHAPTER 4
-        msg4 = await bot.send_message(
-            chat_id,
-            "👑 <b>CHAPTER 4 - COUNCIL OF STORMS</b>\n\n"
-            "⚡ Ravijah: '300 years... the Tempest grows stronger.'\n\n"
-            "🗡️ Bablu: 'The Crystal Empire kneels before us!'",
+        # CHAPTER 4: The Golden Age
+        msg4 = await bot.send_photo(
+            chat_id=chat_id,
+            photo=TEMPEST_PICS[3],  # Storm picture
+            caption="""👑 <b>CHAPTER 4: GOLDEN AGE</b>
+
+<code>Year 150</code>
+
+⚡ <b>RAVIJAH:</b> "300 years... and the Tempest grows stronger."
+
+🗡️ <b>BABLU:</b> "The Crystal Empire kneels! Their princess offers her crown!"
+
+👤 <b>KENY:</b> "The Void Walkers are eliminated. None escaped."
+
+⚡ <b>RAVIJAH:</b> "Good. Now we look to the stars. New initiates, new power."
+
+🌀 <i>The legend grew, century after century...</i>""",
             parse_mode=ParseMode.HTML
         )
         story_messages.append(msg4.message_id)
         await asyncio.sleep(8)
         
-        # CHAPTER 5
-        msg5 = await bot.send_message(
-            chat_id,
-            "📡 <b>CHAPTER 5 - MODERN ERA</b>\n\n"
-            f"🌀 Narrator: And now, {user_name}... your story begins.\n\n"
-            "<i>The eternal storm awaits...</i>",
+        # CHAPTER 5: Modern Era & Welcome
+        msg5 = await bot.send_photo(
+            chat_id=chat_id,
+            photo=TEMPEST_PICS[2],  # Initiated picture
+            caption=f"""📡 <b>CHAPTER 5: THE ETERNAL WATCH</b>
+
+<code>Present Day</code>
+
+⚡ <b>RAVIJAH:</b> "The storm adapts. Now it flows through cables and codes."
+
+💻 <b>KENY:</b> "Our network spans continents. Every upload, a digital sacrifice."
+
+📱 <b>BABLU:</b> "New initiates join daily. The Tempest thrives."
+
+🌀 <b>NARRATOR:</b> And now, {user_name}... your story begins.
+
+<i>The eternal storm welcomes you...</i>
+
+⚡ Will you join the legend?""",
             parse_mode=ParseMode.HTML
         )
         story_messages.append(msg5.message_id)
         
-        # Auto-delete after story completion
-        await asyncio.sleep(10)
+        # Auto-delete after completion
+        await asyncio.sleep(12)
         await delete_story_messages(chat_id)
         
+        return True
+        
     except Exception as e:
-        print(f"Story error: {e}")
+        print(f"Story animation error: {e}")
+        return False
 
 # ========== ORIGINAL COMMANDS ==========
 @dp.message(CommandStart())
@@ -355,11 +478,13 @@ async def help_cmd(message: Message):
 <code>/users</code> - User list (.txt)
 <code>/admins</code> - List bot admins
 <code>/backup</code> - Backup database
+<code>/scan</code> - Scan for new users/groups
 
 ⚡ <b>Owner:</b>
 <code>/pro [id]</code> - Make admin
 <code>/toggle</code> - Toggle bot
-<code>/broadcast</code> - Send to all
+<code>/broadcast</code> - Send to all users
+<code>/broadcast_gc</code> - Send to groups only
 <code>/restart</code> - Restart bot
 <code>/emergency_stop</code> - Stop bot"""
     
@@ -384,6 +509,17 @@ async def admins_cmd(message: Message):
     await message.answer(admin_text, parse_mode=ParseMode.HTML)
     log_command(message.from_user.id, message.chat.type, "admins")
 
+@dp.message(Command("scan"))
+async def scan_cmd(message: Message):
+    if not await is_admin(message.from_user.id):
+        await message.answer("🚫 Admin only")
+        return
+    
+    scan_msg = await message.answer("🔍 <b>Scanning database for updates...</b>", parse_mode=ParseMode.HTML)
+    result = await scan_users_and_groups()
+    await scan_msg.edit_text(result, parse_mode=ParseMode.HTML)
+    log_command(message.from_user.id, message.chat.type, "scan")
+
 @dp.message(Command("profile"))
 async def profile_cmd(message: Message):
     update_user(message.from_user)
@@ -394,11 +530,11 @@ async def profile_cmd(message: Message):
     c = conn.cursor()
     
     # Get user stats
-    c.execute("SELECT uploads, commands, joined_date FROM users WHERE user_id = ?", (message.from_user.id,))
+    c.execute("SELECT uploads, commands, joined_date, cult_status, cult_rank, sacrifices FROM users WHERE user_id = ?", (message.from_user.id,))
     row = c.fetchone()
     
     if row:
-        uploads, cmds, joined = row
+        uploads, cmds, joined, cult_status, cult_rank, sacrifices = row
         # Count wishes
         c.execute("SELECT COUNT(*) FROM wishes WHERE user_id = ?", (message.from_user.id,))
         wishes = c.fetchone()[0] or 0
@@ -409,21 +545,35 @@ async def profile_cmd(message: Message):
         except:
             join_date = "Recently"
     else:
-        uploads = cmds = wishes = 0
+        uploads = cmds = wishes = sacrifices = 0
+        cult_status = "none"
+        cult_rank = "None"
         join_date = "Today"
     
     conn.close()
     
-    await message.answer(
-        f"👤 <b>PROFILE: {message.from_user.first_name}</b>\n\n"
-        f"📁 <b>Uploads:</b> {uploads}\n"
-        f"✨ <b>Wishes:</b> {wishes}\n"
-        f"🔧 <b>Commands:</b> {cmds}\n"
-        f"📅 <b>Joined:</b> {join_date}\n"
-        f"🆔 <b>ID:</b> <code>{message.from_user.id}</code>\n\n"
-        f"💡 <b>Next:</b> Try /link to upload files",
-        parse_mode=ParseMode.HTML
-    )
+    profile_text = f"""
+👤 <b>PROFILE: {message.from_user.first_name}</b>
+
+📁 <b>Uploads:</b> {uploads}
+✨ <b>Wishes:</b> {wishes}
+🔧 <b>Commands:</b> {cmds}
+📅 <b>Joined:</b> {join_date}
+🆔 <b>ID:</b> <code>{message.from_user.id}</code>
+"""
+    
+    if cult_status != "none":
+        profile_text += f"""
+━━━━━━━━━━━━━━━━━━━━
+🌪️ <b>TEMPEST CULT</b>
+👑 <b>Rank:</b> {cult_rank}
+⚔️ <b>Sacrifices:</b> {sacrifices}
+━━━━━━━━━━━━━━━━━━━━
+"""
+    
+    profile_text += "\n💡 <b>Next:</b> Try /link to upload files"
+    
+    await message.answer(profile_text, parse_mode=ParseMode.HTML)
     log_command(message.from_user.id, message.chat.type, "profile")
 
 @dp.message(Command("stats"))
@@ -507,7 +657,6 @@ async def stats_cmd(message: Message):
 🕒 <b>SYSTEM:</b>
 • Uptime: {int(time.time() - start_time)}s
 • Status: {'🟢 ACTIVE' if bot_active else '🔴 PAUSED'}
-• Host: Railway
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 📈 <b>PERCENTAGES:</b>
@@ -711,11 +860,27 @@ async def broadcast_cmd(message: Message):
         "• Text message\n"
         "• Photo with caption\n"
         "• Video with caption\n\n"
-        "⚠️ <b>Next message will be broadcasted</b>\n"
+        "⚠️ <b>Next message will be broadcasted to ALL USERS</b>\n"
         "❌ <code>/cancel</code> to abort",
         parse_mode=ParseMode.HTML
     )
     log_command(message.from_user.id, message.chat.type, "broadcast_start")
+
+@dp.message(Command("broadcast_gc"))
+async def broadcast_gc_cmd(message: Message):
+    if not await is_admin(message.from_user.id):
+        return
+    
+    broadcast_state[message.from_user.id] = "group"
+    await message.answer(
+        "📢 <b>Send group broadcast message now:</b>\n"
+        "• Text message only\n"
+        "• Will send to ALL GROUPS\n\n"
+        "⚠️ <b>Next message will be broadcasted to GROUPS</b>\n"
+        "❌ <code>/cancel</code> to abort",
+        parse_mode=ParseMode.HTML
+    )
+    log_command(message.from_user.id, message.chat.type, "broadcast_gc_start")
 
 @dp.message(Command("backup"))
 async def backup_cmd(message: Message):
@@ -846,6 +1011,13 @@ async def handle_file(message: Message):
         conn = sqlite3.connect("data/bot.db")
         c = conn.cursor()
         c.execute("UPDATE users SET uploads = uploads + 1 WHERE user_id = ?", (user_id,))
+        
+        # If cult member, add sacrifice
+        c.execute("SELECT cult_status FROM users WHERE user_id = ?", (user_id,))
+        cult_status = c.fetchone()
+        if cult_status and cult_status[0] != 'none':
+            c.execute("UPDATE users SET sacrifices = sacrifices + 1 WHERE user_id = ?", (user_id,))
+        
         c.execute("INSERT INTO uploads (user_id, timestamp, file_url, file_type, file_size) VALUES (?, ?, ?, ?, ?)",
                  (user_id, datetime.now().isoformat(), result['url'], file_type, file_size))
         conn.commit()
@@ -856,15 +1028,22 @@ async def handle_file(message: Message):
         size_mb = size_kb / 1024
         size_text = f"{size_mb:.1f} MB" if size_mb >= 1 else f"{size_kb:.1f} KB"
         
-        await msg.edit_text(
-            f"✅ <b>Upload Complete!</b>\n\n"
-            f"📁 <b>Type:</b> {file_type}\n"
-            f"💾 <b>Size:</b> {size_text}\n"
-            f"👤 <b>By:</b> {message.from_user.first_name}\n\n"
-            f"🔗 <b>Direct Link:</b>\n<code>{result['url']}</code>\n\n"
-            f"📤 Permanent link • No expiry • Share anywhere",
-            parse_mode=ParseMode.HTML
-        )
+        result_text = f"""✅ <b>Upload Complete!</b>
+
+📁 <b>Type:</b> {file_type}
+💾 <b>Size:</b> {size_text}
+👤 <b>By:</b> {message.from_user.first_name}
+
+🔗 <b>Direct Link:</b>
+<code>{result['url']}</code>
+
+📤 Permanent link • No expiry • Share anywhere"""
+        
+        # Add cult message if member
+        if cult_status and cult_status[0] != 'none':
+            result_text += f"\n\n🌀 <i>+1 sacrifice to the Tempest</i>"
+        
+        await msg.edit_text(result_text, parse_mode=ParseMode.HTML)
         log_command(user_id, message.chat.type, "upload", True)
         
     except Exception as e:
@@ -1011,7 +1190,7 @@ async def tempest_join_cmd(message: Message):
     result = c.fetchone()
     
     if result and result[0] != "none":
-        await message.answer("🌀 <b>Already part of the Tempest!</b>", parse_mode=ParseMode.HTML)
+        await message.answer("🌀 <b>Already part of the Tempest!</b>\nUse /Tempest_progress to check your status.", parse_mode=ParseMode.HTML)
         conn.close()
         return
     
@@ -1033,24 +1212,25 @@ async def tempest_join_cmd(message: Message):
     # Sacrifice selection
     keyboard = InlineKeyboardBuilder()
     sacrifices = [
-        "🩸 Firstborn's Soul",
-        "💎 Diamond Collection", 
-        "📜 Internet History",
-        "🎮 Gaming Account",
-        "🚫 Cancel"
+        "1. 🩸 Firstborn's Soul",
+        "2. 💎 Diamond Collection", 
+        "3. 📜 Internet History",
+        "4. 🎮 Gaming Account",
+        "5. 🚫 Cancel"
     ]
     
-    for i, sacrifice in enumerate(sacrifices[:-1], 1):
-        keyboard.add(InlineKeyboardButton(text=f"{i}. {sacrifice}", callback_data=f"sacrifice_{i}"))
-    keyboard.add(InlineKeyboardButton(text=sacrifices[-1], callback_data="sacrifice_cancel"))
-    keyboard.adjust(2)
+    for i in range(1, 5):
+        keyboard.add(InlineKeyboardButton(text=f"{i}", callback_data=f"sacrifice_{i}"))
+    keyboard.add(InlineKeyboardButton(text="❌", callback_data="sacrifice_cancel"))
+    keyboard.adjust(5)
     
     await message.answer(
         "<b>What do you sacrifice?</b>\n\n"
         "1. Your firstborn's eternal soul\n"
         "2. A diamond worth a kingdom\n"  
         "3. Your complete internet history\n"
-        "4. Your legendary gaming account",
+        "4. Your legendary gaming account\n\n"
+        "<i>Choose a number...</i>",
         parse_mode=ParseMode.HTML,
         reply_markup=keyboard.as_markup()
     )
@@ -1090,12 +1270,10 @@ async def handle_sacrifice(callback: CallbackQuery):
         parse_mode=ParseMode.HTML
     )
     
-    # Tell the story
-    await tell_tempest_story(callback.message.chat.id, pending_joins[user_id]["name"])
+    # Show animated story
+    await animate_tempest_story(callback.message.chat.id, pending_joins[user_id]["name"])
     
-    await asyncio.sleep(12)  # Wait for story to complete
-    
-    # Add to cult
+    # Add to cult after story
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
     c.execute("UPDATE users SET cult_status = 'member', cult_rank = 'Initiate', cult_join_date = ?, sacrifices = 1 WHERE user_id = ?",
@@ -1104,12 +1282,13 @@ async def handle_sacrifice(callback: CallbackQuery):
     conn.close()
     
     # Send completion message
-    completion = await callback.message.answer(
+    await callback.message.answer(
         f"✅ <b>INITIATION COMPLETE!</b>\n\n"
         f"🌀 Welcome to the Tempest, {pending_joins[user_id]['name']}!\n"
         f"⚡ Rank: Initiate\n"
         f"💀 Sacrifice: {sacrifice}\n\n"
-        f"<i>The eternal storm welcomes you...</i>",
+        f"<i>The eternal storm welcomes you...</i>\n\n"
+        f"Use /Tempest_progress to track your growth",
         parse_mode=ParseMode.HTML
     )
     
@@ -1141,6 +1320,7 @@ async def tempest_progress_cmd(message: Message):
         # Progress calculation
         next_rank = "Adept" if sacrifices < 10 else "Master"
         needed = max(0, 10 - sacrifices)
+        progress = min(sacrifices * 10, 100)
         
         progress_text = f"""
 🌀 <b>TEMPEST PROGRESS</b>
@@ -1150,6 +1330,7 @@ async def tempest_progress_cmd(message: Message):
 ⚔️ <b>Sacrifices:</b> {sacrifices}
 📅 <b>Member Since:</b> {time_text}
 
+<b>Progress:</b> [{'▓' * (progress // 10)}{'░' * (10 - progress // 10)}] {progress}%
 <b>Next Rank:</b> {next_rank}
 <b>Sacrifices Needed:</b> {needed}
 
@@ -1169,11 +1350,13 @@ async def tempest_progress_cmd(message: Message):
     await message.answer(progress_text, parse_mode=ParseMode.HTML)
     log_command(message.from_user.id, message.chat.type, "tempest_progress")
 
-# ========== BROADCAST HANDLER ==========
+# ========== BROADCAST HANDLERS ==========
 @dp.message()
 async def handle_broadcast(message: Message):
     user_id = message.from_user.id
-    if user_id in broadcast_state and broadcast_state[user_id]:
+    
+    # Handle user broadcast
+    if user_id in broadcast_state and broadcast_state[user_id] is True:
         broadcast_state[user_id] = False
         
         conn = sqlite3.connect("data/bot.db")
@@ -1203,19 +1386,53 @@ async def handle_broadcast(message: Message):
         
         await status_msg.edit_text(f"✅ Sent to {success}/{total} users")
         log_command(user_id, message.chat.type, f"broadcast {success}/{total}")
+    
+    # Handle group broadcast
+    elif user_id in broadcast_state and broadcast_state[user_id] == "group":
+        broadcast_state[user_id] = False
+        
+        if not message.text:
+            await message.answer("❌ Group broadcast supports text only")
+            return
+        
+        conn = sqlite3.connect("data/bot.db")
+        c = conn.cursor()
+        c.execute("SELECT group_id FROM groups")
+        groups = [row[0] for row in c.fetchall()]
+        conn.close()
+        
+        total = len(groups)
+        status_msg = await message.answer(f"📤 Sending to {total} groups...")
+        
+        success = 0
+        for group_id in groups:
+            try:
+                await bot.send_message(group_id, f"📢 {message.text}")
+                success += 1
+                await asyncio.sleep(0.1)
+            except:
+                continue
+        
+        await status_msg.edit_text(f"✅ Sent to {success}/{total} groups")
+        log_command(user_id, message.chat.type, f"broadcast_gc {success}/{total}")
 
 # ========== MAIN ==========
 async def main():
-    print("🚀 Bot running...")
-    print("🤖 Original commands restored")
-    print("🌀 Tempest Cult: HIDDEN")
+    print("🚀 PRO BOT v3.0 STARTING...")
+    print("✅ Database initialized")
+    print("🔧 All commands: READY")
+    print("🌀 Tempest Cult: HIDDEN & WORKING")
+    print("📡 Broadcast systems: ACTIVE")
+    print("🎮 Games: FUNCTIONAL")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━")
+    
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n🛑 Bot stopped")
+        print("\n🛑 Bot stopped gracefully")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Fatal error: {e}")
         traceback.print_exc()
