@@ -28,14 +28,12 @@ TEMPEST_LEADER = 6211708776  # @dont_try_to_copy_mee
 TEMPEST_VICE1 = 6581129741   # @Bablu_is_op
 TEMPEST_VICE2 = 6108185460   # @Nocis_Creed (Developer)
 
-# TEMPEST PICTURES - Using imgur as backup for reliability
-TEMPEST_PICS = {
-    "join": "https://i.imgur.com/3Xr5J8b.jpg",      # Storm cloud
-    "unity": "https://i.imgur.com/9vQ7z2L.jpg",     # Lightning
-    "initiated": "https://i.imgur.com/5dY8k9T.jpg", # Dark ritual
-    "storm": "https://i.imgur.com/7Wc3VpN.jpg",     # Epic storm
-    "council": "https://i.imgur.com/2KjL9xM.jpg",   # Council meeting
-}
+# TEMPEST PICTURES - Using the 3 images you provided
+TEMPEST_PICS = [
+    "https://files.catbox.moe/qjmgcg.jpg",  # Join picture
+    "https://files.catbox.moe/k07i6j.jpg",  # Unity picture  
+    "https://files.catbox.moe/d9qnw5.jpg",  # Initiated picture
+]
 
 # Create directories
 Path("data").mkdir(exist_ok=True)
@@ -50,7 +48,6 @@ bot_active = True
 upload_waiting = {}
 broadcast_state = {}
 pending_joins = {}
-story_messages = []  # Store story message IDs for deletion
 
 # ========== DATABASE ==========
 def init_db():
@@ -236,15 +233,6 @@ async def upload_to_catbox(file_data, filename):
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
-async def delete_story_messages(chat_id):
-    """Delete all story messages"""
-    for msg_id in story_messages:
-        try:
-            await bot.delete_message(chat_id, msg_id)
-        except:
-            pass
-    story_messages.clear()
-
 # ========== SCAN FUNCTION ==========
 async def scan_users_and_groups():
     """Scan database to update user and group information"""
@@ -305,219 +293,152 @@ async def scan_users_and_groups():
     except Exception as e:
         return f"❌ Scan error: {str(e)[:100]}"
 
-# ========== ANIMATED STORY SYSTEM - FIXED WITH RELIABLE IMAGES ==========
+# ========== ANIMATED STORY SYSTEM - SINGLE MESSAGE VERSION ==========
 async def animate_tempest_story(chat_id: int, user_name: str):
-    """Show animated story with pictures - FIXED VERSION"""
+    """Show animated story in ONE message - FIXED VERSION"""
     try:
-        # Clear previous story messages
-        await delete_story_messages(chat_id)
-        
         print(f"🌀 Starting Tempest story for {user_name} in chat {chat_id}")
         
-        # CHAPTER 1: The Beginning
-        try:
-            msg1 = await bot.send_photo(
-                chat_id=chat_id,
-                photo=TEMPEST_PICS["storm"],
-                caption="""🌌 <b>CHAPTER 1: THE VOID ERA</b>
-
-⚡ <b>RAVIJAH:</b> "The silence... it's deafening. This world needs a storm."
-
-🌑 <i>Year 0 - The Shattered Realms</i>
-
-Ravijah wandered through broken cities, lightning dancing at his fingertips. The Great Calm had lasted centuries, but a prophecy foretold change...
-
-🌀 <i>The eternal storm begins to stir...</i>""",
-                parse_mode=ParseMode.HTML
-            )
-            story_messages.append(msg1.message_id)
-            print("✅ Sent chapter 1")
-            await asyncio.sleep(7)
-        except Exception as e:
-            print(f"❌ Error chapter 1: {e}")
-            msg1 = await bot.send_message(
-                chat_id,
-                "🌌 <b>CHAPTER 1: THE VOID ERA</b>\n\n" +
-                "⚡ <b>RAVIJAH:</b> 'The silence... it's deafening. This world needs a storm.'\n\n" +
-                "🌑 <i>Year 0 - The Shattered Realms</i>\n\n" +
-                "Ravijah wandered through broken cities, lightning dancing at his fingertips...",
-                parse_mode=ParseMode.HTML
-            )
-            story_messages.append(msg1.message_id)
-            await asyncio.sleep(5)
+        # Start with first image
+        story_message = await bot.send_photo(
+            chat_id=chat_id,
+            photo=TEMPEST_PICS[0],
+            caption="🌌 <b>CHAPTER 1: THE VOID ERA</b>\n\n"
+                   "⚡ <b>RAVIJAH:</b> \"The silence... it's deafening. This world needs a storm.\"\n\n"
+                   "🌑 <i>Year 0 - The Shattered Realms</i>\n\n"
+                   "🌀 <i>The eternal storm begins to stir...</i>\n\n"
+                   "▰▱▱▱▱▱▱▱▱▱ 10%",
+            parse_mode=ParseMode.HTML
+        )
         
-        # CHAPTER 2: The Council Forms
-        try:
-            msg2 = await bot.send_photo(
-                chat_id=chat_id,
-                photo=TEMPEST_PICS["council"],
-                caption="""🔥 <b>CHAPTER 2: COUNCIL OF STORMS</b>
-
-🗡️ <b>BABLU:</b> "The Shard Lords took everything! When do we strike back?"
-
-👤 <b>KENY:</b> *emerges from darkness* "The Blood Moon rises soon. We prepare."
-
-⚡ <b>RAVIJAH:</b> "We gather the worthy. The Tempest will rise."
-
-❤️‍🔥 <b>ELARA:</b> "Your power... it terrifies others, but not me."
-
-🌪️ <i>The first ritual approaches...</i>""",
-                parse_mode=ParseMode.HTML
-            )
-            story_messages.append(msg2.message_id)
-            print("✅ Sent chapter 2")
-            await asyncio.sleep(7)
-        except Exception as e:
-            print(f"❌ Error chapter 2: {e}")
-            msg2 = await bot.send_message(
-                chat_id,
-                "🔥 <b>CHAPTER 2: COUNCIL OF STORMS</b>\n\n" +
-                "🗡️ <b>BABLU:</b> 'The Shard Lords took everything! When do we strike back?'\n\n" +
-                "👤 <b>KENY:</b> *emerges from darkness* 'The Blood Moon rises soon. We prepare.'\n\n" +
-                "⚡ <b>RAVIJAH:</b> 'We gather the worthy. The Tempest will rise.'",
-                parse_mode=ParseMode.HTML
-            )
-            story_messages.append(msg2.message_id)
-            await asyncio.sleep(5)
+        await asyncio.sleep(3)
         
-        # CHAPTER 3: Betrayal & Sacrifice
-        try:
-            msg3 = await bot.send_photo(
-                chat_id=chat_id,
-                photo=TEMPEST_PICS["unity"],
-                caption="""💔 <b>CHAPTER 3: FESTIVAL OF FLAMES</b>
-
-🎪 <i>The Twin Moons align...</i>
-
-🔪 <b>KAELEN:</b> "NOW! KILL THE STORM-BORN!"
-
-⚡ <b>RAVIJAH:</b> "ELARA, BEHIND YOU—!"
-
-🩸 <b>ELARA:</b> *takes the poisoned dagger* "Promise me... you'll live..."
-
-💀 <i>The blade finds its mark...</i>
-
-🌪️ <b>RAVIJAH:</b> *scream shatters the sky* "NOOOOOO!"
-
-🌀 <i>Grief births the First Tempest...</i>""",
-                parse_mode=ParseMode.HTML
-            )
-            story_messages.append(msg3.message_id)
-            print("✅ Sent chapter 3")
-            await asyncio.sleep(7)
-        except Exception as e:
-            print(f"❌ Error chapter 3: {e}")
-            msg3 = await bot.send_message(
-                chat_id,
-                "💔 <b>CHAPTER 3: FESTIVAL OF FLAMES</b>\n\n" +
-                "🔪 <b>KAELEN:</b> 'NOW! KILL THE STORM-BORN!'\n\n" +
-                "⚡ <b>RAVIJAH:</b> 'ELARA, BEHIND YOU—!'\n\n" +
-                "🩸 <b>ELARA:</b> *takes the poisoned dagger* 'Promise me... you'll live...'",
-                parse_mode=ParseMode.HTML
-            )
-            story_messages.append(msg3.message_id)
-            await asyncio.sleep(5)
+        # Update to second chapter with second image
+        await story_message.edit_caption(
+            caption="🌌 <b>CHAPTER 1: THE VOID ERA</b>\n\n"
+                   "⚡ <b>RAVIJAH:</b> \"The silence... it's deafening. This world needs a storm.\"\n\n"
+                   "🌑 <i>Year 0 - The Shattered Realms</i>\n\n"
+                   "🔥 <b>CHAPTER 2: COUNCIL OF STORMS</b>\n\n"
+                   "🗡️ <b>BABLU:</b> \"The Shard Lords took everything! When do we strike back?\"\n\n"
+                   "👤 <b>KENY:</b> *emerges from darkness* \"The Blood Moon rises soon. We prepare.\"\n\n"
+                   "🌪️ <i>The first ritual approaches...</i>\n\n"
+                   "▰▰▱▱▱▱▱▱▱▱ 20%",
+            parse_mode=ParseMode.HTML
+        )
         
-        # CHAPTER 4: The Golden Age
-        try:
-            msg4 = await bot.send_photo(
-                chat_id=chat_id,
-                photo=TEMPEST_PICS["join"],
-                caption="""👑 <b>CHAPTER 4: GOLDEN ERA</b>
-
-<code>Year 150 - Age of Conquest</code>
-
-⚡ <b>RAVIJAH:</b> "Three centuries of storms. The Tempest stands unbroken."
-
-🗡️ <b>BABLU:</b> "The Crystal Empire surrenders! Their queen offers tribute!"
-
-👤 <b>KENY:</b> "The Shadow Syndicate eliminated. Their leaders now dust."
-
-⚡ <b>RAVIJAH:</b> "The storm grows. New blood joins our ranks."
-
-🌀 <i>Legend becomes reality, century after century...</i>""",
-                parse_mode=ParseMode.HTML
-            )
-            story_messages.append(msg4.message_id)
-            print("✅ Sent chapter 4")
-            await asyncio.sleep(7)
-        except Exception as e:
-            print(f"❌ Error chapter 4: {e}")
-            msg4 = await bot.send_message(
-                chat_id,
-                "👑 <b>CHAPTER 4: GOLDEN ERA</b>\n\n" +
-                "⚡ <b>RAVIJAH:</b> 'Three centuries of storms. The Tempest stands unbroken.'\n\n" +
-                "🗡️ <b>BABLU:</b> 'The Crystal Empire surrenders! Their queen offers tribute!'\n\n" +
-                "👤 <b>KENY:</b> 'The Shadow Syndicate eliminated. Their leaders now dust.'",
-                parse_mode=ParseMode.HTML
-            )
-            story_messages.append(msg4.message_id)
-            await asyncio.sleep(5)
+        await asyncio.sleep(3)
         
-        # CHAPTER 5: Modern Era & Welcome
-        try:
-            msg5 = await bot.send_photo(
-                chat_id=chat_id,
-                photo=TEMPEST_PICS["initiated"],
-                caption=f"""📡 <b>CHAPTER 5: ETERNAL STORM</b>
-
-<code>Present Day - Digital Age</code>
-
-⚡ <b>RAVIJAH:</b> "The storm adapts. Now it flows through networks and codes."
-
-💻 <b>KENY:</b> "Our reach spans the digital world. Every connection strengthens us."
-
-📱 <b>BABLU:</b> "New souls join daily. The Tempest evolves."
-
-🌀 <b>NARRATOR:</b> And now, {user_name}... the choice is yours.
-
-<i>Will you join the eternal storm?</i>
-
-⚡ Become legend...
-🌩️ Write your chapter...
-🌀 Join the Tempest!""",
+        # Update to third chapter with third image
+        await bot.edit_message_media(
+            chat_id=chat_id,
+            message_id=story_message.message_id,
+            media=types.InputMediaPhoto(
+                media=TEMPEST_PICS[1],
+                caption="🌌 <b>CHAPTER 1: THE VOID ERA</b>\n\n"
+                       "⚡ <b>RAVIJAH:</b> \"The silence... it's deafening. This world needs a storm.\"\n\n"
+                       "🔥 <b>CHAPTER 2: COUNCIL OF STORMS</b>\n\n"
+                       "🗡️ <b>BABLU:</b> \"The Shard Lords took everything!\"\n\n"
+                       "💔 <b>CHAPTER 3: FESTIVAL OF FLAMES</b>\n\n"
+                       "🔪 <b>KAELEN:</b> \"NOW! KILL THE STORM-BORN!\"\n\n"
+                       "⚡ <b>RAVIJAH:</b> \"ELARA, BEHIND YOU—!\"\n\n"
+                       "🩸 <b>ELARA:</b> *takes the poisoned dagger* \"Promise me... you'll live...\"\n\n"
+                       "▰▰▰▱▱▱▱▱▱▱ 30%",
                 parse_mode=ParseMode.HTML
             )
-            story_messages.append(msg5.message_id)
-            print("✅ Sent chapter 5")
-        except Exception as e:
-            print(f"❌ Error chapter 5: {e}")
-            msg5 = await bot.send_message(
-                chat_id,
-                f"📡 <b>CHAPTER 5: ETERNAL STORM</b>\n\n" +
-                f"⚡ <b>RAVIJAH:</b> 'The storm adapts. Now it flows through networks and codes.'\n\n" +
-                f"💻 <b>KENY:</b> 'Our reach spans the digital world.'\n\n" +
-                f"🌀 <b>NARRATOR:</b> And now, {user_name}... the choice is yours.\n\n" +
-                f"<i>Will you join the eternal storm?</i>",
-                parse_mode=ParseMode.HTML
-            )
-            story_messages.append(msg5.message_id)
+        )
         
-        # Auto-delete after completion
-        print("⏳ Waiting before deleting story...")
+        await asyncio.sleep(3)
+        
+        # Continue with same image
+        await story_message.edit_caption(
+            caption="🌌 <b>CHAPTER 1: THE VOID ERA</b>\n\n"
+                   "⚡ <b>RAVIJAH:</b> \"This world needs a storm.\"\n\n"
+                   "🔥 <b>CHAPTER 2: COUNCIL OF STORMS</b>\n\n"
+                   "🗡️ <b>BABLU:</b> \"We must strike back!\"\n\n"
+                   "💔 <b>CHAPTER 3: FESTIVAL OF FLAMES</b>\n\n"
+                   "🔪 <b>KAELEN:</b> \"KILL THE STORM-BORN!\"\n\n"
+                   "⚡ <b>RAVIJAH:</b> *scream shatters the sky* \"NOOOOOO!\"\n\n"
+                   "👑 <b>CHAPTER 4: GOLDEN ERA</b>\n\n"
+                   "⚡ <b>RAVIJAH:</b> \"Three centuries of storms. The Tempest stands unbroken.\"\n\n"
+                   "▰▰▰▰▱▱▱▱▱▱ 40%",
+            parse_mode=ParseMode.HTML
+        )
+        
+        await asyncio.sleep(3)
+        
+        # Update to final image
+        await bot.edit_message_media(
+            chat_id=chat_id,
+            message_id=story_message.message_id,
+            media=types.InputMediaPhoto(
+                media=TEMPEST_PICS[2],
+                caption="🔥 <b>CHAPTER 2: COUNCIL OF STORMS</b>\n\n"
+                       "👤 <b>KENY:</b> \"Our preparation is complete.\"\n\n"
+                       "💔 <b>CHAPTER 3: FESTIVAL OF FLAMES</b>\n\n"
+                       "💀 <i>The blade finds its mark...</i>\n\n"
+                       "👑 <b>CHAPTER 4: GOLDEN ERA</b>\n\n"
+                       "⚡ <b>RAVIJAH:</b> \"The Tempest stands unbroken.\"\n\n"
+                       "🗡️ <b>BABLU:</b> \"The Crystal Empire surrenders!\"\n\n"
+                       "📡 <b>CHAPTER 5: ETERNAL STORM</b>\n\n"
+                       "💻 <b>KENY:</b> \"Our reach spans the digital world.\"\n\n"
+                       "▰▰▰▰▰▱▱▱▱▱ 50%",
+                parse_mode=ParseMode.HTML
+            )
+        )
+        
+        await asyncio.sleep(3)
+        
+        # Final update
+        await story_message.edit_caption(
+            caption="💔 <b>CHAPTER 3: FESTIVAL OF FLAMES</b>\n\n"
+                   "🌀 <i>Grief births the First Tempest...</i>\n\n"
+                   "👑 <b>CHAPTER 4: GOLDEN ERA</b>\n\n"
+                   "⚡ <b>RAVIJAH:</b> \"Legend becomes reality, century after century...\"\n\n"
+                   "📡 <b>CHAPTER 5: ETERNAL STORM</b>\n\n"
+                   "<code>Present Day - Digital Age</code>\n\n"
+                   "⚡ <b>RAVIJAH:</b> \"The storm adapts. Now it flows through networks and codes.\"\n\n"
+                   "📱 <b>BABLU:</b> \"New souls join daily. The Tempest evolves.\"\n\n"
+                   f"🌀 <b>NARRATOR:</b> And now, {user_name}... the choice is yours.\n\n"
+                   "<i>Will you join the eternal storm?</i>\n\n"
+                   "▰▰▰▰▰▰▰▰▰▰ 100%\n\n"
+                   "⚡ <i>Story Complete</i>",
+            parse_mode=ParseMode.HTML
+        )
+        
+        print("✅ Story completed successfully")
+        
+        # Auto-delete after 10 seconds
         await asyncio.sleep(10)
-        await delete_story_messages(chat_id)
-        print("✅ Story completed and deleted")
+        try:
+            await bot.delete_message(chat_id, story_message.message_id)
+            print("✅ Story message deleted")
+        except:
+            print("⚠️ Could not delete story message")
         
         return True
         
     except Exception as e:
         print(f"❌ Story animation error: {e}")
-        # Send simple text story if pictures fail
+        # Send simple one-time story if animation fails
         try:
             fallback = await bot.send_message(
                 chat_id,
-                f"🌀 <b>TEMPEST SAGA</b>\n\n" +
-                f"⚡ <b>RAVIJAH:</b> 'The storm calls...'\n" +
-                f"🗡️ <b>BABLU:</b> 'We fight as one!'\n" +
-                f"👤 <b>KENY:</b> 'Silence is our weapon...'\n\n" +
-                f"🌪️ {user_name}, welcome to the legend...\n\n" +
-                f"<i>Story will auto-delete in 10 seconds...</i>",
+                f"🌀 <b>TEMPEST SAGA - COMPLETE STORY</b>\n\n"
+                f"⚡ <b>RAVIJAH:</b> 'The storm calls...'\n"
+                f"🗡️ <b>BABLU:</b> 'We fight as one!'\n"
+                f"👤 <b>KENY:</b> 'Silence is our weapon...'\n\n"
+                f"💔 Betrayal at the Festival of Flames...\n"
+                f"👑 Golden Era of conquest...\n"
+                f"📡 Modern digital age...\n\n"
+                f"🌪️ {user_name}, welcome to the legend...\n\n"
+                f"<i>This message will auto-delete in 10 seconds...</i>",
                 parse_mode=ParseMode.HTML
             )
-            story_messages.append(fallback.message_id)
             await asyncio.sleep(10)
-            await delete_story_messages(chat_id)
+            try:
+                await bot.delete_message(chat_id, fallback.message_id)
+            except:
+                pass
         except:
             pass
         return False
@@ -1364,7 +1285,7 @@ async def handle_sacrifice(callback: CallbackQuery):
         parse_mode=ParseMode.HTML
     )
     
-    # Show animated story - THIS WILL NOW WORK
+    # Show animated story - NOW IN ONE MESSAGE
     await animate_tempest_story(chat_id, pending_joins[user.id]["name"])
     
     # Add to cult after story
@@ -1510,14 +1431,15 @@ async def handle_broadcast(message: Message):
 
 # ========== MAIN ==========
 async def main():
-    print("🚀 PRO BOT v3.2 STARTING...")
+    print("🚀 PRO BOT v3.3 STARTING...")
     print("✅ Database initialized")
     print("👥 User/Group detection: ACTIVE")
     print("🌀 Tempest Cult: WORKS IN GROUPS")
-    print("🎬 Animated Story: FIXED & WORKING")
+    print("🎬 Story: ONE MESSAGE ONLY (no flooding)")
     print("📡 All commands: READY")
     print("━━━━━━━━━━━━━━━━━━━━━━━━")
     print(f"🌪️ Tempest Leaders: {TEMPEST_LEADER}, {TEMPEST_VICE1}, {TEMPEST_VICE2}")
+    print(f"🖼️ Using your 3 provided images")
     
     await dp.start_polling(bot)
 
