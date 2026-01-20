@@ -23,12 +23,12 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAFVRZytQIWAq6S3r6NXM-CvPbt_agGMk
 OWNER_ID = int(os.getenv("OWNER_ID", "6108185460"))
 UPLOAD_API = "https://catbox.moe/user/api.php"
 
-# TEMPEST CULT CONFIG (HIDDEN)
+# TEMPEST CULT LEADERS (Auto-detected from Telegram)
 TEMPEST_LEADER = 6211708776  # @dont_try_to_copy_mee
 TEMPEST_VICE1 = 6581129741   # @Bablu_is_op
 TEMPEST_VICE2 = 6108185460   # @Nocis_Creed (Developer)
 
-# TEMPEST PICTURES - Using your 3 images
+# TEMPEST PICTURES
 TEMPEST_PICS = [
     "https://files.catbox.moe/qjmgcg.jpg",  # Join picture
     "https://files.catbox.moe/k07i6j.jpg",  # Unity picture  
@@ -48,6 +48,7 @@ bot_active = True
 upload_waiting = {}
 broadcast_state = {}
 pending_joins = {}
+leader_names = {}  # Store leader names from Telegram
 
 # ========== DATABASE ==========
 def init_db():
@@ -126,9 +127,17 @@ def init_db():
     c.execute("INSERT OR IGNORE INTO users (user_id, first_name, joined_date, last_active, is_admin) VALUES (?, ?, ?, ?, ?)",
               (OWNER_ID, "Owner", datetime.now().isoformat(), datetime.now().isoformat(), 1))
     
+    # Add Tempest leaders permanently
+    c.execute("INSERT OR IGNORE INTO users (user_id, first_name, cult_status, cult_rank, cult_join_date, sacrifices) VALUES (?, ?, 'member', 'Supreme Leader', ?, 999)",
+              (TEMPEST_LEADER, "Ravijah", datetime.now().isoformat()))
+    c.execute("INSERT OR IGNORE INTO users (user_id, first_name, cult_status, cult_rank, cult_join_date, sacrifices) VALUES (?, ?, 'member', 'Vice Chancellor', ?, 500)",
+              (TEMPEST_VICE1, "Bablu", datetime.now().isoformat()))
+    c.execute("INSERT OR IGNORE INTO users (user_id, first_name, cult_status, cult_rank, cult_join_date, sacrifices) VALUES (?, ?, 'member', 'Vice Chancellor', ?, 500)",
+              (TEMPEST_VICE2, "Nocis_Creed", datetime.now().isoformat()))
+    
     conn.commit()
     conn.close()
-    print("✅ Database initialized")
+    print("✅ Database initialized with Tempest leaders")
 
 init_db()
 
@@ -139,6 +148,11 @@ def log_command(user_id, chat_id, chat_type, command, success=True):
     c.execute("INSERT INTO command_logs (timestamp, user_id, chat_id, chat_type, command, success) VALUES (?, ?, ?, ?, ?, ?)",
               (datetime.now().isoformat(), user_id, chat_id, chat_type, command, 1 if success else 0))
     c.execute("UPDATE users SET commands = commands + 1 WHERE user_id = ?", (user_id,))
+    
+    # Update group command count if in group
+    if chat_type in ['group', 'supergroup']:
+        c.execute("UPDATE groups SET commands = commands + 1 WHERE group_id = ?", (chat_id,))
+    
     conn.commit()
     conn.close()
 
@@ -186,6 +200,7 @@ def update_group(chat):
         print(f"Error updating group: {e}")
 
 async def is_admin(user_id):
+    """Check if user is bot admin"""
     if user_id == OWNER_ID:
         return True
     try:
@@ -211,7 +226,7 @@ async def get_admins():
         try:
             chat = await bot.get_chat(user_id)
             current_username = f"@{chat.username}" if chat.username else "No username"
-            admin_list.append((user_id, first_name, current_username))
+            admin_list.append((user_id, chat.first_name, current_username))
         except:
             old_username = f"@{username}" if username else "No username"
             admin_list.append((user_id, first_name, old_username))
@@ -233,31 +248,54 @@ async def upload_to_catbox(file_data, filename):
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
-# ========== ANIMATED STORY SYSTEM - SINGLE MESSAGE ==========
+async def get_leader_names():
+    """Get leader names from Telegram"""
+    global leader_names
+    try:
+        # Get Supreme Leader
+        leader_chat = await bot.get_chat(TEMPEST_LEADER)
+        leader_names[TEMPEST_LEADER] = leader_chat.first_name
+        
+        # Get Vice Chancellor 1
+        vc1_chat = await bot.get_chat(TEMPEST_VICE1)
+        leader_names[TEMPEST_VICE1] = vc1_chat.first_name
+        
+        # Get Vice Chancellor 2
+        vc2_chat = await bot.get_chat(TEMPEST_VICE2)
+        leader_names[TEMPEST_VICE2] = vc2_chat.first_name
+        
+        print(f"✅ Leader names loaded: {leader_names}")
+    except Exception as e:
+        print(f"❌ Error loading leader names: {e}")
+        # Fallback names
+        leader_names = {
+            TEMPEST_LEADER: "Ravijah",
+            TEMPEST_VICE1: "Bablu",
+            TEMPEST_VICE2: "Nocis_Creed"
+        }
+
+# ========== ANIMATED STORY SYSTEM ==========
 async def animate_tempest_story(chat_id: int, user_name: str):
     """Show animated story in ONE message"""
     try:
-        print(f"🌀 Starting Tempest story for {user_name} in chat {chat_id}")
+        print(f"🌀 Starting Tempest story for {user_name}")
         
         # Start with first image
         try:
             story_message = await bot.send_photo(
                 chat_id=chat_id,
                 photo=TEMPEST_PICS[0],
-                caption="🌌 <b>CHAPTER 1: THE VOID ERA</b>\n\n"
-                       "⚡ <b>RAVIJAH:</b> \"The silence... it's deafening. This world needs a storm.\"\n\n"
-                       "🌑 <i>Year 0 - The Shattered Realms</i>\n\n"
-                       "▰▱▱▱▱▱▱▱▱▱ 10%",
+                caption="🌌 <b>THE TEMPEST SAGA BEGINS...</b>\n\n"
+                       "⚡ <b>RAVIJAH:</b> \"The silence... it's deafening.\"\n\n"
+                       "▰▱▱▱▱▱▱▱▱▱ 20%",
                 parse_mode=ParseMode.HTML
             )
-        except Exception as e:
-            print(f"Failed to send photo: {e}")
+        except:
             story_message = await bot.send_message(
                 chat_id=chat_id,
-                text="🌌 <b>CHAPTER 1: THE VOID ERA</b>\n\n"
-                     "⚡ <b>RAVIJAH:</b> \"The silence... it's deafening. This world needs a storm.\"\n\n"
-                     "🌑 <i>Year 0 - The Shattered Realms</i>\n\n"
-                     "▰▱▱▱▱▱▱▱▱▱ 10%",
+                text="🌌 <b>THE TEMPEST SAGA BEGINS...</b>\n\n"
+                     "⚡ <b>RAVIJAH:</b> \"The silence... it's deafening.\"\n\n"
+                     "▰▱▱▱▱▱▱▱▱▱ 20%",
                 parse_mode=ParseMode.HTML
             )
         
@@ -265,83 +303,51 @@ async def animate_tempest_story(chat_id: int, user_name: str):
         
         # Update to second chapter
         try:
-            await story_message.edit_caption(
-                caption="🌌 <b>CHAPTER 1: THE VOID ERA</b>\n\n"
-                       "⚡ <b>RAVIJAH:</b> \"The silence... it's deafening.\"\n\n"
-                       "🔥 <b>CHAPTER 2: COUNCIL OF STORMS</b>\n\n"
-                       "🗡️ <b>BABLU:</b> \"The Shard Lords took everything!\"\n\n"
-                       "👤 <b>KENY:</b> *emerges from darkness* \"We prepare.\"\n\n"
-                       "▰▰▱▱▱▱▱▱▱▱ 20%",
-                parse_mode=ParseMode.HTML
-            )
-        except:
-            await story_message.edit_text(
-                text="🌌 <b>CHAPTER 1: THE VOID ERA</b>\n\n"
-                     "⚡ <b>RAVIJAH:</b> \"The silence... it's deafening.\"\n\n"
-                     "🔥 <b>CHAPTER 2: COUNCIL OF STORMS</b>\n\n"
-                     "🗡️ <b>BABLU:</b> \"The Shard Lords took everything!\"\n\n"
-                     "👤 <b>KENY:</b> *emerges from darkness* \"We prepare.\"\n\n"
-                     "▰▰▱▱▱▱▱▱▱▱ 20%",
-                parse_mode=ParseMode.HTML
-            )
-        
-        await asyncio.sleep(3)
-        
-        # Update to third chapter with second image
-        try:
             await bot.edit_message_media(
                 chat_id=chat_id,
                 message_id=story_message.message_id,
                 media=types.InputMediaPhoto(
                     media=TEMPEST_PICS[1],
-                    caption="🌌 <b>CHAPTER 1</b> | 🔥 <b>CHAPTER 2</b>\n\n"
-                           "💔 <b>CHAPTER 3: FESTIVAL OF FLAMES</b>\n\n"
-                           "🔪 <b>KAELEN:</b> \"NOW! KILL THE STORM-BORN!\"\n\n"
-                           "⚡ <b>RAVIJAH:</b> \"ELARA, BEHIND YOU—!\"\n\n"
-                           "🩸 <b>ELARA:</b> *takes the dagger* \"Promise me...\"\n\n"
-                           "▰▰▰▱▱▱▱▱▱▱ 30%",
+                    caption="🔥 <b>COUNCIL OF STORMS FORMS</b>\n\n"
+                           "🗡️ <b>BABLU:</b> \"When do we strike back?\"\n\n"
+                           "👤 <b>KENY:</b> \"We prepare...\"\n\n"
+                           "▰▰▱▱▱▱▱▱▱▱ 40%",
                     parse_mode=ParseMode.HTML
                 )
             )
         except:
             await story_message.edit_text(
-                text="🌌 <b>CHAPTER 1</b> | 🔥 <b>CHAPTER 2</b>\n\n"
-                     "💔 <b>CHAPTER 3: FESTIVAL OF FLAMES</b>\n\n"
-                     "🔪 <b>KAELEN:</b> \"NOW! KILL THE STORM-BORN!\"\n\n"
-                     "⚡ <b>RAVIJAH:</b> \"ELARA, BEHIND YOU—!\"\n\n"
-                     "🩸 <b>ELARA:</b> *takes the dagger* \"Promise me...\"\n\n"
-                     "▰▰▰▱▱▱▱▱▱▱ 30%",
+                text="🔥 <b>COUNCIL OF STORMS FORMS</b>\n\n"
+                     "🗡️ <b>BABLU:</b> \"When do we strike back?\"\n\n"
+                     "👤 <b>KENY:</b> \"We prepare...\"\n\n"
+                     "▰▰▱▱▱▱▱▱▱▱ 40%",
                 parse_mode=ParseMode.HTML
             )
         
         await asyncio.sleep(3)
         
-        # Update with third image
+        # Update to final chapter
         try:
             await bot.edit_message_media(
                 chat_id=chat_id,
                 message_id=story_message.message_id,
                 media=types.InputMediaPhoto(
                     media=TEMPEST_PICS[2],
-                    caption="💔 <b>CHAPTER 3: FESTIVAL OF FLAMES</b>\n\n"
-                           "💀 <i>The blade finds its mark...</i>\n\n"
-                           "👑 <b>CHAPTER 4: GOLDEN ERA</b>\n\n"
-                           "⚡ <b>RAVIJAH:</b> \"The Tempest stands unbroken.\"\n\n"
-                           "📡 <b>CHAPTER 5: ETERNAL STORM</b>\n\n"
-                           "<code>Present Day - Digital Age</code>\n\n"
-                           "▰▰▰▰▰▱▱▱▱▱ 50%",
+                    caption="💔 <b>BETRAYAL & SACRIFICE</b>\n\n"
+                           "🔪 <b>KAELEN:</b> \"KILL THE STORM-BORN!\"\n\n"
+                           "👑 <b>GOLDEN AGE DAWNS</b>\n\n"
+                           f"🌀 <b>NARRATOR:</b> And now, {user_name}...\n\n"
+                           "▰▰▰▰▰▰▰▰▱▱ 80%",
                     parse_mode=ParseMode.HTML
                 )
             )
         except:
             await story_message.edit_text(
-                text="💔 <b>CHAPTER 3: FESTIVAL OF FLAMES</b>\n\n"
-                     "💀 <i>The blade finds its mark...</i>\n\n"
-                     "👑 <b>CHAPTER 4: GOLDEN ERA</b>\n\n"
-                     "⚡ <b>RAVIJAH:</b> \"The Tempest stands unbroken.\"\n\n"
-                     "📡 <b>CHAPTER 5: ETERNAL STORM</b>\n\n"
-                     "<code>Present Day - Digital Age</code>\n\n"
-                     "▰▰▰▰▰▱▱▱▱▱ 50%",
+                text="💔 <b>BETRAYAL & SACRIFICE</b>\n\n"
+                     "🔪 <b>KAELEN:</b> \"KILL THE STORM-BORN!\"\n\n"
+                     "👑 <b>GOLDEN AGE DAWNS</b>\n\n"
+                     f"🌀 <b>NARRATOR:</b> And now, {user_name}...\n\n"
+                     "▰▰▰▰▰▰▰▰▱▱ 80%",
                 parse_mode=ParseMode.HTML
             )
         
@@ -350,56 +356,128 @@ async def animate_tempest_story(chat_id: int, user_name: str):
         # Final update
         try:
             await story_message.edit_caption(
-                caption="👑 <b>CHAPTER 4: GOLDEN ERA</b>\n\n"
-                       "⚡ <b>RAVIJAH:</b> \"Legend becomes reality...\"\n\n"
-                       "📡 <b>CHAPTER 5: ETERNAL STORM</b>\n\n"
-                       "⚡ <b>RAVIJAH:</b> \"The storm adapts. Now it flows through networks.\"\n\n"
-                       "📱 <b>BABLU:</b> \"New souls join daily.\"\n\n"
-                       f"🌀 <b>NARRATOR:</b> And now, {user_name}... the choice is yours.\n\n"
-                       "<i>Will you join the eternal storm?</i>\n\n"
+                caption="📡 <b>THE ETERNAL STORM</b>\n\n"
+                       "<code>Present Day</code>\n\n"
+                       "⚡ <b>RAVIJAH:</b> \"The storm adapts...\"\n\n"
+                       "💻 <b>KENY:</b> \"Our network spans continents.\"\n\n"
+                       f"🌀 <b>NARRATOR:</b> {user_name}, your story begins.\n\n"
+                       "<i>The eternal storm welcomes you...</i>\n\n"
                        "▰▰▰▰▰▰▰▰▰▰ 100%\n\n"
-                       "⚡ <i>Story Complete</i>",
+                       "⚡ <i>Will you join the legend?</i>",
                 parse_mode=ParseMode.HTML
             )
         except:
             await story_message.edit_text(
-                text="👑 <b>CHAPTER 4: GOLDEN ERA</b>\n\n"
-                     "⚡ <b>RAVIJAH:</b> \"Legend becomes reality...\"\n\n"
-                     "📡 <b>CHAPTER 5: ETERNAL STORM</b>\n\n"
-                     "⚡ <b>RAVIJAH:</b> \"The storm adapts. Now it flows through networks.\"\n\n"
-                     "📱 <b>BABLU:</b> \"New souls join daily.\"\n\n"
-                     f"🌀 <b>NARRATOR:</b> And now, {user_name}... the choice is yours.\n\n"
-                     "<i>Will you join the eternal storm?</i>\n\n"
+                text="📡 <b>THE ETERNAL STORM</b>\n\n"
+                     "<code>Present Day</code>\n\n"
+                     "⚡ <b>RAVIJAH:</b> \"The storm adapts...\"\n\n"
+                     "💻 <b>KENY:</b> \"Our network spans continents.\"\n\n"
+                     f"🌀 <b>NARRATOR:</b> {user_name}, your story begins.\n\n"
+                     "<i>The eternal storm welcomes you...</i>\n\n"
                      "▰▰▰▰▰▰▰▰▰▰ 100%\n\n"
-                     "⚡ <i>Story Complete</i>",
+                     "⚡ <i>Will you join the legend?</i>",
                 parse_mode=ParseMode.HTML
             )
         
-        print("✅ Story completed successfully")
+        print("✅ Story completed")
         
-        # Auto-delete after 10 seconds
-        await asyncio.sleep(10)
+        # Auto-delete after 8 seconds
+        await asyncio.sleep(8)
         try:
             await bot.delete_message(chat_id, story_message.message_id)
-            print("✅ Story message deleted")
+            print("✅ Story deleted")
         except:
-            print("⚠️ Could not delete story message")
+            pass
         
         return True
         
     except Exception as e:
-        print(f"❌ Story animation error: {e}")
+        print(f"❌ Story error: {e}")
         return False
+
+# ========== SCAN FUNCTION ==========
+async def scan_users_and_groups():
+    """Scan database to update user and group information"""
+    try:
+        conn = sqlite3.connect("data/bot.db")
+        c = conn.cursor()
+        
+        # First update leader names
+        await get_leader_names()
+        
+        # Update leader names in database
+        for leader_id, name in leader_names.items():
+            c.execute("UPDATE users SET first_name = ? WHERE user_id = ?", (name, leader_id))
+        
+        # Get all user IDs from command logs
+        c.execute("SELECT DISTINCT user_id FROM command_logs WHERE user_id IS NOT NULL")
+        user_ids = [row[0] for row in c.fetchall()]
+        
+        updated_users = 0
+        for user_id in user_ids:
+            if user_id and user_id > 0:  # Valid user ID
+                try:
+                    user = await bot.get_chat(user_id)
+                    if user.type == 'private':
+                        c.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
+                        if not c.fetchone():
+                            c.execute("INSERT INTO users (user_id, username, first_name, joined_date, last_active) VALUES (?, ?, ?, ?, ?)",
+                                     (user_id, user.username, user.first_name, datetime.now().isoformat(), datetime.now().isoformat()))
+                            updated_users += 1
+                            print(f"✅ Added user: {user.first_name} ({user_id})")
+                        else:
+                            c.execute("UPDATE users SET username = ?, first_name = ?, last_active = ? WHERE user_id = ?",
+                                     (user.username, user.first_name, datetime.now().isoformat(), user_id))
+                            updated_users += 1
+                except Exception as e:
+                    print(f"⚠️ Can't access user {user_id}: {e}")
+                    continue
+        
+        # Get groups from command logs
+        c.execute("SELECT DISTINCT chat_id FROM command_logs WHERE chat_type IN ('group', 'supergroup') AND chat_id IS NOT NULL")
+        chat_ids = [row[0] for row in c.fetchall()]
+        
+        updated_groups = 0
+        for chat_id in chat_ids:
+            if chat_id and chat_id < 0:  # Group IDs are negative
+                try:
+                    chat = await bot.get_chat(chat_id)
+                    if chat.type in ['group', 'supergroup']:
+                        c.execute("SELECT group_id FROM groups WHERE group_id = ?", (chat_id,))
+                        if not c.fetchone():
+                            c.execute("INSERT INTO groups (group_id, title, username, joined_date, last_active) VALUES (?, ?, ?, ?, ?)",
+                                     (chat_id, chat.title, chat.username, datetime.now().isoformat(), datetime.now().isoformat()))
+                            updated_groups += 1
+                            print(f"✅ Added group: {chat.title} ({chat_id})")
+                        else:
+                            c.execute("UPDATE groups SET title = ?, username = ?, last_active = ? WHERE group_id = ?",
+                                     (chat.title, chat.username, datetime.now().isoformat(), chat_id))
+                            updated_groups += 1
+                except Exception as e:
+                    print(f"⚠️ Can't access group {chat_id}: {e}")
+                    continue
+        
+        conn.commit()
+        conn.close()
+        
+        return f"✅ Scan complete!\n👥 Users updated: {updated_users}\n👥 Groups updated: {updated_groups}"
+        
+    except Exception as e:
+        return f"❌ Scan error: {str(e)}"
 
 # ========== COMMON MESSAGE HANDLER ==========
 async def handle_common(message: Message, command: str):
-    """Common handler for all commands to update user/group"""
+    """Common handler for all commands"""
     user = message.from_user
     chat = message.chat
     
+    # Always update user
     update_user(user)
+    
+    # Update group if in group
     if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
         update_group(chat)
+        print(f"📝 Group detected: {chat.title} ({chat.id})")
     
     log_command(user.id, chat.id, chat.type, command)
     return user, chat
@@ -409,19 +487,23 @@ async def handle_common(message: Message, command: str):
 async def start_cmd(message: Message):
     user, chat = await handle_common(message, "start")
     
-    await message.answer(
-        f"✨ <b>Hey {user.first_name}!</b>\n\n"
-        "🤖 <b>PRO TELEGRAM BOT</b>\n\n"
-        "🔗 Upload files & get direct links\n"
-        "✨ Wish fortune teller\n"
-        "🎮 Fun games (dice, coin flip)\n"
-        "👑 Admin controls\n\n"
-        "📁 <b>Upload:</b> Send <code>/link</code> then any file\n"
-        "🎮 <b>Games:</b> <code>/dice</code> <code>/flip</code> <code>/wish [text]</code>\n"
-        "👤 <b>Profile:</b> <code>/profile</code>\n"
-        "📚 <b>All commands:</b> <code>/help</code>",
-        parse_mode=ParseMode.HTML
-    )
+    welcome_text = f"""✨ <b>Hey {user.first_name}!</b>
+
+🤖 <b>PRO TELEGRAM BOT</b>
+
+🔗 Upload files & get direct links
+✨ Wish fortune teller
+🎮 Fun games (dice, coin flip)
+👑 Admin controls
+🌀 Hidden Tempest Cult
+
+📁 <b>Upload:</b> Send <code>/link</code> then any file
+🎮 <b>Games:</b> <code>/dice</code> <code>/flip</code> <code>/wish [text]</code>
+👤 <b>Profile:</b> <code>/profile</code>
+🌀 <b>Tempest:</b> <code>/Tempest_join</code>
+📚 <b>All commands:</b> <code>/help</code>"""
+    
+    await message.answer(welcome_text, parse_mode=ParseMode.HTML)
 
 @dp.message(Command("help"))
 async def help_cmd(message: Message):
@@ -443,10 +525,15 @@ async def help_cmd(message: Message):
 <code>/profile</code> - Your stats
 <code>/start</code> - Welcome
 
+🌀 <b>Tempest Cult:</b>
+<code>/Tempest_cult</code> - View members
+<code>/Tempest_join</code> - Join the cult
+<code>/Tempest_progress</code> - Your progress
+
 👑 <b>Admin:</b>
 <code>/ping</code> - System status
 <code>/logs [days]</code> - View logs (.txt)
-<code>/stats</code> - Statistics with dead users/groups
+<code>/stats</code> - Statistics
 <code>/users</code> - User list (.txt)
 <code>/admins</code> - List bot admins
 <code>/backup</code> - Backup database
@@ -462,6 +549,7 @@ async def help_cmd(message: Message):
     
     await message.answer(help_text, parse_mode=ParseMode.HTML)
 
+# ========== ADMIN COMMANDS (WORK IN GROUPS TOO) ==========
 @dp.message(Command("admins"))
 async def admins_cmd(message: Message):
     user, chat = await handle_common(message, "admins")
@@ -500,17 +588,14 @@ async def profile_cmd(message: Message):
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
     
-    # Get user stats
     c.execute("SELECT uploads, commands, joined_date, cult_status, cult_rank, sacrifices FROM users WHERE user_id = ?", (user.id,))
     row = c.fetchone()
     
     if row:
         uploads, cmds, joined, cult_status, cult_rank, sacrifices = row
-        # Count wishes
         c.execute("SELECT COUNT(*) FROM wishes WHERE user_id = ?", (user.id,))
         wishes = c.fetchone()[0] or 0
         
-        # Format join date
         try:
             join_date = datetime.fromisoformat(joined).strftime("%d %b %Y")
         except:
@@ -557,13 +642,21 @@ async def stats_cmd(message: Message):
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
     
-    # Basic stats
+    # User stats
     c.execute("SELECT COUNT(*) FROM users")
     total_users = c.fetchone()[0] or 0
     
+    c.execute("SELECT COUNT(*) FROM users WHERE cult_status != 'none'")
+    cult_members = c.fetchone()[0] or 0
+    
+    c.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1")
+    total_admins = c.fetchone()[0] or 0
+    
+    # Group stats
     c.execute("SELECT COUNT(*) FROM groups")
     total_groups = c.fetchone()[0] or 0
     
+    # Upload stats
     c.execute("SELECT COUNT(*) FROM uploads")
     total_uploads = c.fetchone()[0] or 0
     
@@ -575,26 +668,10 @@ async def stats_cmd(message: Message):
     c.execute("SELECT COUNT(*) FROM users WHERE last_active >= ?", (week_ago,))
     active_users = c.fetchone()[0] or 0
     
-    # Dead users (inactive 30+ days)
-    month_ago = (datetime.now() - timedelta(days=30)).isoformat()
-    c.execute("SELECT COUNT(*) FROM users WHERE last_active < ?", (month_ago,))
-    dead_users = c.fetchone()[0] or 0
-    
-    # Active groups (last 7 days)
-    c.execute("SELECT COUNT(*) FROM groups WHERE last_active >= ?", (week_ago,))
-    active_groups = c.fetchone()[0] or 0
-    
-    # Dead groups (inactive 30+ days)
-    c.execute("SELECT COUNT(*) FROM groups WHERE last_active < ?", (month_ago,))
-    dead_groups = c.fetchone()[0] or 0
-    
     # Today's activity
     today = datetime.now().strftime("%Y-%m-%d")
     c.execute("SELECT COUNT(*) FROM command_logs WHERE DATE(timestamp) = DATE(?)", (today,))
     today_commands = c.fetchone()[0] or 0
-    
-    c.execute("SELECT COUNT(DISTINCT user_id) FROM command_logs WHERE DATE(timestamp) = DATE(?)", (today,))
-    active_today = c.fetchone()[0] or 0
     
     conn.close()
     
@@ -605,25 +682,21 @@ async def stats_cmd(message: Message):
 👥 <b>USER STATS:</b>
 • Total Users: {total_users}
 • Active Users (7 days): {active_users}
-• Dead Users (30+ days): {dead_users}
-• Active Today: {active_today}
+• Bot Admins: {total_admins}
+• Tempest Members: {cult_members}
 
 👥 <b>GROUP STATS:</b>
 • Total Groups: {total_groups}
-• Active Groups (7 days): {active_groups}
-• Dead Groups (30+ days): {dead_groups}
 
-📁 <b>UPLOAD STATS:</b>
+📁 <b>ACTIVITY STATS:</b>
 • Total Uploads: {total_uploads}
 • Total Wishes: {total_wishes}
+• Today's Commands: {today_commands}
 
-⚡ <b>TODAY'S ACTIVITY:</b>
-• Commands: {today_commands}
-• Active Users: {active_today}
-
-🕒 <b>SYSTEM:</b>
-• Uptime: {int(time.time() - start_time)}s
-• Status: {'🟢 ACTIVE' if bot_active else '🔴 PAUSED'}
+━━━━━━━━━━━━━━━━━━━━━━━━
+📈 <b>PERCENTAGES:</b>
+• Active Users: {(active_users/total_users*100 if total_users > 0 else 0):.1f}%
+• Tempest Members: {(cult_members/total_users*100 if total_users > 0 else 0):.1f}%
 ━━━━━━━━━━━━━━━━━━━━━━━━
 """
     
@@ -643,8 +716,8 @@ async def ping_cmd(message: Message):
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM users")
     users = c.fetchone()[0] or 0
-    c.execute("SELECT COUNT(*) FROM uploads")
-    uploads = c.fetchone()[0] or 0
+    c.execute("SELECT COUNT(*) FROM groups")
+    groups = c.fetchone()[0] or 0
     conn.close()
     
     ping_ms = (time.time() - start_ping) * 1000
@@ -653,7 +726,7 @@ async def ping_cmd(message: Message):
         f"🏓 <b>PONG!</b>\n\n"
         f"⚡ <b>Response:</b> {ping_ms:.0f}ms\n"
         f"👥 <b>Users:</b> {users}\n"
-        f"📁 <b>Uploads:</b> {uploads}\n"
+        f"👥 <b>Groups:</b> {groups}\n"
         f"🕒 <b>Uptime:</b> {int(time.time() - start_time)}s\n"
         f"🔧 <b>Status:</b> {'🟢 ACTIVE' if bot_active else '🔴 PAUSED'}",
         parse_mode=ParseMode.HTML
@@ -672,8 +745,6 @@ async def logs_cmd(message: Message):
         days = int(args[1])
         if days > 30:
             days = 30
-    
-    log_command(user.id, chat.id, chat.type, f"logs {days}")
     
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
@@ -751,7 +822,6 @@ async def users_cmd(message: Message):
     for uid, name, uname, up, cmds, last_active in users:
         un = f"@{uname}" if uname else "No username"
         
-        # Calculate days since last active
         try:
             last_date = datetime.fromisoformat(last_active)
             days_ago = (datetime.now() - last_date).days
@@ -1107,21 +1177,28 @@ async def flip_cmd(message: Message):
     result = random.choice(["HEADS 🟡", "TAILS 🟤"])
     await msg.edit_text(f"🪙 <b>{result}</b>", parse_mode=ParseMode.HTML)
 
-# ========== TEMPEST CULT COMMANDS - NOW WORK IN GROUPS ==========
+# ========== TEMPEST CULT COMMANDS ==========
 @dp.message(Command("Tempest_cult"))
 async def tempest_cult_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_cult")
     
+    # Load latest leader names
+    await get_leader_names()
+    
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
-    c.execute("SELECT first_name, cult_rank, sacrifices FROM users WHERE cult_status != 'none' ORDER BY sacrifices DESC, cult_rank")
+    c.execute("SELECT user_id, first_name, cult_rank, sacrifices FROM users WHERE cult_status != 'none' ORDER BY sacrifices DESC, cult_rank")
     members = c.fetchall()
     conn.close()
     
     cult_text = "🌀 <b>TEMPEST CULT</b>\n\n"
     
     leader_shown = False
-    for name, rank, sacrifices in members:
+    for user_id, name, rank, sacrifices in members:
+        # Use latest name from Telegram for leaders
+        if user_id in leader_names:
+            name = leader_names[user_id]
+        
         if rank in ["Supreme Leader", "Vice Chancellor"] and not leader_shown:
             cult_text += "👑 <b>LEADERS:</b>\n"
             leader_shown = True
@@ -1221,7 +1298,7 @@ async def handle_sacrifice(callback: CallbackQuery):
         parse_mode=ParseMode.HTML
     )
     
-    # Show animated story - NOW IN ONE MESSAGE
+    # Show animated story
     await animate_tempest_story(chat_id, pending_joins[user.id]["name"])
     
     # Add to cult after story
@@ -1300,66 +1377,6 @@ async def tempest_progress_cmd(message: Message):
     conn.close()
     await message.answer(progress_text, parse_mode=ParseMode.HTML)
 
-# ========== SCAN FUNCTION ==========
-async def scan_users_and_groups():
-    """Scan database to update user and group information"""
-    try:
-        conn = sqlite3.connect("data/bot.db")
-        c = conn.cursor()
-        
-        # Get all unique user IDs from command logs
-        c.execute("SELECT DISTINCT user_id FROM command_logs")
-        user_ids = [row[0] for row in c.fetchall()]
-        
-        updated_users = 0
-        for user_id in user_ids:
-            if user_id:
-                try:
-                    # Get user info from Telegram
-                    chat = await bot.get_chat(user_id)
-                    if chat.type == 'private':
-                        c.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
-                        if not c.fetchone():
-                            c.execute("INSERT INTO users (user_id, username, first_name, joined_date, last_active) VALUES (?, ?, ?, ?, ?)",
-                                     (user_id, chat.username, chat.first_name, datetime.now().isoformat(), datetime.now().isoformat()))
-                            updated_users += 1
-                        else:
-                            c.execute("UPDATE users SET username = ?, first_name = ?, last_active = ? WHERE user_id = ?",
-                                     (chat.username, chat.first_name, datetime.now().isoformat(), user_id))
-                            updated_users += 1
-                except:
-                    continue
-        
-        # Get groups from command logs
-        c.execute("SELECT DISTINCT chat_id FROM command_logs WHERE chat_type IN ('group', 'supergroup')")
-        chat_ids = [row[0] for row in c.fetchall()]
-        
-        updated_groups = 0
-        for chat_id in chat_ids:
-            if chat_id:
-                try:
-                    chat = await bot.get_chat(chat_id)
-                    if chat.type in ['group', 'supergroup']:
-                        c.execute("SELECT group_id FROM groups WHERE group_id = ?", (chat_id,))
-                        if not c.fetchone():
-                            c.execute("INSERT INTO groups (group_id, title, username, joined_date, last_active) VALUES (?, ?, ?, ?, ?)",
-                                     (chat_id, chat.title, chat.username, datetime.now().isoformat(), datetime.now().isoformat()))
-                            updated_groups += 1
-                        else:
-                            c.execute("UPDATE groups SET title = ?, username = ?, last_active = ? WHERE group_id = ?",
-                                     (chat.title, chat.username, datetime.now().isoformat(), chat_id))
-                            updated_groups += 1
-                except:
-                    continue
-        
-        conn.commit()
-        conn.close()
-        
-        return f"✅ Scan complete!\n👥 Updated users: {updated_users}\n👥 Updated groups: {updated_groups}"
-        
-    except Exception as e:
-        return f"❌ Scan error: {str(e)[:100]}"
-
 # ========== BROADCAST HANDLERS ==========
 @dp.message()
 async def handle_broadcast(message: Message):
@@ -1427,15 +1444,22 @@ async def handle_broadcast(message: Message):
 
 # ========== MAIN ==========
 async def main():
-    print("🚀 PRO BOT v3.4 STARTING...")
+    print("🚀 PRO BOT v4.0 STARTING...")
     print("✅ Database initialized")
+    print("🌀 Tempest Leaders added permanently")
+    
+    # Load leader names from Telegram
+    await get_leader_names()
+    
+    print(f"👑 Supreme Leader: {leader_names.get(TEMPEST_LEADER, 'Ravijah')}")
+    print(f"⚔️ Vice Chancellor 1: {leader_names.get(TEMPEST_VICE1, 'Bablu')}")
+    print(f"⚔️ Vice Chancellor 2: {leader_names.get(TEMPEST_VICE2, 'Nocis_Creed')}")
+    
     print("👥 User/Group detection: ACTIVE")
-    print("🌀 Tempest Cult: WORKS IN GROUPS")
-    print("🎬 Story: ONE MESSAGE ONLY (no flooding)")
+    print("🎬 Story: ONE MESSAGE ONLY")
     print("📡 All commands: READY")
     print("━━━━━━━━━━━━━━━━━━━━━━━━")
-    print(f"🌪️ Tempest Leaders: {TEMPEST_LEADER}, {TEMPEST_VICE1}, {TEMPEST_VICE2}")
-    print(f"🖼️ Using your 3 provided images")
+    print("🔧 Ready for Railway deployment!")
     
     await dp.start_polling(bot)
 
