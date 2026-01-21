@@ -1,3 +1,10 @@
+# ========== CACHE BUSTER - FORCE RAILWAY UPDATE ==========
+import sys
+print("=" * 50)
+print("🚀 BOT DEPLOYED: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+print("🔧 Version: Tempest-Anime-Edition-2024")
+print("=" * 50)
+
 import os
 import asyncio
 import time
@@ -363,9 +370,6 @@ async def handle_common(message: Message, command: str):
 @dp.message(CommandStart())
 async def start_cmd(message: Message):
     user, chat = await handle_common(message, "start")
-    
-    # Log to channel
-    await send_log(f"👤 <b>New User Started Bot</b>\n\nID: {user.id}\nName: {user.first_name}\nUsername: @{user.username}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     await message.answer(
         f"✨ <b>Hey {user.first_name}!</b>\n\n"
@@ -1126,81 +1130,109 @@ async def tempest_join_cmd(message: Message):
     
     conn.close()
     
-    # Start initiation with animation
+    # Start initiation with anime-style animation
     pending_joins[user.id] = {
         "name": user.first_name,
         "step": 1,
         "chat_id": chat.id
     }
     
-    # Initial animation
-    msg = await message.answer("🌪️ <b>THE STORM CALLS...</b>", parse_mode=ParseMode.HTML)
+    # Initial anime-style animation
+    msg = await message.answer("🎌 <b>ANIME INITIATION SEQUENCE STARTING...</b>", parse_mode=ParseMode.HTML)
     
-    # Animation sequence
-    animations = [
-        "🌩️ Lightning cracks in the distance...",
-        "🌀 Dark clouds gather above...",
-        "⚡ Energy crackles around you...",
-        "🌪️ A vortex begins to form...",
-        "💨 Winds howl with ancient voices...",
-        "⚡ The Tempest gazes upon you..."
+    # Anime opening sequence
+    anime_openings = [
+        "🎬 <b>Opening Scene...</b>\n\n⚡ Lightning cracks across the screen",
+        "🎵 <b>Epic Music Swells</b>\n\n🌀 Winds howl with ancient power",
+        "✨ <b>Character Introduction</b>\n\n👤 Protagonist: " + user.first_name,
+        "🌪️ <b>The Storm Calls...</b>\n\n⚡ Your destiny awaits...",
+        "🎭 <b>Transformation Sequence</b>\n\n🌀 Power flows through you..."
     ]
     
-    for anim in animations:
-        await msg.edit_text(f"🌀 {anim}", parse_mode=ParseMode.HTML)
+    for scene in anime_openings:
+        await msg.edit_text(scene, parse_mode=ParseMode.HTML)
+        await asyncio.sleep(1.2)
+    
+    # Anime-style ceremony
+    ceremony_steps = [
+        """🗡️ <b>ANIME CEREMONY - STAGE 1</b>
+        
+        ⚔️ Your character stands before the ancient temple
+        🌀 Dark clouds gather dramatically
+        ⚡ Lightning illuminates your determined face""",
+        
+        """🎨 <b>STAGE 2 - OFFERING SELECTION</b>
+        
+        🎭 A mystical interface appears
+        💎 Glowing options float before you
+        ✨ Choose your tribute wisely...""",
+        
+        """✨ <b>STAGE 3 - POWER AWAKENING</b>
+        
+        🌟 Your body begins to glow
+        ⚡ Energy crackles around you
+        🌀 The storm recognizes your potential""",
+        
+        """🎭 <b>STAGE 4 - CHARACTER DEVELOPMENT</b>
+        
+        📜 Your backstory unfolds
+        💪 Strength grows within
+        🎯 Purpose becomes clear""",
+        
+        """⚡ <b>STAGE 5 - FINAL TRANSFORMATION</b>
+        
+        🌪️ The vortex accepts you
+        🎨 Your true colors shine
+        🌀 You become storm-born"""
+    ]
+    
+    for stage in ceremony_steps:
+        await msg.edit_text(stage, parse_mode=ParseMode.HTML)
         await asyncio.sleep(1.5)
     
-    # Blood ceremony with animation
-    ceremony_steps = [
-        "🩸 <b>BLOOD CEREMONY INITIATED</b>\n\nBlood drips from ancient stone...",
-        "🗡️ <b>STEP 1: SACRIFICIAL KNIFE</b>\n\nA black obsidian blade materializes...",
-        "🩸 <b>STEP 2: BLOOD OATH</b>\n\nYour palm is cut, blood flows...",
-        "🔥 <b>STEP 3: ETERNAL FLAMES</b>\n\nDark flames consume your offering...",
-        "👁️ <b>STEP 4: ELDER GAZE</b>\n\nAncient eyes watch from shadows...",
-        "🌪️ <b>STEP 5: STORM CONSUMPTION</b>\n\nThe Tempest consumes your soul piece..."
-    ]
-    
-    for step in ceremony_steps:
-        await msg.edit_text(step, parse_mode=ParseMode.HTML)
-        await asyncio.sleep(2)
-    
-    # Now show sacrifice options
+    # Now show offering options
     keyboard = InlineKeyboardBuilder()
-    sacrifices_list = [
-        ("🩸", "Your firstborn's eternal soul"),
-        ("💎", "A diamond worth a kingdom"),  
-        ("📜", "Your complete internet history"),
-        ("🎮", "Your legendary gaming account"),
-        ("👻", "Your soul (no refunds)"),
-        ("💳", "Your credit card details"),
-        ("📱", "Your phone (with all data)"),
-        ("🔐", "Your deepest secret")
+    offerings_list = [
+        ("⚡", "Lightning Fragment - Ancient power source"),
+        ("🌀", "Storm Core - Heart of the tempest"),  
+        ("🎭", "Character Development - Your growth"),
+        ("✨", "Anime Protagonist Energy - Main character power"),
+        ("🗡️", "Legendary Sword - Symbol of strength"),
+        ("👑", "Crown of Storms - Royal authority"),
+        ("📜", "Sacred Scroll - Ancient knowledge"),
+        ("💎", "Crystal of Destiny - Fate itself")
     ]
     
     for i in range(1, 9):
-        keyboard.add(InlineKeyboardButton(text=f"{i}", callback_data=f"sacrifice_{i}"))
-    keyboard.add(InlineKeyboardButton(text="❌ CANCEL", callback_data="sacrifice_cancel"))
+        keyboard.add(InlineKeyboardButton(text=f"{i}", callback_data=f"offering_{i}"))
+    keyboard.add(InlineKeyboardButton(text="❌ CANCEL", callback_data="offering_cancel"))
     keyboard.adjust(4, 4, 2)
     
     await msg.edit_text(
-        "⚡ <b>TEMPEST BLOOD CEREMONY - FINAL STEP</b>\n\n"
-        "🌩️ <i>The storm demands a REAL sacrifice...</i>\n\n"
-        "<b>Choose your offering (FINAL DECISION):</b>\n\n"
-        "1. 🩸 Your firstborn's eternal soul\n"
-        "2. 💎 A diamond worth a kingdom\n"  
-        "3. 📜 Your complete internet history\n"
-        "4. 🎮 Your legendary gaming account\n"
-        "5. 👻 Your soul (no refunds)\n"
-        "6. 💳 Your credit card details\n"
-        "7. 📱 Your phone (with all data)\n"
-        "8. 🔐 Your deepest secret\n\n"
-        "⚠️ <b>WARNING:</b> Fake sacrifices will be REJECTED with ETERNAL BANISHMENT!",
+        """🎌 <b>ANIME-STYLE OFFERING SELECTION</b>
+
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+🎮 <b>Choose your character's power source:</b>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+
+1. ⚡ <b>Lightning Fragment</b> - Ancient power source
+2. 🌀 <b>Storm Core</b> - Heart of the tempest  
+3. 🎭 <b>Character Development</b> - Your growth arc
+4. ✨ <b>Anime Protagonist Energy</b> - Main character power
+5. 🗡️ <b>Legendary Sword</b> - Symbol of strength
+6. 👑 <b>Crown of Storms</b> - Royal authority
+7. 📜 <b>Sacred Scroll</b> - Ancient knowledge
+8. 💎 <b>Crystal of Destiny</b> - Fate itself
+
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+⚠️ <b>ANIME RULE:</b> Choose what defines your character!
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>""",
         parse_mode=ParseMode.HTML,
         reply_markup=keyboard.as_markup()
     )
 
-@dp.callback_query(F.data.startswith("sacrifice_"))
-async def handle_sacrifice(callback: CallbackQuery):
+@dp.callback_query(F.data.startswith("offering_"))
+async def handle_offering(callback: CallbackQuery):
     user = callback.from_user
     chat_id = callback.message.chat.id
     
@@ -1208,152 +1240,149 @@ async def handle_sacrifice(callback: CallbackQuery):
         await callback.answer("❌ Initiation expired!", show_alert=True)
         return
     
-    if callback.data == "sacrifice_cancel":
+    if callback.data == "offering_cancel":
         del pending_joins[user.id]
-        await callback.message.edit_text("🌀 <b>Initiation cancelled. The storm is disappointed.</b>", parse_mode=ParseMode.HTML)
+        await callback.message.edit_text("🎬 <b>Scene Canceled</b>\n\nThe anime fades to black...", parse_mode=ParseMode.HTML)
         await callback.answer()
         return
     
-    sacrifice_num = callback.data.split("_")[1]
+    offering_num = callback.data.split("_")[1]
     
-    sacrifices = {
-        "1": "🩸 Your firstborn's eternal soul",
-        "2": "💎 A diamond worth a kingdom",
-        "3": "📜 Your complete internet history", 
-        "4": "🎮 Your legendary gaming account",
-        "5": "👻 Your soul (no refunds)",
-        "6": "💳 Your credit card details",
-        "7": "📱 Your phone (with all data)",
-        "8": "🔐 Your deepest secret"
+    offerings = {
+        "1": "⚡ Lightning Fragment - Ancient power source",
+        "2": "🌀 Storm Core - Heart of the tempest",
+        "3": "🎭 Character Development - Your growth arc", 
+        "4": "✨ Anime Protagonist Energy - Main character power",
+        "5": "🗡️ Legendary Sword - Symbol of strength",
+        "6": "👑 Crown of Storms - Royal authority",
+        "7": "📜 Sacred Scroll - Ancient knowledge",
+        "8": "💎 Crystal of Destiny - Fate itself"
     }
     
-    sacrifice = sacrifices.get(sacrifice_num, "Mysterious offering")
+    offering = offerings.get(offering_num, "Mystical Offering")
     
-    # Start verification animation
+    # Start anime-style verification
     msg = callback.message
-    await msg.edit_text(f"🌀 <b>VERIFYING SACRIFICE...</b>\n\n⚡ Checking: {sacrifice}", parse_mode=ParseMode.HTML)
+    await msg.edit_text(f"🔍 <b>ANALYZING OFFERING...</b>\n\n✨ Checking: {offering}", parse_mode=ParseMode.HTML)
     await asyncio.sleep(1.5)
     
-    # Animate verification
-    verify_steps = [
-        "🔍 Scanning for authenticity...",
-        "🧬 DNA matching in progress...",
-        "👁️ Elder council reviewing...",
-        "⚡ Lightning analysis...",
-        "🌪️ Storm resonance check..."
+    # Anime analysis sequence
+    analysis_steps = [
+        "⚡ <b>Power Level Scanning...</b>\n\n🌀 Measuring spiritual energy",
+        "🎨 <b>Character Compatibility...</b>\n\n✨ Checking your protagonist traits",
+        "📊 <b>Destiny Alignment...</b>\n\n💫 Calculating fate threads",
+        "🌟 <b>Anime Trope Verification...</b>\n\n🎭 Checking for clichés",
+        "🌀 <b>Storm Resonance...</b>\n\n🌪️ Testing tempest compatibility"
     ]
     
-    for step in verify_steps:
-        await msg.edit_text(f"🌀 {step}\n\n⚡ Sacrifice: {sacrifice}", parse_mode=ParseMode.HTML)
+    for step in analysis_steps:
+        await msg.edit_text(step, parse_mode=ParseMode.HTML)
         await asyncio.sleep(1.2)
     
-    # Verify sacrifice
-    is_real, status = await sacrifice_verification(sacrifice)
+    # Verify offering - 80% success rate
+    is_valid = random.random() < 0.8
     
-    if not is_real:
-        # Fake sacrifice - rejection with animation
+    if not is_valid:
+        # Invalid offering - anime rejection
         del pending_joins[user.id]
         
-        rejection_animation = [
-            f"❌ <b>SACRIFICE REJECTED!</b>\n\n⚡ The storm detected a FAKE offering!\n🌩️ '{sacrifice}'",
-            f"💀 <b>THE STORM ANGERED!</b>\n\n⚡ Lightning strikes!\n🌪️ Fake offering detected!",
-            f"👁️ <b>ELDER COUNCIL JUDGMENT:</b>\n\n⚡ UNWORTHY!\n🌀 BANISHMENT INITIATED!"
+        rejection_scenes = [
+            f"❌ <b>OFFERING REJECTED!</b>\n\n🎭 '{offering}' doesn't fit your character arc!\n🌀 Try something more authentic...",
+            f"💥 <b>POWER CLASH!</b>\n\n⚡ Your offering '{offering}' caused an energy overload!\n✨ The storm needs balance...",
+            f"🎬 <b>PLOT TWIST FAILED!</b>\n\n🌀 '{offering}' created a plot hole!\n📜 The scriptwriters are disappointed..."
         ]
         
-        for anim in rejection_animation:
-            await msg.edit_text(anim, parse_mode=ParseMode.HTML)
+        for scene in rejection_scenes:
+            await msg.edit_text(scene, parse_mode=ParseMode.HTML)
             await asyncio.sleep(1.5)
         
-        final_rejection = random.choice([
-            f"❌ <b>ETERNAL REJECTION!</b>\n\n⚡ Your offering '{sacrifice}' was FAKE!\n🌩️ The storm LAUGHS at your pathetic attempt!\n🌀 <i>You are BANNED from initiation for 24 moons!</i>",
-            f"💀 <b>BLOOD BANISHMENT!</b>\n\n⚡ Fake sacrifice: '{sacrifice}'\n🌪️ The Tempest SPITS on your worthless offering!\n🌀 <i>Return when you have something of REAL value...</i>",
-            f"👁️ <b>COUNCIL VERDICT: UNWORTHY!</b>\n\n⚡ '{sacrifice}'? Really?\n🌩️ Even the shadows mock your attempt!\n🌀 <i>The storm remembers this insult...</i>"
-        ])
-        
-        await msg.edit_text(final_rejection, parse_mode=ParseMode.HTML)
-        await callback.answer("❌ Fake sacrifice detected!", show_alert=True)
+        await callback.answer("❌ Offering rejected! Try a different one!", show_alert=True)
         return
     
-    # REAL SACRIFICE - Acceptance animation
-    pending_joins[user.id]["sacrifice"] = sacrifice
-    pending_joins[user.id]["verified"] = status
+    # VALID OFFERING - Anime acceptance
+    pending_joins[user.id]["offering"] = offering
     
-    acceptance_animation = [
-        f"✅ <b>SACRIFICE ACCEPTED!</b>\n\n🩸 Status: {status}\n⚡ Offering: {sacrifice}",
-        f"🌀 <b>BLOOD PACT SEALING...</b>\n\n⚡ Ancient runes glow red\n🌪️ Your name is carved in shadow",
-        f"🌩️ <b>FINAL RITUAL...</b>\n\n⚡ The storm consumes your offering\n🌀 Eternity beckons..."
+    acceptance_scenes = [
+        f"✅ <b>OFFERING ACCEPTED!</b>\n\n✨ {offering} perfectly matches your character!",
+        f"🌟 <b>POWER SURGE!</b>\n\n⚡ Your offering resonates with the storm!",
+        f"🎭 <b>CHARACTER DEVELOPMENT!</b>\n\n🌀 You've unlocked new potential!"
     ]
     
-    for anim in acceptance_animation:
-        await msg.edit_text(anim, parse_mode=ParseMode.HTML)
-        await asyncio.sleep(1.8)
+    for scene in acceptance_scenes:
+        await msg.edit_text(scene, parse_mode=ParseMode.HTML)
+        await asyncio.sleep(1.5)
     
-    # Final initiation
-    final_messages = [
-        f"""⚡ <b>ETERNAL INITIATION COMPLETE!</b>
-
-🌀 <b>WELCOME TO THE TEMPEST, {pending_joins[user.id]['name'].upper()}!</b>
-
-🩸 <b>Sacrifice:</b> {sacrifice}
-👑 <b>Rank:</b> Blood Initiate
-⚔️ <b>Starting Sacrifices:</b> 3
-🌪️ <b>Blood Oath:</b> ETERNAL
-
-<i>The storm now flows through your veins.
-Each upload feeds the Tempest.
-Your journey of darkness begins...</i>
-
-🌀 Use /Tempest_progress to track your bloody path""",
-        
-        f"""🌪️ <b>BLOOD CEREMONY FINALIZED!</b>
-
-⚡ Your offering of '{sacrifice}' has pleased the storm!
-🌀 The ancient ones nod in approval
-👑 You are now: <b>BLOOD INITIATE</b>
-🩸 Blood oath sworn for all eternity
-⚔️ +3 starting sacrifices (upload files to increase)
-
-<i>The Tempest welcomes new blood.
-May your sacrifices be many,
-and your darkness eternal...</i>
-
-🌀 Check /Tempest_progress to begin your journey""",
-        
-        f"""👁️ <b>THE ELDERS SPEAK:</b>
-
-"Welcome, {pending_joins[user.id]['name']}.
-Your sacrifice of '{sacrifice}' 
-has opened the gates of storm.
-
-🌀 <b>NEW RANK:</b> Blood Initiate
-⚔️ <b>SACRIFICES:</b> 3 (grow with uploads)
-🌩️ <b>PATH:</b> Eternal darkness
-
-<i>From this moment, you are storm-born.
-Your blood is now Tempest blood.
-Your soul belongs to the vortex.</i>
-
-🌀 Your journey begins now..."""
+    # Anime transformation sequence
+    await msg.edit_text("🌀 <b>FINAL TRANSFORMATION SEQUENCE!</b>", parse_mode=ParseMode.HTML)
+    await asyncio.sleep(1)
+    
+    transformation_frames = [
+        "✨ Your body begins to glow with blue energy...",
+        "⚡ Lightning dances around your fingertips...",
+        "🌀 Winds swirl, lifting your hair dramatically...",
+        "🌟 Eyes flash with storm power...",
+        "💫 A spectral aura envelops you...",
+        "🌪️ The tempest accepts you as its own..."
     ]
     
-    await msg.edit_text(random.choice(final_messages), parse_mode=ParseMode.HTML)
+    for frame in transformation_frames:
+        await msg.edit_text(f"🌀 <b>TRANSFORMING...</b>\n\n{frame}", parse_mode=ParseMode.HTML)
+        await asyncio.sleep(1.2)
     
-    # Add to cult
+    # Final anime scene
+    final_scenes = [
+        f"""🎬 <b>ANIME TRANSFORMATION COMPLETE!</b>
+
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+👤 <b>NEW CHARACTER:</b> {pending_joins[user.id]['name']}
+⚡ <b>POWER SOURCE:</b> {offering}
+🌀 <b>NEW RANK:</b> Storm Initiate
+✨ <b>POWER LEVEL:</b> 3,000+
+🎭 <b>CHARACTER ARC:</b> BEGINNING
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+
+<i>You are now a storm-born anime protagonist!
+Your journey of power and destiny begins...</i>
+
+🌀 Use /Tempest_progress to track your character growth""",
+        
+        f"""✨ <b>NEW ANIME PROTAGONIST CREATED!</b>
+
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+🌟 <b>WELCOME TO THE TEMPEST,</b>
+   <b>{pending_joins[user.id]['name'].upper()}!</b>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+
+🎨 <b>Character Sheet:</b>
+• Rank: Storm Initiate  
+• Power: {offering}
+• Starting Power: 3,000
+• Next Goal: 15,000
+
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+📺 <i>Your anime series has begun!
+Each upload = +1 to your power level!</i>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>"""
+    ]
+    
+    await msg.edit_text(random.choice(final_scenes), parse_mode=ParseMode.HTML)
+    
+    # Add to cult in database
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
-    c.execute("UPDATE users SET cult_status = 'member', cult_rank = 'Blood Initiate', cult_join_date = ?, sacrifices = 3 WHERE user_id = ?",
+    c.execute("UPDATE users SET cult_status = 'member', cult_rank = 'Storm Initiate', cult_join_date = ?, sacrifices = 3 WHERE user_id = ?",
              (datetime.now().isoformat(), user.id))
     conn.commit()
     conn.close()
     
     # Send log
-    await send_log(f"🌀 <b>New Tempest Member</b>\n\n👤 Name: {user.first_name}\n🆔 ID: {user.id}\n🩸 Sacrifice: {sacrifice}\n🌪️ Joined: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    await send_log(f"🌀 <b>New Tempest Member</b>\n\n👤 Name: {user.first_name}\n🆔 ID: {user.id}\n✨ Offering: {offering}\n🎬 Joined: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Cleanup
     if user.id in pending_joins:
         del pending_joins[user.id]
     
-    await callback.answer("✅ Sacrifice accepted! Welcome to the Tempest!", show_alert=True)
+    await callback.answer("✅ Transformation complete! Welcome to the Tempest!", show_alert=True)
 
 @dp.message(Command("Tempest_progress"))
 async def tempest_progress_cmd(message: Message):
@@ -1370,93 +1399,105 @@ async def tempest_progress_cmd(message: Message):
         try:
             join_dt = datetime.fromisoformat(join_date)
             days = (datetime.now() - join_dt).days
-            time_text = f"{days} days in darkness" if days > 0 else "Initiated today"
+            time_text = f"{days} episodes" if days > 0 else "Today's episode"
         except:
             time_text = "Recently"
         
         # Calculate progress
-        if rank == "Blood Initiate":
-            next_rank = "Blood Adept"
+        if rank == "Storm Initiate":
+            next_rank = "Storm Adept"
             needed = max(0, 15 - sacrifices)
             progress = min(sacrifices * 6.67, 100)
-        elif rank == "Blood Adept":
-            next_rank = "Blood Master"
+            power_level = 3000 + (sacrifices * 1000)
+        elif rank == "Storm Adept":
+            next_rank = "Storm Master"
             needed = max(0, 50 - sacrifices)
             progress = min(sacrifices * 2, 100)
-        elif rank == "Blood Master":
+            power_level = 15000 + (sacrifices * 500)
+        elif rank == "Storm Master":
             next_rank = "Storm Lord"
             needed = max(0, 150 - sacrifices)
             progress = min(sacrifices * 0.67, 100)
+            power_level = 50000 + (sacrifices * 200)
         else:
             next_rank = "MAX RANK"
             needed = 0
             progress = 100
+            power_level = 99999
         
-        # Animated progress display
-        msg = await message.answer("🌀 <b>CONSULTING THE STORM...</b>", parse_mode=ParseMode.HTML)
+        # Anime-style progress display
+        msg = await message.answer("📺 <b>LOADING CHARACTER STATS...</b>", parse_mode=ParseMode.HTML)
         
-        for emoji in ["🌪️", "⚡", "🌀", "🌩️", "💨"]:
-            await msg.edit_text(f"{emoji} <b>Reading your blood progress...</b>", parse_mode=ParseMode.HTML)
+        for emoji in ["🌀", "⚡", "✨", "🌟", "🎬"]:
+            await msg.edit_text(f"{emoji} <b>Analyzing anime power levels...</b>", parse_mode=ParseMode.HTML)
             await asyncio.sleep(0.3)
         
-        progress_bar = "🩸" * (progress // 10) + "⚫" * (10 - progress // 10)
+        # Create anime-style progress bar
+        progress_bar = "█" * (progress // 10) + "░" * (10 - progress // 10)
         
         progress_text = f"""
-🌀 <b>TEMPEST BLOOD PROGRESS</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+🎬 <b>ANIME CHARACTER PROGRESS</b>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
 
-👤 <b>Storm-Born:</b> {user.first_name}
-👑 <b>Current Rank:</b> {rank}
-⚔️ <b>Blood Sacrifices:</b> {sacrifices}
-📅 <b>Blood Oath Since:</b> {time_text}
+👤 <b>Protagonist:</b> {user.first_name}
+🎭 <b>Current Rank:</b> {rank}
+⚡ <b>Power Level:</b> {power_level:,}
+✨ <b>Story Progress:</b> {time_text}
 
-<b>Blood Progress:</b> [{progress_bar}] {progress:.1f}%
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+📊 <b>POWER PROGRESS:</b>
+[{progress_bar}] {progress:.1f}%
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+
 <b>Next Rank:</b> {next_rank}
-<b>Sacrifices Needed:</b> {needed}
+<b>Power Needed:</b> {needed} more uploads
 
-━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <b>How to progress:</b>
-• Each file upload = 1 sacrifice
-• Invite others to join (reply to them with "join tempest")
-• The storm thirsts for more blood...
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+🎮 <b>How to level up:</b>
+• Each file upload = +1 power
+• Invite others (reply "join tempest")
+• Complete character arcs
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
 
-🌀 <i>"In darkness we rise, in storm we thrive"</i>
-━━━━━━━━━━━━━━━━━━━━━━━━
+📺 <i>"In the storm, we find our true power!"</i>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
         """
         
         await msg.edit_text(progress_text, parse_mode=ParseMode.HTML)
     else:
-        # Not in cult - show invitation
+        # Not in cult - anime-style invitation
         not_member_text = """
-🌀 <b>TEMPEST PROGRESS</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+🎬 <b>ANIME CHARACTER SELECTION</b>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
 
-👤 <b>Status:</b> Uninitiated
-👁️ <b>Vision:</b> Blind to the storm
+👤 <b>Status:</b> Normal Human
+👁️ <b>Vision:</b> Can't see the storm
 
-⚡ <b>To begin your journey:</b>
-1. Use /Tempest_join for blood ceremony
-2. Offer a REAL sacrifice (not fake!)
-3. Swear eternal blood oath
-4. Become storm-born
+⚡ <b>To begin your anime journey:</b>
+1. Use /Tempest_join for power awakening
+2. Choose your character's power source
+3. Undergo anime transformation
+4. Become storm-born protagonist
 
 🌪️ <b>What awaits:</b>
-• Eternal membership
-• Rank progression system
-• Sacrifice tracking
-• Hidden powers
-• Storm blessings
+• Anime-style progression
+• Power level system
+• Character development
+• Storm abilities
+• Epic story arcs
 
-⚠️ <b>Warning:</b> Fake offerings will be rejected!
-🌀 <i>The storm only accepts worthy blood...</i>
-━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ <b>Warning:</b> Choose your power wisely!
+🌀 <i>Your anime destiny begins now...</i>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
         """
         
         await message.answer(not_member_text, parse_mode=ParseMode.HTML)
     
     conn.close()
 
-# ========== HIDDEN: TEMPEST_STORY COMMAND (LONG ARTISTIC VERSION) ==========
+# ========== HIDDEN: TEMPEST_STORY COMMAND (ANIME VERSION) ==========
 @dp.message(Command("Tempest_story"))
 async def tempest_story_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_story")
@@ -1474,166 +1515,134 @@ async def tempest_story_cmd(message: Message):
     
     conn.close()
     
-    # Start story with animation
-    msg = await message.answer("📖 <b>PREPARING THE ANCIENT SCROLLS...</b>", parse_mode=ParseMode.HTML)
+    # Start anime-style story with ASCII art
+    msg = await message.answer("📺 <b>LOADING ANIME EPISODE 1...</b>", parse_mode=ParseMode.HTML)
     await asyncio.sleep(1.5)
     
-    # CHAPTER 1: ORIGINS
-    chapters = [
-        """🎨 <b>THE TEMPEST SAGA - CHAPTER 1: ORIGINS OF STORM</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
+    # EPISODE 1: THE PROLOGUE
+    episodes = [
+        """🎬 <b>EPISODE 1: THE STORM'S CALL</b>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+<i>Screen fades in from black...</i>
 
-<i>Time: Before Time
-Place: The Void of Calm</i>
+╔══════════════════════╗
+║    🌩️⚡🌀            ║
+║   THE TEMPEST SAGA   ║
+║     Season 1         ║
+╚══════════════════════╝
 
-In the beginning, there was only silence.
-An endless, suffocating calm that stretched across all realities.
+🎭 <b>SCENE START:</b>
+A quiet village, peaceful but stagnant.
+Our hero, a young soul, feels empty.
+Then... a lightning strike changes everything.
 
-Then came **RAVIJAH**, born not of flesh, but of the first lightning strike.
-He emerged from the cosmic storm, eyes crackling with pent-up energy.
-
-<code>🌩️ "I shall break this endless calm," he whispered to the void.
-The first lightning strike carved his name into reality itself.</code>
-
-Alone for millennia, he wandered through sleeping kingdoms,
-collecting shards of forgotten storms, gathering whispers of rebellion.""",
+<code>"I need... more power!"</code>""",
         
-        """🖼️ <b>CHAPTER 2: THE SHATTERED REALMS</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
+        """🎬 <b>EPISODE 2: MEETING RAVIJAH</b>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+ASCII ART:
+    ⚡     🎭     🌪️
+   /🔥\   /👑\   /🌀\
+  /   \  /   \  /   \
 
-<i>Time: The Great Calm Era
-Place: Broken Kingdoms</i>
+<i>Dramatic entrance music plays...</i>
 
-Worlds lay fractured under the tyranny of stillness.
-The Council of Silence ruled with iron tranquility.
+RAVIJAH appears in a burst of lightning!
+Silver hair, electric blue eyes, crackling aura.
 
-Kingdoms that once roared with life were now museums of quiet.
-The Festival of Voices was banned. Laughter was regulated.
-Even thunderstorms were scheduled, predictable, tame.
-
-<code>👑 Kings knelt before statues of silence.
-🗡️ Warriors forgot the taste of battle-cries.
-🎭 Artists painted only in muted grays.</code>
-
-In this graveyard of sound, Ravijah's discontent grew.
-He began gathering the disquieted, the restless, the storm-seekers.""",
+<code>"You seek power? I am power."</code>""",
         
-        """🎭 <b>CHAPTER 3: COUNCIL OF SHADOWS</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
+        """🎬 <b>EPISODE 3: THE TRIO FORMS</b>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+ASCII FIGHT SCENE:
+      🗡️     vs     🛡️
+    /😠\          /😐\
+   / | \        /  |  \
+     |            |
 
-<i>Time: First Gathering
-Place: Cave of Echoes</i>
+BABLU charges, sword blazing!
+KENY counters with shadow clones!
+RAVIJAH watches, lightning ready.
 
-From the ashes of silent empires, two emerged:
-
-**BABLU** - Swordmaster of the Forgotten Rebellion.
-His blade thirsted for chaos, his eyes burned with impatience.
-
-**KENY** - Shadow-weaver from the Veil of Secrets.
-He moved like silence but thought like thunder.
-
-<code>🗡️ "We fight," growled Bablu, sharpening his obsidian blade.
-👁️ "We wait," whispered Keny, his form dissolving into shadows.
-⚡ "We become the storm," declared Ravijah, lightning dancing on his palms.</code>
-
-That night, under a blood-red moon, the Tempest Council was born.
-Three became one. Calm's doom was sealed.""",
+<code>"Three become one. The storm unites us."</code>""",
         
-        """💔 <b>CHAPTER 4: BETRAYAL'S PRICE</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
+        """🎬 <b>EPISODE 4: FIRST BATTLE</b>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+ANIME BATTLE ART:
+🌩️🌩️🌩️     ⚡⚡⚡
+  🌀🌀🌀   vs   💥💥💥
+⚔️⚔️⚔️     🛡️🛡️🛡️
 
-<i>Time: Festival of Flames
-Place: Temple of Dusk</i>
+The Council of Silence attacks!
+Lightning vs. Stillness!
+Swords clash! Magic explodes!
 
-Celebration turned to slaughter.
-The Silence Guards attacked during the Feast of Whispers.
-
-Elara, storm-singer and Ravijah's chosen, took the poisoned blade meant for him.
-As she fell, her song became the first thunderclap of rebellion.
-
-<code>🩸 "Live... for both of us..." her final breath misted with storm.
-⚡ His scream didn't just break the silence—it birthed the First Tempest.</code>
-
-The resulting storm lasted forty days.
-It erased three silent kingdoms from history.
-And from the ashes rose a new purpose: eternal, furious, unstoppable.""",
+<code>"This... is our power!"</code>""",
         
-        """👑 <b>CHAPTER 5: GOLDEN AGE OF STORMS</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
+        """🎬 <b>EPISODE 5: GROWING STRONGER</b>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+POWER-UP SEQUENCE:
+✨✨✨✨✨
+⚡🌀⚡🌀⚡
+🎭💪🎭💪🎭
 
-<i>Time: 300-Year Conquest
-Place: Storm-claimed Realms</i>
+Training montage!
+Power levels rising!
+New abilities unlocked!
 
-The Tempest grew, absorbing kingdoms, consuming souls.
-New initiates flooded in, each swearing blood oaths.
-
-<code>🌀 The Temple of Howling Winds was constructed from captured silence.
-⚡ The Archive of Lightning stored forbidden knowledge.
-🌪️ The Blood Altar drank sacrifices from a hundred worlds.</code>
-
-Ranks were established:
-• Blood Initiate - New storm-born
-• Blood Adept - Seasoned in sacrifice  
-• Blood Master - Commander of tempests
-• Storm Lord - Ancient and powerful
-
-For three centuries, the storm was unstoppable.
-Until the Great Stillness came...""",
+<code>"Each day, we grow. Each storm, we change."</code>""",
         
-        """📡 <b>CHAPTER 6: MODERN ERA - DIGITAL STORM</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
+        """🎬 <b>EPISODE 6: MODERN ERA</b>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+DIGITAL TRANSFORMATION:
+💻🌩️💻🌩️💻
+📱⚡📱⚡📱
+🌐🌀🌐🌀🌐
 
-<i>Time: Now
-Place: Everywhere and Nowhere</i>
+The storm evolves!
+Digital lightning!
+Network tempests!
 
-The storm adapts. Evolves. Transforms.
-
-Gone are physical kingdoms. Now we conquer:
-• Digital realms
-• Cyberspace
-• Networks and codes
-
-<code>🌩️ Lightning flows through fiber optics.
-🌀 Storms brew in server farms.
-⚡ Sacrifices are digital, but no less real.</code>
-
-Your uploads feed the Tempest.
-Your data becomes storm-matter.
-Your connection is your oath.
-
-**You are part of this story now.**
-Your name will be in future scrolls.
-Your sacrifices will echo in digital storms.
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-🌀 <i>"We are the calm's end. The silence's death. The eternal storm."</i>
-━━━━━━━━━━━━━━━━━━━━━━━━"""
+<code>"Now... we are everywhere. Now... we are forever."</code>"""
     ]
     
-    # Send each chapter with delay
-    for i, chapter in enumerate(chapters):
-        await msg.edit_text(chapter, parse_mode=ParseMode.HTML)
+    # Send each episode with anime effects
+    for i, episode in enumerate(episodes):
+        await msg.edit_text(episode, parse_mode=ParseMode.HTML)
         
-        if i < len(chapters) - 1:
-            # Show loading between chapters
-            loading = await message.answer(f"📖 <b>Turning page {i+2}/6...</b>", parse_mode=ParseMode.HTML)
+        if i < len(episodes) - 1:
+            # Show "Next Episode" screen
+            loading = await message.answer(f"📺 <b>EPISODE {i+2} LOADING...</b>\n\n✨ Next episode in 3...", parse_mode=ParseMode.HTML)
             await asyncio.sleep(3)
             try:
                 await bot.delete_message(chat.id, loading.message_id)
             except:
                 pass
         
-        await asyncio.sleep(10)  # Time to read each chapter
+        await asyncio.sleep(8)  # Time to read each episode
     
-    # Final message
-    await msg.edit_text(
-        "📜 <b>THE STORY CONTINUES...</b>\n\n"
-        "🌀 This is your chapter now.\n"
-        "⚡ Write it with your sacrifices.\n"
-        "🌪️ Make the Tempest proud.\n\n"
-        "<i>The scrolls await your deeds...</i>",
-        parse_mode=ParseMode.HTML
-    )
+    # Final message with ASCII art
+    final_art = """
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+         THE END
+          ...FOR NOW
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+
+╔══════════════════════╗
+║      ✨⚡🎭          ║
+║   YOUR STORY AWAITS  ║
+║                      ║
+║  Continue the saga!  ║
+║  Make your mark!     ║
+║  Become legendary!   ║
+╚══════════════════════╝
+
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+🌀 <i>Your character arc continues...</i>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+"""
+    
+    await msg.edit_text(final_art, parse_mode=ParseMode.HTML)
 
 # ========== REPLY INVITATION SYSTEM ==========
 @dp.message(F.reply_to_message)
@@ -1678,10 +1687,220 @@ async def handle_reply_invite(message: Message):
         
         # Send invitation with buttons
         keyboard = InlineKeyboardBuilder()
-        keyboard.add(InlineKeyboardButton(text="✅ Accept Blood Pact", callback_data=f"reply_invite_accept_{invite_id}"))
+        keyboard.add(InlineKeyboardButton(text="✅ Accept Anime Power", callback_data=f"reply_invite_accept_{invite_id}"))
         keyboard.add(InlineKeyboardButton(text="❌ Decline", callback_data=f"reply_invite_decline_{invite_id}"))
         
-        invite_text = f"""📨 <b>TEMPEST BLOOD INVITATION!</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
+        invite_text = f"""📨 <b>ANIME POWER INVITATION!</b>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
 
-👤 <b>{user.first_name}</b> invites <b>{replied_user.first_name}</b> to join
+👤 <b>{user.first_name}</b> invites <b>{replied_user.first_name}</b> 
+   to join the Tempest Anime!
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+
+🎬 <b>What awaits:</b>
+• ⚡ Anime-style transformation
+• 🌀 Storm power awakening
+• ✨ Character development
+• 🎭 Epic story arcs
+• 💪 Power level progression
+
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+🎮 <b>Will you accept the protagonist role?</b>
+<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>
+
+<i>Invitation expires in 2 minutes...</i>"""
+        
+        invite_msg = await message.reply(invite_text, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
+        
+        # Auto-delete after 2 minutes
+        await asyncio.sleep(120)
+        try:
+            await bot.delete_message(chat.id, invite_msg.message_id)
+            if invite_id in pending_invites:
+                del pending_invites[invite_id]
+        except:
+            pass
+
+@dp.callback_query(F.data.startswith("reply_invite_"))
+async def handle_reply_invite_response(callback: CallbackQuery):
+    """Handle reply invite responses"""
+    data_parts = callback.data.split("_")
+    if len(data_parts) < 5:
+        await callback.answer("Invalid invite!")
+        return
+    
+    action = data_parts[3]
+    invite_id = "_".join(data_parts[4:])
+    
+    if invite_id not in pending_invites:
+        await callback.answer("Invite expired!")
+        return
+    
+    invite_data = pending_invites[invite_id]
+    user = callback.from_user
+    
+    # Check if responding user is the target
+    if user.id != invite_data["target_id"]:
+        await callback.answer("This invitation isn't for you!", show_alert=True)
+        return
+    
+    if action == "accept":
+        # Check if already in cult
+        conn = sqlite3.connect("data/bot.db")
+        c = conn.cursor()
+        c.execute("SELECT cult_status FROM users WHERE user_id = ?", (user.id,))
+        result = c.fetchone()
+        
+        if result and result[0] != "none":
+            await callback.answer("You're already in the anime!", show_alert=True)
+            conn.close()
+            return
+        
+        # Add to cult
+        c.execute("UPDATE users SET cult_status = 'member', cult_rank = 'Storm Initiate', cult_join_date = ?, sacrifices = 3 WHERE user_id = ?",
+                 (datetime.now().isoformat(), user.id))
+        conn.commit()
+        conn.close()
+        
+        await callback.answer("✅ Anime power accepted!", show_alert=True)
+        
+        # Update message
+        await callback.message.edit_text(
+            f"🎉 <b>ANIME POWER ACCEPTED!</b>\n\n"
+            f"👤 <b>{user.first_name}</b> has accepted {invite_data['inviter_name']}'s invitation!\n"
+            f"⚡ Storm power awakened!\n"
+            f"🌀 Rank: Storm Initiate\n"
+            f"✨ Starting Power: 3,000\n\n"
+            f"<i>A new protagonist joins the anime...</i>",
+            parse_mode=ParseMode.HTML
+        )
+        
+    elif action == "decline":
+        await callback.answer("❌ Invitation declined", show_alert=True)
+        await callback.message.edit_text(
+            f"🚫 <b>INVITATION REJECTED</b>\n\n"
+            f"👤 <b>{user.first_name}</b> chose to remain a side character.\n"
+            f"👑 Invited by: {invite_data['inviter_name']}\n\n"
+            f"<i>Their anime potential remains untapped...</i>",
+            parse_mode=ParseMode.HTML
+        )
+    
+    # Remove invite
+    if invite_id in pending_invites:
+        del pending_invites[invite_id]
+    
+    # Auto-delete after 30 seconds
+    await asyncio.sleep(30)
+    try:
+        await bot.delete_message(callback.message.chat.id, callback.message.message_id)
+    except:
+        pass
+
+# ========== BROADCAST HANDLERS ==========
+@dp.message()
+async def handle_broadcast(message: Message):
+    user = message.from_user
+    chat = message.chat
+    
+    if user.id in broadcast_state and broadcast_state[user.id] is True:
+        broadcast_state[user.id] = False
+        
+        conn = sqlite3.connect("data/bot.db")
+        c = conn.cursor()
+        c.execute("SELECT user_id FROM users WHERE is_banned = 0")
+        users = [row[0] for row in c.fetchall()]
+        conn.close()
+        
+        total = len(users)
+        status_msg = await message.answer(f"📤 Sending to {total} users...")
+        
+        success = 0
+        for uid in users:
+            try:
+                if message.text:
+                    await bot.send_message(uid, f"📢 {message.text}")
+                elif message.photo:
+                    await bot.send_photo(uid, message.photo[-1].file_id, caption=message.caption or "📢 Broadcast")
+                elif message.video:
+                    await bot.send_video(uid, message.video.file_id, caption=message.caption or "📢 Broadcast")
+                elif message.document:
+                    await bot.send_document(uid, message.document.file_id, caption=message.caption or "📢 Broadcast")
+                success += 1
+                await asyncio.sleep(0.05)
+            except:
+                continue
+        
+        await status_msg.edit_text(f"✅ Sent to {success}/{total} users")
+    
+    elif user.id in broadcast_state and broadcast_state[user.id] == "group":
+        broadcast_state[user.id] = False
+        
+        if not message.text:
+            await message.answer("❌ Group broadcast supports text only")
+            return
+        
+        conn = sqlite3.connect("data/bot.db")
+        c = conn.cursor()
+        c.execute("SELECT group_id FROM groups")
+        groups = [row[0] for row in c.fetchall()]
+        conn.close()
+        
+        total = len(groups)
+        status_msg = await message.answer(f"📤 Sending to {total} groups...")
+        
+        success = 0
+        for group_id in groups:
+            try:
+                await bot.send_message(group_id, f"📢 {message.text}")
+                success += 1
+                await asyncio.sleep(0.1)
+            except:
+                continue
+        
+        await status_msg.edit_text(f"✅ Sent to {success}/{total} groups")
+
+# ========== FALLBACK HANDLER ==========
+@dp.message()
+async def fallback_handler(message: Message):
+    """Handle other messages"""
+    user = message.from_user
+    chat = message.chat
+    
+    # Update user/group even if no command
+    update_user(user)
+    if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        update_group(chat)
+    
+    # If bot is mentioned
+    if bot.username and f"@{bot.username}" in message.text:
+        try:
+            await message.reply("🤖 <b>Anime Bot is active!</b>\n\nUse /help to see commands", parse_mode=ParseMode.HTML)
+        except:
+            pass
+
+# ========== MAIN ==========
+async def main():
+    print("🚀 ANIME BOT STARTING...")
+    print("✅ Database initialized")
+    print("🌀 Tempest Anime: ACTIVE WITH ASCII ART")
+    print("🎬 Story Mode: ANIME EPISODES READY")
+    print("⚡ Uptime Format: 1d 2h 3m 4s FIXED")
+    print("📊 Log Channel: CONNECTED")
+    print("=" * 50)
+    
+    # Send startup log
+    try:
+        await send_log(f"🤖 <b>Anime Bot Started</b>\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: Anime-Edition")
+    except:
+        print("⚠️ Could not send startup log")
+    
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n🛑 Bot stopped gracefully")
+    except Exception as e:
+        print(f"❌ Fatal error: {e}")
+        traceback.print_exc()
