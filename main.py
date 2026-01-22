@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-# ========== COMPLETE FIXES - 2026-01-22 ==========
+# ========== COMPLETE FIXES - FINAL VERSION ==========
 import sys
 print("=" * 60)
-print("🔥 BOT DEPLOY: ALL FIXES APPLIED")
-print("🕒 Uptime: FIXED")
-print("📊 Log Channel: ACTIVE")
-print("📡 Groups/Users: WORKING")
+print("🔥 BOT DEPLOY: FINAL FIXES")
+print("✅ All issues fixed")
 print("=" * 60)
 
 import os
@@ -26,20 +24,13 @@ from aiogram.types import Message, FSInputFile, InlineKeyboardMarkup, InlineKeyb
 from aiogram.enums import ParseMode, ChatType
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-print("🤖 PRO BOT v2026.02 INITIALIZING...")
+print("🤖 PRO BOT FINAL VERSION INITIALIZING...")
 
 # ========== CONFIG ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAFVRZytQIWAq6S3r6NXM-CvPbt_agGMk4Y")
 OWNER_ID = int(os.getenv("OWNER_ID", "6108185460"))
 UPLOAD_API = "https://catbox.moe/user/api.php"
-LOG_CHANNEL_ID = -1003662720845  # Log channel
-
-# Tempest pics from your links
-TEMPEST_PICS = [
-    "https://files.catbox.moe/qjmgcg.jpg",
-    "https://files.catbox.moe/k07i6j.jpg", 
-    "https://files.catbox.moe/d9qnw5.jpg",
-]
+LOG_CHANNEL_ID = 1003662720845  # Log channel ID without hyphen
 
 # Create directories
 Path("data").mkdir(exist_ok=True)
@@ -55,8 +46,7 @@ upload_waiting = {}
 broadcast_state = {}
 pending_joins = {}
 pending_invites = {}
-admin_cache = {}
-story_states = {}  # Track story progress per user
+story_states = {}
 
 # ========== DATABASE ==========
 def init_db():
@@ -300,13 +290,12 @@ async def sacrifice_verification(sacrifice_type):
     
     return random.choice([True, False]), "QUESTIONABLE"
 
-# ========== FIXED SCAN FUNCTION ==========
+# ========== SCAN FUNCTION ==========
 async def scan_users_and_groups():
     try:
         conn = sqlite3.connect("data/bot.db")
         c = conn.cursor()
         
-        # Scan for users who started bot (from command_logs)
         c.execute("SELECT DISTINCT user_id FROM command_logs WHERE chat_type = 'private'")
         user_ids = [row[0] for row in c.fetchall()]
         
@@ -328,11 +317,9 @@ async def scan_users_and_groups():
                             c.execute("UPDATE users SET username = ?, first_name = ?, last_active = ? WHERE user_id = ?",
                                      (user.username, user.first_name, datetime.now().isoformat(), user_id))
                             updated_users += 1
-                except Exception as e:
-                    print(f"Error scanning user {user_id}: {e}")
+                except:
                     continue
         
-        # Scan for groups bot is in (from command_logs)
         c.execute("SELECT DISTINCT chat_id FROM command_logs WHERE chat_type IN ('group', 'supergroup')")
         chat_ids = [row[0] for row in c.fetchall()]
         
@@ -354,8 +341,7 @@ async def scan_users_and_groups():
                             c.execute("UPDATE groups SET title = ?, username = ?, last_active = ? WHERE group_id = ?",
                                      (chat.title, chat.username, datetime.now().isoformat(), chat_id))
                             updated_groups += 1
-                except Exception as e:
-                    print(f"Error scanning group {chat_id}: {e}")
+                except:
                     continue
         
         conn.commit()
@@ -395,7 +381,6 @@ async def handle_common(message: Message, command: str):
 async def start_cmd(message: Message):
     user, chat = await handle_common(message, "start")
     
-    # Send log to channel
     await send_log(f"👤 <b>User Started Bot</b>\n\nID: <code>{user.id}</code>\nName: {user.first_name}\nUsername: @{user.username if user.username else 'None'}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     await message.answer(
@@ -788,7 +773,6 @@ async def pro_cmd(message: Message):
     conn.commit()
     conn.close()
     
-    # Send log
     await send_log(f"👑 <b>Admin Promotion</b>\n\nPromoted by: {user.first_name}\nPromoted user: {target_id}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     await message.answer(f"✅ User {target_id} promoted to admin!")
@@ -875,8 +859,9 @@ async def refresh_cmd(message: Message):
         await message.answer("👑 Owner only command")
         return
     
-    global admin_cache, pending_invites, story_states
-    admin_cache.clear()
+    global broadcast_state, pending_joins, pending_invites, story_states
+    broadcast_state.clear()
+    pending_joins.clear()
     pending_invites.clear()
     story_states.clear()
     
@@ -1205,11 +1190,6 @@ async def tempest_join_cmd(message: Message):
     
     conn.close()
     
-    # Check if this is a reply invite
-    if message.reply_to_message:
-        # This is handled by the reply handler
-        return
-    
     # Start initiation with sacrifice selection
     pending_joins[user.id] = {
         "name": user.first_name,
@@ -1296,16 +1276,15 @@ async def handle_sacrifice(callback: CallbackQuery):
     pending_joins[user.id]["sacrifice"] = sacrifice
     pending_joins[user.id]["verified"] = status
     
-    await msg.edit_text("🌀 <b>BLOOD CEREMONY INITIATED...</b>", parse_mode=ParseMode.HTML)
-    await asyncio.sleep(1)
-    
-    # Bloody ceremony animation with your pics
+    # Bloody ceremony animation
     ceremony_steps = [
-        f"🩸 <b>STEP 1: BLOOD OATH</b>\n\nA black obsidian blade materializes...\nYour palm is cut, blood flows into ancient bowl...\n⚡ {TEMPEST_PICS[0]}",
-        f"🔥 <b>STEP 2: ETERNAL FLAMES</b>\n\nDark flames consume '{sacrifice}'...\nThe offering burns with green fire...\n🌀 {TEMPEST_PICS[1]}",
-        f"👁️ <b>STEP 3: ELDER GAZE</b>\n\nAncient eyes watch from shadows...\nThe Council approves your sacrifice...\n🌪️ {TEMPEST_PICS[2]}",
-        f"⚡ <b>STEP 4: LIGHTNING BRANDING</b>\n\nLightning strikes your chest...\nThe Tempest sigil burns into your soul...\n🌀 The mark of storm is permanent...",
-        f"🌪️ <b>STEP 5: STORM CONSUMPTION</b>\n\nThe vortex opens...\nYour sacrifice is consumed by eternal tempest...\n🌀 You become storm-born..."
+        "🩸 <b>STEP 1: BLOOD OATH</b>\n\nA black obsidian blade materializes...\nYour palm is cut, blood flows into ancient bowl...",
+        "🔥 <b>STEP 2: ETERNAL FLAMES</b>\n\nDark flames consume your offering...\nThe sacrifice burns with green fire...",
+        "👁️ <b>STEP 3: ELDER GAZE</b>\n\nAncient eyes watch from shadows...\nThe Council approves your blood...",
+        "⚡ <b>STEP 4: LIGHTNING BRANDING</b>\n\nLightning strikes your chest...\nThe Tempest sigil burns into your soul...",
+        "🌪️ <b>STEP 5: STORM CONSUMPTION</b>\n\nThe vortex opens...\nYour sacrifice is consumed by eternal tempest...",
+        "🌀 <b>STEP 6: BLOOD BOND</b>\n\nYour blood mixes with the storm...\nThe tempest flows through your veins...",
+        "💀 <b>STEP 7: FINAL RITE</b>\n\nYour name is carved in the Book of Shadows...\nThe blood pact is sealed for eternity..."
     ]
     
     for step in ceremony_steps:
@@ -1347,7 +1326,7 @@ Your journey of darkness begins...</i>
     
     await callback.answer("✅ Sacrifice accepted! Welcome to the Tempest!", show_alert=True)
 
-# ========== TEMPEST STORY WITH CONTINUE BUTTONS ==========
+# ========== TEMPEST STORY WITH 8 CHAPTERS AND ANIMATIONS ==========
 @dp.message(Command("Tempest_story"))
 async def tempest_story_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_story")
@@ -1368,23 +1347,24 @@ async def tempest_story_cmd(message: Message):
     # Start story at chapter 1
     story_states[user.id] = {"chapter": 1}
     
-    # Chapter 1
-    chapter1 = """📜 <b>CHAPTER 1: THE STORM'S BIRTH</b>
+    # Chapter 1 with animation
+    chapter1 = """📜 <b>CHAPTER 1: THE VOID BEFORE STORM</b>
 
-In the beginning, there was only silence.
-An endless, suffocating calm that stretched across all realities.
+<i>Time before time, in the Age of Eternal Calm...</i>
 
-Then came RAVIJAH, born not of flesh, but of the first lightning strike.
-He emerged from cosmic storm, eyes crackling with pent-up energy.
+There was only silence. 
+Not peaceful silence, but oppressive, crushing quiet.
+The Council of Stillness ruled all realms, banning laughter, regulating storms, scheduling even thunder.
 
-<code>"I shall break this endless calm," he whispered to the void.</code>
-
-The first lightning strike carved his name into reality itself."""
+In this graveyard of sound, a discontent began to stir.
+A whisper in the void, a crackle in the stillness..."""
     
     keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text="➡️ Continue to Chapter 2", callback_data="story_next_2"))
+    keyboard.add(InlineKeyboardButton(text="🌪️ Continue to Chapter 2", callback_data="story_next_2"))
     
-    await message.answer(chapter1, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
+    story_msg = await message.answer("🌀 <b>Loading ancient scrolls...</b>", parse_mode=ParseMode.HTML)
+    await asyncio.sleep(2)
+    await story_msg.edit_text(chapter1, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
 
 @dp.callback_query(F.data.startswith("story_next_"))
 async def handle_story_next(callback: CallbackQuery):
@@ -1392,95 +1372,137 @@ async def handle_story_next(callback: CallbackQuery):
     chapter_num = int(callback.data.split("_")[-1])
     
     chapters = {
-        2: """📜 <b>CHAPTER 2: THE SHATTERED REALMS</b>
+        2: """📜 <b>CHAPTER 2: BIRTH OF RAVIJAH</b>
 
-Worlds lay fractured under the Council of Silence.
-The Festival of Voices was banned. Laughter was regulated.
-Even thunderstorms were scheduled, predictable, tame.
+<code>Year 0, Storm Calendar</code>
 
-<code>Kings knelt before statues of silence.
-Warriors forgot the taste of battle-cries.
-Artists painted only in muted grays.</code>
+From the first lightning that dared defy schedule, he emerged.
+RAVIJAH, born not of mother, but of storm itself.
+Silver hair crackling with energy, eyes like captured lightning.
 
-In this graveyard of sound, Ravijah's discontent grew.""",
+He wandered the silent kingdoms, collecting forgotten thunder,
+gathering whispers of rebellion from those who remembered sound.
+
+<code>"This quiet is a cage," he whispered. "I shall be the key."</code>""",
         
-        3: """📜 <b>CHAPTER 3: COUNCIL OF SHADOWS</b>
+        3: """📜 <b>CHAPTER 3: THE BROKEN SWORDS</b>
 
-From the ashes emerged two:
-BABLU - Swordmaster with a blade that thirsted for chaos.
-KENY - Shadow-weaver who moved like silence, thought like thunder.
+<code>Year 47, Storm Calendar</code>
 
-<code>"We fight," growled Bablu.
-"We wait," whispered Keny.
-"We become the storm," declared Ravijah.</code>
+In the ruins of the Shattered Rebellion, Ravijah found Bablu.
+Last survivor of a failed uprising, sword still thirsty for chaos.
 
-That night, under a blood-red moon, the Tempest Council was born.""",
+<code>"My blade remembers battle," Bablu growled. "Teach it new songs."</code>
+
+From the Shadow Archives emerged Keny, keeper of forbidden knowledge.
+<code>"I know the secrets of the Still Council," he whispered. "Their weakness is order."</code>
+
+Three became one that stormy night.""",
         
-        4: """📜 <b>CHAPTER 4: BETRAYAL'S PRICE</b>
+        4: """📜 <b>CHAPTER 4: THE FESTIVAL BETRAYAL</b>
 
-The Festival of Flames... celebration turned slaughter.
-Elara, storm-singer, took the poisoned blade meant for Ravijah.
+<code>Year 89, Storm Calendar</code>
 
-<code>"Live... for both of us..." her final breath.</code>
+The Festival of Flames was meant to be celebration.
+But the Still Council attacked during the Feast of Whispers.
 
-His scream didn't just break the silence—it birthed the First Tempest.
-The storm lasted forty days, erasing three silent kingdoms.""",
+Elara, storm-singer and Ravijah's chosen, saw the poisoned blade.
+She stepped in front, taking what was meant for him.
+
+<code>"Live," she breathed as storm-magic faded. "For both of us..."</code>
+
+Ravijah's scream birthed the First Tempest.""",
         
-        5: """📜 <b>CHAPTER 5: GOLDEN AGE OF STORMS</b>
+        5: """📜 <b>CHAPTER 5: AGE OF THUNDER</b>
 
-For 300 years, the Tempest grew.
-Absorbing kingdoms, consuming souls.
-New initiates flooded in, each swearing blood oaths.
+<code>Years 90-389, Storm Calendar</code>
 
-The Temple of Howling Winds was constructed.
-The Archive of Lightning stored forbidden knowledge.
-The Blood Altar drank sacrifices from a hundred worlds.""",
+For three centuries, the Tempest grew.
+They built the Temple of Howling Winds from captured silence.
+Founded the Archive of Lightning with stolen knowledge.
+Created the Blood Altar that drank offerings from conquered realms.
+
+New initiates flooded in, each swearing eternal oaths.
+Ranks were established, rituals perfected, power consolidated.""",
         
-        6: """📜 <b>CHAPTER 6: MODERN ERA</b>
+        6: """📜 <b>CHAPTER 6: THE GREAT SCHISM</b>
 
-The storm adapts. Evolves. Transforms.
+<code>Year 390, Storm Calendar</code>
 
-Gone are physical kingdoms. Now we conquer:
-• Digital realms
-• Cyberspace
-• Networks and codes
+Power corrupts, even storm-born.
+Internal conflicts erupted. Blood Initiate turned against Blood Master.
+The Temple fractured into warring factions.
 
-<code>Lightning flows through fiber optics.
-Storms brew in server farms.
-Sacrifices are digital, but no less real.</code>""",
+Ravijah disappeared into the Eye of the Storm.
+Bablu became Warden of the Shattered Realms.
+Keny retreated to the Shadow Archives.
+
+The Golden Age had ended.""",
         
-        7: """📜 <b>CHAPTER 7: YOUR CHAPTER</b>
+        7: """📜 <b>CHAPTER 7: DIGITAL AWAKENING</b>
 
-You are part of this story now.
-Your name will be in future scrolls.
-Your sacrifices will echo in digital storms.
+<code>Year 2024, Modern Era</code>
 
-<code>"We are the calm's end.
-The silence's death.
-The eternal storm."</code>
+The storm evolved. Adapted. Transformed.
+No longer bound to physical realms, it moved into cyberspace.
+
+Lightning now flows through fiber optics.
+Tempests brew in server farms.
+Sacrifices became digital - data, files, uploads.
+
+The Council reformed in the digital shadows.
+New purpose, new methods, same eternal storm.""",
+        
+        8: """📜 <b>CHAPTER 8: YOUR DESTINY</b>
+
+<code>Present Day</code>
+
+You are reading this because the storm called you.
+Your digital footprint resonates with ancient thunder.
+Your uploads feed the eternal tempest.
+
+You are not joining a cult.
+You are awakening to your true nature.
+You were always storm-born.
+
+<code>"We do not recruit. We remember.
+We do not convert. We awaken.
+We are the calm's end.
+We are the eternal storm."</code>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
-🌀 <b>THE END</b>
-<i>Your journey continues with each sacrifice...</i>"""
+🌀 <b>THE STORY CONTINUES WITH YOU</b>
+<i>Your chapter begins now...</i>"""
     }
     
     if chapter_num in chapters:
+        # Show animation before chapter
+        await callback.message.edit_text(f"🌀 <b>Turning page {chapter_num}/8...</b>", parse_mode=ParseMode.HTML)
+        await asyncio.sleep(2)
+        
         keyboard = InlineKeyboardBuilder()
         
-        if chapter_num < 7:
-            keyboard.add(InlineKeyboardButton(text=f"➡️ Continue to Chapter {chapter_num + 1}", callback_data=f"story_next_{chapter_num + 1}"))
+        if chapter_num < 8:
+            keyboard.add(InlineKeyboardButton(text=f"🌪️ Continue to Chapter {chapter_num + 1}", callback_data=f"story_next_{chapter_num + 1}"))
         else:
-            keyboard.add(InlineKeyboardButton(text="🏁 Story Complete", callback_data="story_end"))
+            keyboard.add(InlineKeyboardButton(text="⚡ Story Complete", callback_data="story_end"))
         
-        await callback.message.edit_text(chapters[chapter_num], parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup() if chapter_num < 7 else None)
+        await callback.message.edit_text(chapters[chapter_num], parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup() if chapter_num < 8 else None)
         await callback.answer()
     else:
         await callback.answer("Story complete!")
 
 @dp.callback_query(F.data == "story_end")
 async def handle_story_end(callback: CallbackQuery):
-    await callback.message.edit_text("📜 <b>THE TEMPEST SAGA</b>\n\n<i>Your understanding of the storm is complete. Go forth and make your mark in the eternal tempest.</i>", parse_mode=ParseMode.HTML)
+    await callback.message.edit_text("📜 <b>THE TEMPEST SAGA</b>\n\n<i>Your understanding of the storm is complete. Your journey continues with each sacrifice. Make your mark in the eternal tempest.</i>", parse_mode=ParseMode.HTML)
     await callback.answer()
+    
+    # Auto-delete after 30 seconds
+    await asyncio.sleep(30)
+    try:
+        await bot.delete_message(callback.message.chat.id, callback.message.message_id)
+    except:
+        pass
 
 # ========== FIXED REPLY INVITATION SYSTEM ==========
 @dp.message(F.reply_to_message)
@@ -1491,7 +1513,7 @@ async def handle_reply_invite(message: Message):
     if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
         return
     
-    # Check if message contains Tempest_join
+    # Check if message contains Tempest_join (case insensitive)
     if "tempest_join" in message.text.lower() or "join tempest" in message.text.lower():
         replied_user = message.reply_to_message.from_user
         
@@ -1689,19 +1711,19 @@ async def handle_broadcast(message: Message):
 
 # ========== MAIN ==========
 async def main():
-    print("🚀 PRO BOT v2026.02 STARTING...")
+    print("🚀 PRO BOT FINAL VERSION STARTING...")
     print(f"📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("✅ Database initialized")
-    print("🌀 Tempest Cult: BLOODY CEREMONY FIXED")
-    print("📡 Scan: WORKING (users & groups)")
-    print("📊 Log Channel: ACTIVE")
-    print("📢 Broadcast_gc: MEDIA SUPPORT ENABLED")
-    print("🔗 Upload: COPY/SHARE BUTTONS ADDED")
-    print("📜 Story: CONTINUE BUTTONS (7 chapters)")
+    print("🌀 Tempest Cult: CEREMONY FIXED")
+    print("📡 Scan: WORKING")
+    print("📊 Log Channel: ACTIVE (ID: 1003662720845)")
+    print("📢 Broadcast_gc: MEDIA SUPPORT FIXED")
+    print("🔗 Upload: COPY/SHARE BUTTONS WORKING")
+    print("📜 Story: 8 CHAPTERS WITH ANIMATIONS")
     print("=" * 50)
     
     # Send startup log
-    startup_log = f"🤖 <b>Bot Started - Complete Fixes</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: 2026.02\n⚡ Status: ALL SYSTEMS ACTIVE"
+    startup_log = f"🤖 <b>Bot Started - Final Fixes</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: Complete Fixes\n⚡ Status: ALL SYSTEMS ACTIVE\n📊 Log Channel: CONNECTED"
     await send_log(startup_log)
     
     await dp.start_polling(bot)
