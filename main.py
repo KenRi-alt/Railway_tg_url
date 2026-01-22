@@ -1103,8 +1103,9 @@ async def flip_cmd(message: Message):
     result = random.choice(["HEADS 🟡", "TAILS 🟤"])
     await msg.edit_text(f"🪙 <b>{result}</b>", parse_mode=ParseMode.HTML)
 
-# ========== HIDDEN TEMPEST PROGRESS ==========
-@dp.message(Command("Tempest_progress"))
+# ========== HIDDEN TEMPEST PROGRESS - FIXED CASE INSENSITIVE ==========
+@dp.message(Command("Tempest_progress", ignore_case=True))
+@dp.message(Command("tempest_progress", ignore_case=True))
 async def tempest_progress_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_progress")
     
@@ -1172,8 +1173,9 @@ async def tempest_progress_cmd(message: Message):
     conn.close()
     await message.answer(progress_text, parse_mode=ParseMode.HTML)
 
-# ========== TEMPEST JOIN WITH BLOODY CEREMONY ==========
-@dp.message(Command("Tempest_join"))
+# ========== TEMPEST JOIN WITH BLOODY CEREMONY - FIXED CASE INSENSITIVE ==========
+@dp.message(Command("Tempest_join", ignore_case=True))
+@dp.message(Command("tempest_join", ignore_case=True))
 async def tempest_join_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_join")
     
@@ -1221,19 +1223,23 @@ async def tempest_join_cmd(message: Message):
         reply_markup=keyboard.as_markup()
     )
 
+# ========== FIXED TEMPEST JOIN CALLBACK - NO TIMEOUT ERROR ==========
 @dp.callback_query(F.data.startswith("sacrifice_"))
 async def handle_sacrifice(callback: CallbackQuery):
     user = callback.from_user
+    
+    # ANSWER CALLBACK IMMEDIATELY to prevent timeout
+    await callback.answer()
+    
     chat_id = callback.message.chat.id
     
     if user.id not in pending_joins:
-        await callback.answer("❌ Initiation expired!", show_alert=True)
         return
     
     if callback.data == "sacrifice_cancel":
-        del pending_joins[user.id]
+        if user.id in pending_joins:
+            del pending_joins[user.id]
         await callback.message.edit_text("🌀 <b>Initiation cancelled. The storm is disappointed.</b>", parse_mode=ParseMode.HTML)
-        await callback.answer()
         return
     
     sacrifice_num = callback.data.split("_")[1]
@@ -1260,7 +1266,8 @@ async def handle_sacrifice(callback: CallbackQuery):
     is_real, status = await sacrifice_verification(sacrifice)
     
     if not is_real:
-        del pending_joins[user.id]
+        if user.id in pending_joins:
+            del pending_joins[user.id]
         
         rejection = random.choice([
             f"❌ <b>SACRIFICE REJECTED!</b>\n\n⚡ '{sacrifice}' is FAKE!\n🌩️ The storm LAUGHS at your pathetic offering!\n🌀 <i>Banned from initiation for 24 hours!</i>",
@@ -1269,7 +1276,6 @@ async def handle_sacrifice(callback: CallbackQuery):
         ])
         
         await msg.edit_text(rejection, parse_mode=ParseMode.HTML)
-        await callback.answer("❌ Fake sacrifice detected!", show_alert=True)
         return
     
     # REAL SACRIFICE - Start bloody ceremony animation
@@ -1323,11 +1329,9 @@ Your journey of darkness begins...</i>
     # Cleanup
     if user.id in pending_joins:
         del pending_joins[user.id]
-    
-    await callback.answer("✅ Sacrifice accepted! Welcome to the Tempest!", show_alert=True)
 
 # ========== TEMPEST STORY WITH 8 CHAPTERS AND ANIMATIONS ==========
-@dp.message(Command("Tempest_story"))
+@dp.message(Command("Tempest_story", ignore_case=True))
 async def tempest_story_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_story")
     
@@ -1368,6 +1372,9 @@ A whisper in the void, a crackle in the stillness..."""
 
 @dp.callback_query(F.data.startswith("story_next_"))
 async def handle_story_next(callback: CallbackQuery):
+    # ANSWER CALLBACK IMMEDIATELY to prevent timeout
+    await callback.answer()
+    
     user = callback.from_user
     chapter_num = int(callback.data.split("_")[-1])
     
@@ -1488,14 +1495,13 @@ We are the eternal storm."</code>
             keyboard.add(InlineKeyboardButton(text="⚡ Story Complete", callback_data="story_end"))
         
         await callback.message.edit_text(chapters[chapter_num], parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup() if chapter_num < 8 else None)
-        await callback.answer()
     else:
-        await callback.answer("Story complete!")
+        await callback.message.edit_text("📜 <b>Story complete!</b>", parse_mode=ParseMode.HTML)
 
 @dp.callback_query(F.data == "story_end")
 async def handle_story_end(callback: CallbackQuery):
-    await callback.message.edit_text("📜 <b>THE TEMPEST SAGA</b>\n\n<i>Your understanding of the storm is complete. Your journey continues with each sacrifice. Make your mark in the eternal tempest.</i>", parse_mode=ParseMode.HTML)
     await callback.answer()
+    await callback.message.edit_text("📜 <b>THE TEMPEST SAGA</b>\n\n<i>Your understanding of the storm is complete. Your journey continues with each sacrifice. Make your mark in the eternal tempest.</i>", parse_mode=ParseMode.HTML)
     
     # Auto-delete after 30 seconds
     await asyncio.sleep(30)
@@ -1574,23 +1580,23 @@ async def handle_reply_invite(message: Message):
 
 @dp.callback_query(F.data.startswith("reply_invite_"))
 async def handle_reply_invite_response(callback: CallbackQuery):
+    # ANSWER CALLBACK IMMEDIATELY to prevent timeout
+    await callback.answer()
+    
     data_parts = callback.data.split("_")
     if len(data_parts) < 5:
-        await callback.answer("Invalid invite!")
         return
     
     action = data_parts[3]
     invite_id = "_".join(data_parts[4:])
     
     if invite_id not in pending_invites:
-        await callback.answer("Invite expired!")
         return
     
     invite_data = pending_invites[invite_id]
     user = callback.from_user
     
     if user.id != invite_data["target_id"]:
-        await callback.answer("This invitation isn't for you!", show_alert=True)
         return
     
     if action == "accept":
@@ -1600,7 +1606,6 @@ async def handle_reply_invite_response(callback: CallbackQuery):
         result = c.fetchone()
         
         if result and result[0] != "none":
-            await callback.answer("You're already in the cult!", show_alert=True)
             conn.close()
             return
         
@@ -1608,8 +1613,6 @@ async def handle_reply_invite_response(callback: CallbackQuery):
                  (datetime.now().isoformat(), user.id))
         conn.commit()
         conn.close()
-        
-        await callback.answer("✅ Blood pact accepted!", show_alert=True)
         
         await callback.message.edit_text(
             f"🎉 <b>BLOOD PACT SEALED!</b>\n\n"
@@ -1625,7 +1628,6 @@ async def handle_reply_invite_response(callback: CallbackQuery):
         await send_log(f"🌀 <b>Invitation Accepted</b>\n\n👤 Invited: {user.first_name}\n👑 Inviter: {invite_data['inviter_name']}\n🆔 User ID: {user.id}\n🌪️ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
     elif action == "decline":
-        await callback.answer("❌ Invitation declined", show_alert=True)
         await callback.message.edit_text(
             f"🚫 <b>INVITATION REJECTED</b>\n\n"
             f"👤 <b>{user.first_name}</b> rejected the Tempest's call.\n"
@@ -1643,7 +1645,7 @@ async def handle_reply_invite_response(callback: CallbackQuery):
     except:
         pass
 
-# ========== FIXED BROADCAST HANDLER ==========
+# ========== FIXED BROADCAST HANDLER - NOW SUPPORTS MEDIA FOR GROUPS TOO ==========
 @dp.message()
 async def handle_broadcast(message: Message):
     user = message.from_user
@@ -1690,13 +1692,13 @@ async def handle_broadcast(message: Message):
                 if message.text:
                     await bot.send_message(target_id, f"📢 {message.text}")
                 elif message.photo:
-                    await bot.send_photo(target_id, message.photo[-1].file_id, caption=message.caption or "📢 Broadcast")
+                    await bot.send_photo(target_id, message.photo[-1].file_id, caption=f"📢 {message.caption}" if message.caption else "📢 Broadcast")
                 elif message.video:
-                    await bot.send_video(target_id, message.video.file_id, caption=message.caption or "📢 Broadcast")
+                    await bot.send_video(target_id, message.video.file_id, caption=f"📢 {message.caption}" if message.caption else "📢 Broadcast")
                 elif message.document:
-                    await bot.send_document(target_id, message.document.file_id, caption=message.caption or "📢 Broadcast")
+                    await bot.send_document(target_id, message.document.file_id, caption=f"📢 {message.caption}" if message.caption else "📢 Broadcast")
                 elif message.audio:
-                    await bot.send_audio(target_id, message.audio.file_id, caption=message.caption or "📢 Broadcast")
+                    await bot.send_audio(target_id, message.audio.file_id, caption=f"📢 {message.caption}" if message.caption else "📢 Broadcast")
                 success += 1
                 await asyncio.sleep(0.05)
             except:
