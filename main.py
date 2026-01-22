@@ -2,8 +2,10 @@
 # ========== COMPLETE FIXES - FINAL VERSION ==========
 import sys
 print("=" * 60)
-print("🔥 BOT DEPLOY: FINAL FIXES")
-print("✅ All issues fixed")
+print("🚀 URGENT FIXES APPLIED")
+print("✅ Callback errors fixed")
+print("✅ Case-sensitive commands fixed")
+print("✅ Broadcast media fixed")
 print("=" * 60)
 
 import os
@@ -23,8 +25,9 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.enums import ParseMode, ChatType
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.exceptions import TelegramBadRequest  # NEW IMPORT
 
-print("🤖 PRO BOT FINAL VERSION INITIALIZING...")
+print("🤖 PRO BOT FINAL FIXES INITIALIZING...")
 
 # ========== CONFIG ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAFVRZytQIWAq6S3r6NXM-CvPbt_agGMk4Y")
@@ -125,6 +128,16 @@ def init_db():
 init_db()
 
 # ========== HELPER FUNCTIONS ==========
+async def safe_answer_callback(callback: CallbackQuery, text: str = None, show_alert: bool = False):
+    """Safely answer callback queries, ignoring 'query is too old' errors"""
+    try:
+        await callback.answer(text, show_alert=show_alert)
+    except TelegramBadRequest as e:
+        if "query is too old" in str(e).lower():
+            pass  # Just ignore expired queries
+        else:
+            raise e
+
 def log_command(user_id, chat_id, chat_type, command, success=True):
     try:
         conn = sqlite3.connect("data/bot.db")
@@ -1011,7 +1024,7 @@ async def handle_file(message: Message):
 @dp.callback_query(F.data.startswith("copy_"))
 async def handle_copy(callback: CallbackQuery):
     url = callback.data[5:]  # Remove "copy_" prefix
-    await callback.answer(f"Link copied to clipboard!\n{url}", show_alert=True)
+    await safe_answer_callback(callback, f"Link copied to clipboard!\n{url}", show_alert=True)
 
 @dp.message(Command("cancel"))
 async def cancel_cmd(message: Message):
@@ -1104,7 +1117,7 @@ async def flip_cmd(message: Message):
     await msg.edit_text(f"🪙 <b>{result}</b>", parse_mode=ParseMode.HTML)
 
 # ========== HIDDEN TEMPEST PROGRESS ==========
-@dp.message(Command("Tempest_progress"))
+@dp.message(Command("tempest_progress", ignore_case=True))  # FIXED: Case insensitive
 async def tempest_progress_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_progress")
     
@@ -1173,7 +1186,7 @@ async def tempest_progress_cmd(message: Message):
     await message.answer(progress_text, parse_mode=ParseMode.HTML)
 
 # ========== TEMPEST JOIN WITH BLOODY CEREMONY ==========
-@dp.message(Command("Tempest_join"))
+@dp.message(Command("tempest_join", ignore_case=True))  # FIXED: Case insensitive
 async def tempest_join_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_join")
     
@@ -1227,13 +1240,13 @@ async def handle_sacrifice(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     
     if user.id not in pending_joins:
-        await callback.answer("❌ Initiation expired!", show_alert=True)
+        await safe_answer_callback(callback, "❌ Initiation expired!", show_alert=True)  # FIXED
         return
     
     if callback.data == "sacrifice_cancel":
         del pending_joins[user.id]
         await callback.message.edit_text("🌀 <b>Initiation cancelled. The storm is disappointed.</b>", parse_mode=ParseMode.HTML)
-        await callback.answer()
+        await safe_answer_callback(callback)  # FIXED
         return
     
     sacrifice_num = callback.data.split("_")[1]
@@ -1269,7 +1282,7 @@ async def handle_sacrifice(callback: CallbackQuery):
         ])
         
         await msg.edit_text(rejection, parse_mode=ParseMode.HTML)
-        await callback.answer("❌ Fake sacrifice detected!", show_alert=True)
+        await safe_answer_callback(callback, "❌ Fake sacrifice detected!", show_alert=True)  # FIXED
         return
     
     # REAL SACRIFICE - Start bloody ceremony animation
@@ -1324,10 +1337,10 @@ Your journey of darkness begins...</i>
     if user.id in pending_joins:
         del pending_joins[user.id]
     
-    await callback.answer("✅ Sacrifice accepted! Welcome to the Tempest!", show_alert=True)
+    await safe_answer_callback(callback, "✅ Sacrifice accepted! Welcome to the Tempest!", show_alert=True)  # FIXED
 
 # ========== TEMPEST STORY WITH 8 CHAPTERS AND ANIMATIONS ==========
-@dp.message(Command("Tempest_story"))
+@dp.message(Command("tempest_story", ignore_case=True))  # FIXED: Case insensitive
 async def tempest_story_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_story")
     
@@ -1488,14 +1501,14 @@ We are the eternal storm."</code>
             keyboard.add(InlineKeyboardButton(text="⚡ Story Complete", callback_data="story_end"))
         
         await callback.message.edit_text(chapters[chapter_num], parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup() if chapter_num < 8 else None)
-        await callback.answer()
+        await safe_answer_callback(callback)  # FIXED
     else:
-        await callback.answer("Story complete!")
+        await safe_answer_callback(callback, "Story complete!")  # FIXED
 
 @dp.callback_query(F.data == "story_end")
 async def handle_story_end(callback: CallbackQuery):
     await callback.message.edit_text("📜 <b>THE TEMPEST SAGA</b>\n\n<i>Your understanding of the storm is complete. Your journey continues with each sacrifice. Make your mark in the eternal tempest.</i>", parse_mode=ParseMode.HTML)
-    await callback.answer()
+    await safe_answer_callback(callback)  # FIXED
     
     # Auto-delete after 30 seconds
     await asyncio.sleep(30)
@@ -1576,21 +1589,21 @@ async def handle_reply_invite(message: Message):
 async def handle_reply_invite_response(callback: CallbackQuery):
     data_parts = callback.data.split("_")
     if len(data_parts) < 5:
-        await callback.answer("Invalid invite!")
+        await safe_answer_callback(callback, "Invalid invite!")  # FIXED
         return
     
     action = data_parts[3]
     invite_id = "_".join(data_parts[4:])
     
     if invite_id not in pending_invites:
-        await callback.answer("Invite expired!")
+        await safe_answer_callback(callback, "Invite expired!")  # FIXED
         return
     
     invite_data = pending_invites[invite_id]
     user = callback.from_user
     
     if user.id != invite_data["target_id"]:
-        await callback.answer("This invitation isn't for you!", show_alert=True)
+        await safe_answer_callback(callback, "This invitation isn't for you!", show_alert=True)  # FIXED
         return
     
     if action == "accept":
@@ -1600,7 +1613,7 @@ async def handle_reply_invite_response(callback: CallbackQuery):
         result = c.fetchone()
         
         if result and result[0] != "none":
-            await callback.answer("You're already in the cult!", show_alert=True)
+            await safe_answer_callback(callback, "You're already in the cult!", show_alert=True)  # FIXED
             conn.close()
             return
         
@@ -1609,7 +1622,7 @@ async def handle_reply_invite_response(callback: CallbackQuery):
         conn.commit()
         conn.close()
         
-        await callback.answer("✅ Blood pact accepted!", show_alert=True)
+        await safe_answer_callback(callback, "✅ Blood pact accepted!", show_alert=True)  # FIXED
         
         await callback.message.edit_text(
             f"🎉 <b>BLOOD PACT SEALED!</b>\n\n"
@@ -1625,7 +1638,7 @@ async def handle_reply_invite_response(callback: CallbackQuery):
         await send_log(f"🌀 <b>Invitation Accepted</b>\n\n👤 Invited: {user.first_name}\n👑 Inviter: {invite_data['inviter_name']}\n🆔 User ID: {user.id}\n🌪️ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
     elif action == "decline":
-        await callback.answer("❌ Invitation declined", show_alert=True)
+        await safe_answer_callback(callback, "❌ Invitation declined", show_alert=True)  # FIXED
         await callback.message.edit_text(
             f"🚫 <b>INVITATION REJECTED</b>\n\n"
             f"👤 <b>{user.first_name}</b> rejected the Tempest's call.\n"
@@ -1653,77 +1666,97 @@ async def handle_broadcast(message: Message):
     if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
         update_group(chat)
     
-    # Check if user is in broadcast state
-    if user.id in broadcast_state and broadcast_state[user.id]["step"] == 1:
-        broadcast_data = broadcast_state[user.id]
-        broadcast_type = broadcast_data["type"]
-        broadcast_state[user.id]["step"] = 2
-        
-        if broadcast_type == "users":
-            conn = sqlite3.connect("data/bot.db")
-            c = conn.cursor()
-            c.execute("SELECT user_id FROM users WHERE is_banned = 0")
-            targets = [row[0] for row in c.fetchall()]
-            conn.close()
-            target_type = "users"
-        else:  # groups
-            conn = sqlite3.connect("data/bot.db")
-            c = conn.cursor()
-            c.execute("SELECT group_id FROM groups")
-            targets = [row[0] for row in c.fetchall()]
-            conn.close()
-            target_type = "groups"
-        
-        total = len(targets)
-        if total == 0:
-            await message.answer(f"❌ No {target_type} found to broadcast!")
+    # Check if user is in broadcast state AND this is the content message
+    if user.id in broadcast_state:
+        # Check if we're on step 1 (waiting for content)
+        if broadcast_state[user.id].get("step") == 1:
+            # Process the broadcast
+            broadcast_data = broadcast_state[user.id]
+            broadcast_type = broadcast_data["type"]
+            
+            # Move to step 2 immediately
+            broadcast_state[user.id]["step"] = 2
+            
+            if broadcast_type == "users":
+                conn = sqlite3.connect("data/bot.db")
+                c = conn.cursor()
+                c.execute("SELECT user_id FROM users WHERE is_banned = 0")
+                targets = [row[0] for row in c.fetchall()]
+                conn.close()
+                target_type = "users"
+            else:  # groups
+                conn = sqlite3.connect("data/bot.db")
+                c = conn.cursor()
+                c.execute("SELECT group_id FROM groups")
+                targets = [row[0] for row in c.fetchall()]
+                conn.close()
+                target_type = "groups"
+            
+            total = len(targets)
+            if total == 0:
+                await message.answer(f"❌ No {target_type} found to broadcast!")
+                broadcast_state.pop(user.id, None)
+                return
+            
+            status_msg = await message.answer(f"📤 Sending to {total} {target_type}...")
+            
+            success = 0
+            failed = 0
+            
+            # Handle all message types including media
+            for target_id in targets:
+                try:
+                    if message.text:
+                        await bot.send_message(target_id, f"📢 {message.text}")
+                    elif message.photo:
+                        caption = message.caption or "📢 Broadcast"
+                        await bot.send_photo(target_id, message.photo[-1].file_id, caption=caption)
+                    elif message.video:
+                        caption = message.caption or "📢 Broadcast"
+                        await bot.send_video(target_id, message.video.file_id, caption=caption)
+                    elif message.document:
+                        caption = message.caption or "📢 Broadcast"
+                        await bot.send_document(target_id, message.document.file_id, caption=caption)
+                    elif message.audio:
+                        caption = message.caption or "📢 Broadcast"
+                        await bot.send_audio(target_id, message.audio.file_id, caption=caption)
+                    elif message.sticker:
+                        await bot.send_sticker(target_id, message.sticker.file_id)
+                    elif message.animation:
+                        caption = message.caption or "📢 Broadcast"
+                        await bot.send_animation(target_id, message.animation.file_id, caption=caption)
+                    elif message.voice:
+                        await bot.send_voice(target_id, message.voice.file_id)
+                    
+                    success += 1
+                    await asyncio.sleep(0.05)  # Rate limiting
+                except Exception as e:
+                    failed += 1
+                    continue
+            
+            # Clear broadcast state after completion
             broadcast_state.pop(user.id, None)
-            return
-        
-        status_msg = await message.answer(f"📤 Sending to {total} {target_type}...")
-        
-        success = 0
-        failed = 0
-        
-        for target_id in targets:
-            try:
-                if message.text:
-                    await bot.send_message(target_id, f"📢 {message.text}")
-                elif message.photo:
-                    await bot.send_photo(target_id, message.photo[-1].file_id, caption=message.caption or "📢 Broadcast")
-                elif message.video:
-                    await bot.send_video(target_id, message.video.file_id, caption=message.caption or "📢 Broadcast")
-                elif message.document:
-                    await bot.send_document(target_id, message.document.file_id, caption=message.caption or "📢 Broadcast")
-                elif message.audio:
-                    await bot.send_audio(target_id, message.audio.file_id, caption=message.caption or "📢 Broadcast")
-                success += 1
-                await asyncio.sleep(0.05)
-            except:
-                failed += 1
-                continue
-        
-        await status_msg.edit_text(f"✅ Sent to {success}/{total} {target_type}\n❌ Failed: {failed}")
-        broadcast_state.pop(user.id, None)
-        
-        # Log the broadcast
-        await send_log(f"📢 <b>Broadcast Sent</b>\n\nBy: {user.first_name}\nType: {target_type}\nSent: {success}/{total}\nFailed: {failed}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            await status_msg.edit_text(f"✅ Sent to {success}/{total} {target_type}\n❌ Failed: {failed}")
+            
+            # Log the broadcast
+            await send_log(f"📢 <b>Broadcast Sent</b>\n\nBy: {user.first_name}\nType: {target_type}\nSent: {success}/{total}\nFailed: {failed}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # ========== MAIN ==========
 async def main():
-    print("🚀 PRO BOT FINAL VERSION STARTING...")
+    print("🚀 PRO BOT WITH FIXES STARTING...")
     print(f"📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("✅ Database initialized")
-    print("🌀 Tempest Cult: CEREMONY FIXED")
+    print("🌀 Tempest: ALL CALLBACKS FIXED")
     print("📡 Scan: WORKING")
-    print("📊 Log Channel: ACTIVE (ID: 1003662720845)")
-    print("📢 Broadcast_gc: MEDIA SUPPORT FIXED")
-    print("🔗 Upload: COPY/SHARE BUTTONS WORKING")
-    print("📜 Story: 8 CHAPTERS WITH ANIMATIONS")
+    print("📊 Log Channel: ACTIVE")
+    print("📢 Broadcast: MEDIA SUPPORT FIXED")
+    print("🔗 Upload: COPY/SHARE WORKING")
+    print("📜 Story: 8 CHAPTERS FIXED")
     print("=" * 50)
     
     # Send startup log
-    startup_log = f"🤖 <b>Bot Started - Final Fixes</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: Complete Fixes\n⚡ Status: ALL SYSTEMS ACTIVE\n📊 Log Channel: CONNECTED"
+    startup_log = f"🤖 <b>Bot Started - Callback Fixes</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: Callback Errors Fixed\n⚡ Status: ALL SYSTEMS ACTIVE"
     await send_log(startup_log)
     
     await dp.start_polling(bot)
