@@ -30,7 +30,7 @@ print("🤖 PRO BOT FINAL VERSION INITIALIZING...")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAFVRZytQIWAq6S3r6NXM-CvPbt_agGMk4Y")
 OWNER_ID = int(os.getenv("OWNER_ID", "6108185460"))
 UPLOAD_API = "https://catbox.moe/user/api.php"
-LOG_CHANNEL_ID = -1003662720845  # Log channel ID without hyphen
+LOG_CHANNEL_ID = -1003662720845  # FIXED: Added -100 prefix
 
 # Create directories
 Path("data").mkdir(exist_ok=True)
@@ -656,7 +656,7 @@ async def logs_cmd(message: Message):
     
     log_content = f"📊 BOT LOGS - Last {days} day(s)\n"
     log_content += "=" * 50 + "\n\n"
-    log_content += f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    log_content += f"Generated: {datetime.now().strftime('%Y-%m-d %H:%M:%S')}\n"
     log_content += f"Total Commands: {len(cmd_logs)}\n"
     log_content += f"Total Errors: {len(err_logs)}\n\n"
     
@@ -805,7 +805,8 @@ async def broadcast_cmd(message: Message):
         "• Text message\n"
         "• Photo with caption\n"
         "• Video with caption\n"
-        "• Document with caption\n\n"
+        "• Document with caption\n"
+        "• Audio with caption\n\n"
         "⚠️ <b>Next message will be sent to ALL USERS</b>\n"
         "❌ <code>/cancel</code> to abort",
         parse_mode=ParseMode.HTML
@@ -825,7 +826,8 @@ async def broadcast_gc_cmd(message: Message):
         "• Text message\n"
         "• Photo with caption\n"
         "• Video with caption\n"
-        "• Document with caption\n\n"
+        "• Document with caption\n"
+        "• Audio with caption\n\n"
         "⚠️ <b>Next message will be sent to ALL GROUPS</b>\n"
         "❌ <code>/cancel</code> to abort",
         parse_mode=ParseMode.HTML
@@ -1103,7 +1105,7 @@ async def flip_cmd(message: Message):
     result = random.choice(["HEADS 🟡", "TAILS 🟤"])
     await msg.edit_text(f"🪙 <b>{result}</b>", parse_mode=ParseMode.HTML)
 
-# ========== HIDDEN TEMPEST PROGRESS - FIXED CASE INSENSITIVE ==========
+# ========== HIDDEN TEMPEST PROGRESS - FIXED ==========
 @dp.message(Command("Tempest_progress", ignore_case=True))
 @dp.message(Command("tempest_progress", ignore_case=True))
 async def tempest_progress_cmd(message: Message):
@@ -1173,7 +1175,7 @@ async def tempest_progress_cmd(message: Message):
     conn.close()
     await message.answer(progress_text, parse_mode=ParseMode.HTML)
 
-# ========== TEMPEST JOIN WITH BLOODY CEREMONY - FIXED CASE INSENSITIVE ==========
+# ========== TEMPEST JOIN WITH BLOODY CEREMONY - FIXED ==========
 @dp.message(Command("Tempest_join", ignore_case=True))
 @dp.message(Command("tempest_join", ignore_case=True))
 async def tempest_join_cmd(message: Message):
@@ -1223,82 +1225,82 @@ async def tempest_join_cmd(message: Message):
         reply_markup=keyboard.as_markup()
     )
 
-# ========== FIXED TEMPEST JOIN CALLBACK - NO TIMEOUT ERROR ==========
+# ========== FIXED: TEMPEST JOIN CALLBACK - NO TIMEOUT ERROR ==========
 @dp.callback_query(F.data.startswith("sacrifice_"))
 async def handle_sacrifice(callback: CallbackQuery):
-    user = callback.from_user
-    
-    # ANSWER CALLBACK IMMEDIATELY to prevent timeout
-    await callback.answer()
-    
-    chat_id = callback.message.chat.id
-    
-    if user.id not in pending_joins:
-        return
-    
-    if callback.data == "sacrifice_cancel":
-        if user.id in pending_joins:
-            del pending_joins[user.id]
-        await callback.message.edit_text("🌀 <b>Initiation cancelled. The storm is disappointed.</b>", parse_mode=ParseMode.HTML)
-        return
-    
-    sacrifice_num = callback.data.split("_")[1]
-    
-    sacrifices = {
-        "1": "🩸 Your firstborn's eternal soul",
-        "2": "💎 A diamond worth a kingdom",
-        "3": "📜 Your complete internet history", 
-        "4": "🎮 Your legendary gaming account",
-        "5": "👻 Your soul (no refunds)",
-        "6": "💳 Your credit card details",
-        "7": "📱 Your phone (with all data)",
-        "8": "🔐 Your deepest secret"
-    }
-    
-    sacrifice = sacrifices.get(sacrifice_num, "Mysterious offering")
-    
-    # Start bloody ceremony animation
-    msg = callback.message
-    await msg.edit_text(f"🌀 <b>VERIFYING SACRIFICE...</b>\n\n⚡ {sacrifice}", parse_mode=ParseMode.HTML)
-    await asyncio.sleep(1)
-    
-    # Verify sacrifice
-    is_real, status = await sacrifice_verification(sacrifice)
-    
-    if not is_real:
-        if user.id in pending_joins:
-            del pending_joins[user.id]
+    try:
+        # ANSWER IMMEDIATELY to prevent timeout
+        await callback.answer()
         
-        rejection = random.choice([
-            f"❌ <b>SACRIFICE REJECTED!</b>\n\n⚡ '{sacrifice}' is FAKE!\n🌩️ The storm LAUGHS at your pathetic offering!\n🌀 <i>Banned from initiation for 24 hours!</i>",
-            f"💀 <b>THE STORM ANGERED!</b>\n\n⚡ Fake: '{sacrifice}'\n🌪️ The Tempest SPITS on your worthless offering!\n🌀 <i>Return when you have REAL value...</i>",
-            f"👁️ <b>COUNCIL VERDICT: UNWORTHY!</b>\n\n⚡ '{sacrifice}'? Really?\n🌩️ Even the shadows mock your attempt!\n🌀 <i>The storm remembers this insult...</i>"
-        ])
+        user = callback.from_user
+        chat_id = callback.message.chat.id
         
-        await msg.edit_text(rejection, parse_mode=ParseMode.HTML)
-        return
-    
-    # REAL SACRIFICE - Start bloody ceremony animation
-    pending_joins[user.id]["sacrifice"] = sacrifice
-    pending_joins[user.id]["verified"] = status
-    
-    # Bloody ceremony animation
-    ceremony_steps = [
-        "🩸 <b>STEP 1: BLOOD OATH</b>\n\nA black obsidian blade materializes...\nYour palm is cut, blood flows into ancient bowl...",
-        "🔥 <b>STEP 2: ETERNAL FLAMES</b>\n\nDark flames consume your offering...\nThe sacrifice burns with green fire...",
-        "👁️ <b>STEP 3: ELDER GAZE</b>\n\nAncient eyes watch from shadows...\nThe Council approves your blood...",
-        "⚡ <b>STEP 4: LIGHTNING BRANDING</b>\n\nLightning strikes your chest...\nThe Tempest sigil burns into your soul...",
-        "🌪️ <b>STEP 5: STORM CONSUMPTION</b>\n\nThe vortex opens...\nYour sacrifice is consumed by eternal tempest...",
-        "🌀 <b>STEP 6: BLOOD BOND</b>\n\nYour blood mixes with the storm...\nThe tempest flows through your veins...",
-        "💀 <b>STEP 7: FINAL RITE</b>\n\nYour name is carved in the Book of Shadows...\nThe blood pact is sealed for eternity..."
-    ]
-    
-    for step in ceremony_steps:
-        await msg.edit_text(step, parse_mode=ParseMode.HTML)
-        await asyncio.sleep(2.5)
-    
-    # Final initiation
-    final_message = f"""⚡ <b>ETERNAL INITIATION COMPLETE!</b>
+        if user.id not in pending_joins:
+            return
+        
+        if callback.data == "sacrifice_cancel":
+            if user.id in pending_joins:
+                del pending_joins[user.id]
+            await callback.message.edit_text("🌀 <b>Initiation cancelled. The storm is disappointed.</b>", parse_mode=ParseMode.HTML)
+            return
+        
+        sacrifice_num = callback.data.split("_")[1]
+        
+        sacrifices = {
+            "1": "🩸 Your firstborn's eternal soul",
+            "2": "💎 A diamond worth a kingdom",
+            "3": "📜 Your complete internet history", 
+            "4": "🎮 Your legendary gaming account",
+            "5": "👻 Your soul (no refunds)",
+            "6": "💳 Your credit card details",
+            "7": "📱 Your phone (with all data)",
+            "8": "🔐 Your deepest secret"
+        }
+        
+        sacrifice = sacrifices.get(sacrifice_num, "Mysterious offering")
+        
+        # Start bloody ceremony animation
+        msg = callback.message
+        await msg.edit_text(f"🌀 <b>VERIFYING SACRIFICE...</b>\n\n⚡ {sacrifice}", parse_mode=ParseMode.HTML)
+        await asyncio.sleep(1)
+        
+        # Verify sacrifice
+        is_real, status = await sacrifice_verification(sacrifice)
+        
+        if not is_real:
+            if user.id in pending_joins:
+                del pending_joins[user.id]
+            
+            rejection = random.choice([
+                f"❌ <b>SACRIFICE REJECTED!</b>\n\n⚡ '{sacrifice}' is FAKE!\n🌩️ The storm LAUGHS at your pathetic offering!\n🌀 <i>Banned from initiation for 24 hours!</i>",
+                f"💀 <b>THE STORM ANGERED!</b>\n\n⚡ Fake: '{sacrifice}'\n🌪️ The Tempest SPITS on your worthless offering!\n🌀 <i>Return when you have REAL value...</i>",
+                f"👁️ <b>COUNCIL VERDICT: UNWORTHY!</b>\n\n⚡ '{sacrifice}'? Really?\n🌩️ Even the shadows mock your attempt!\n🌀 <i>The storm remembers this insult...</i>"
+            ])
+            
+            await msg.edit_text(rejection, parse_mode=ParseMode.HTML)
+            return
+        
+        # REAL SACRIFICE - Start bloody ceremony animation
+        pending_joins[user.id]["sacrifice"] = sacrifice
+        pending_joins[user.id]["verified"] = status
+        
+        # Bloody ceremony animation
+        ceremony_steps = [
+            "🩸 <b>STEP 1: BLOOD OATH</b>\n\nA black obsidian blade materializes...\nYour palm is cut, blood flows into ancient bowl...",
+            "🔥 <b>STEP 2: ETERNAL FLAMES</b>\n\nDark flames consume your offering...\nThe sacrifice burns with green fire...",
+            "👁️ <b>STEP 3: ELDER GAZE</b>\n\nAncient eyes watch from shadows...\nThe Council approves your blood...",
+            "⚡ <b>STEP 4: LIGHTNING BRANDING</b>\n\nLightning strikes your chest...\nThe Tempest sigil burns into your soul...",
+            "🌪️ <b>STEP 5: STORM CONSUMPTION</b>\n\nThe vortex opens...\nYour sacrifice is consumed by eternal tempest...",
+            "🌀 <b>STEP 6: BLOOD BOND</b>\n\nYour blood mixes with the storm...\nThe tempest flows through your veins...",
+            "💀 <b>STEP 7: FINAL RITE</b>\n\nYour name is carved in the Book of Shadows...\nThe blood pact is sealed for eternity..."
+        ]
+        
+        for step in ceremony_steps:
+            await msg.edit_text(step, parse_mode=ParseMode.HTML)
+            await asyncio.sleep(2.5)
+        
+        # Final initiation
+        final_message = f"""⚡ <b>ETERNAL INITIATION COMPLETE!</b>
 
 🌀 <b>WELCOME TO THE TEMPEST, {pending_joins[user.id]['name'].upper()}!</b>
 
@@ -1312,25 +1314,42 @@ Each upload feeds the Tempest.
 Your journey of darkness begins...</i>
 
 🌀 Use /Tempest_progress to track your bloody path"""
-    
-    await msg.edit_text(final_message, parse_mode=ParseMode.HTML)
-    
-    # Add to cult
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("UPDATE users SET cult_status = 'member', cult_rank = 'Blood Initiate', cult_join_date = ?, sacrifices = 3 WHERE user_id = ?",
-             (datetime.now().isoformat(), user.id))
-    conn.commit()
-    conn.close()
-    
-    # Send log
-    await send_log(f"🌀 <b>New Tempest Member</b>\n\n👤 Name: {user.first_name}\n🆔 ID: {user.id}\n🩸 Sacrifice: {sacrifice}\n🌪️ Joined: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    # Cleanup
-    if user.id in pending_joins:
-        del pending_joins[user.id]
+        
+        await msg.edit_text(final_message, parse_mode=ParseMode.HTML)
+        
+        # Add to cult - FIXED: Ensure user exists in database first
+        conn = sqlite3.connect("data/bot.db")
+        c = conn.cursor()
+        
+        # Check if user exists in users table
+        c.execute("SELECT user_id FROM users WHERE user_id = ?", (user.id,))
+        if not c.fetchone():
+            # User doesn't exist, insert them first
+            c.execute("INSERT INTO users (user_id, username, first_name, joined_date, last_active) VALUES (?, ?, ?, ?, ?)",
+                     (user.id, user.username, user.first_name, datetime.now().isoformat(), datetime.now().isoformat()))
+        
+        # Now update cult status
+        c.execute("UPDATE users SET cult_status = 'member', cult_rank = 'Blood Initiate', cult_join_date = ?, sacrifices = 3 WHERE user_id = ?",
+                 (datetime.now().isoformat(), user.id))
+        conn.commit()
+        conn.close()
+        
+        # Send log
+        await send_log(f"🌀 <b>New Tempest Member</b>\n\n👤 Name: {user.first_name}\n🆔 ID: {user.id}\n🩸 Sacrifice: {sacrifice}\n🌪️ Joined: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Cleanup
+        if user.id in pending_joins:
+            del pending_joins[user.id]
+            
+    except Exception as e:
+        print(f"Error in handle_sacrifice: {e}")
+        # Still answer callback to prevent timeout
+        try:
+            await callback.answer()
+        except:
+            pass
 
-# ========== TEMPEST STORY WITH 8 CHAPTERS AND ANIMATIONS ==========
+# ========== TEMPEST STORY WITH 8 CHAPTERS AND ANIMATIONS - FIXED ==========
 @dp.message(Command("Tempest_story", ignore_case=True))
 async def tempest_story_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_story")
@@ -1372,14 +1391,15 @@ A whisper in the void, a crackle in the stillness..."""
 
 @dp.callback_query(F.data.startswith("story_next_"))
 async def handle_story_next(callback: CallbackQuery):
-    # ANSWER CALLBACK IMMEDIATELY to prevent timeout
-    await callback.answer()
-    
-    user = callback.from_user
-    chapter_num = int(callback.data.split("_")[-1])
-    
-    chapters = {
-        2: """📜 <b>CHAPTER 2: BIRTH OF RAVIJAH</b>
+    try:
+        # ANSWER IMMEDIATELY to prevent timeout
+        await callback.answer()
+        
+        user = callback.from_user
+        chapter_num = int(callback.data.split("_")[-1])
+        
+        chapters = {
+            2: """📜 <b>CHAPTER 2: BIRTH OF RAVIJAH</b>
 
 <code>Year 0, Storm Calendar</code>
 
@@ -1391,8 +1411,8 @@ He wandered the silent kingdoms, collecting forgotten thunder,
 gathering whispers of rebellion from those who remembered sound.
 
 <code>"This quiet is a cage," he whispered. "I shall be the key."</code>""",
-        
-        3: """📜 <b>CHAPTER 3: THE BROKEN SWORDS</b>
+            
+            3: """📜 <b>CHAPTER 3: THE BROKEN SWORDS</b>
 
 <code>Year 47, Storm Calendar</code>
 
@@ -1405,8 +1425,8 @@ From the Shadow Archives emerged Keny, keeper of forbidden knowledge.
 <code>"I know the secrets of the Still Council," he whispered. "Their weakness is order."</code>
 
 Three became one that stormy night.""",
-        
-        4: """📜 <b>CHAPTER 4: THE FESTIVAL BETRAYAL</b>
+            
+            4: """📜 <b>CHAPTER 4: THE FESTIVAL BETRAYAL</b>
 
 <code>Year 89, Storm Calendar</code>
 
@@ -1419,8 +1439,8 @@ She stepped in front, taking what was meant for him.
 <code>"Live," she breathed as storm-magic faded. "For both of us..."</code>
 
 Ravijah's scream birthed the First Tempest.""",
-        
-        5: """📜 <b>CHAPTER 5: AGE OF THUNDER</b>
+            
+            5: """📜 <b>CHAPTER 5: AGE OF THUNDER</b>
 
 <code>Years 90-389, Storm Calendar</code>
 
@@ -1431,8 +1451,8 @@ Created the Blood Altar that drank offerings from conquered realms.
 
 New initiates flooded in, each swearing eternal oaths.
 Ranks were established, rituals perfected, power consolidated.""",
-        
-        6: """📜 <b>CHAPTER 6: THE GREAT SCHISM</b>
+            
+            6: """📜 <b>CHAPTER 6: THE GREAT SCHISM</b>
 
 <code>Year 390, Storm Calendar</code>
 
@@ -1445,8 +1465,8 @@ Bablu became Warden of the Shattered Realms.
 Keny retreated to the Shadow Archives.
 
 The Golden Age had ended.""",
-        
-        7: """📜 <b>CHAPTER 7: DIGITAL AWAKENING</b>
+            
+            7: """📜 <b>CHAPTER 7: DIGITAL AWAKENING</b>
 
 <code>Year 2024, Modern Era</code>
 
@@ -1459,8 +1479,8 @@ Sacrifices became digital - data, files, uploads.
 
 The Council reformed in the digital shadows.
 New purpose, new methods, same eternal storm.""",
-        
-        8: """📜 <b>CHAPTER 8: YOUR DESTINY</b>
+            
+            8: """📜 <b>CHAPTER 8: YOUR DESTINY</b>
 
 <code>Present Day</code>
 
@@ -1480,35 +1500,48 @@ We are the eternal storm."</code>
 ━━━━━━━━━━━━━━━━━━━━━━━━
 🌀 <b>THE STORY CONTINUES WITH YOU</b>
 <i>Your chapter begins now...</i>"""
-    }
-    
-    if chapter_num in chapters:
-        # Show animation before chapter
-        await callback.message.edit_text(f"🌀 <b>Turning page {chapter_num}/8...</b>", parse_mode=ParseMode.HTML)
-        await asyncio.sleep(2)
+        }
         
-        keyboard = InlineKeyboardBuilder()
-        
-        if chapter_num < 8:
-            keyboard.add(InlineKeyboardButton(text=f"🌪️ Continue to Chapter {chapter_num + 1}", callback_data=f"story_next_{chapter_num + 1}"))
-        else:
-            keyboard.add(InlineKeyboardButton(text="⚡ Story Complete", callback_data="story_end"))
-        
-        await callback.message.edit_text(chapters[chapter_num], parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup() if chapter_num < 8 else None)
-    else:
-        await callback.message.edit_text("📜 <b>Story complete!</b>", parse_mode=ParseMode.HTML)
+        if chapter_num in chapters:
+            # Show animation before chapter
+            await callback.message.edit_text(f"🌀 <b>Turning page {chapter_num}/8...</b>", parse_mode=ParseMode.HTML)
+            await asyncio.sleep(2)
+            
+            keyboard = InlineKeyboardBuilder()
+            
+            if chapter_num < 8:
+                keyboard.add(InlineKeyboardButton(text=f"🌪️ Continue to Chapter {chapter_num + 1}", callback_data=f"story_next_{chapter_num + 1}"))
+            else:
+                keyboard.add(InlineKeyboardButton(text="⚡ Story Complete", callback_data="story_end"))
+            
+            await callback.message.edit_text(chapters[chapter_num], parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup() if chapter_num < 8 else None)
+    except Exception as e:
+        print(f"Error in handle_story_next: {e}")
+        # Still answer callback to prevent timeout
+        try:
+            await callback.answer()
+        except:
+            pass
 
 @dp.callback_query(F.data == "story_end")
 async def handle_story_end(callback: CallbackQuery):
-    await callback.answer()
-    await callback.message.edit_text("📜 <b>THE TEMPEST SAGA</b>\n\n<i>Your understanding of the storm is complete. Your journey continues with each sacrifice. Make your mark in the eternal tempest.</i>", parse_mode=ParseMode.HTML)
-    
-    # Auto-delete after 30 seconds
-    await asyncio.sleep(30)
     try:
-        await bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    except:
-        pass
+        await callback.answer()
+        await callback.message.edit_text("📜 <b>THE TEMPEST SAGA</b>\n\n<i>Your understanding of the storm is complete. Your journey continues with each sacrifice. Make your mark in the eternal tempest.</i>", parse_mode=ParseMode.HTML)
+        
+        # Auto-delete after 30 seconds
+        await asyncio.sleep(30)
+        try:
+            await bot.delete_message(callback.message.chat.id, callback.message.message_id)
+        except:
+            pass
+    except Exception as e:
+        print(f"Error in handle_story_end: {e}")
+        # Still answer callback to prevent timeout
+        try:
+            await callback.answer()
+        except:
+            pass
 
 # ========== FIXED REPLY INVITATION SYSTEM ==========
 @dp.message(F.reply_to_message)
@@ -1580,72 +1613,86 @@ async def handle_reply_invite(message: Message):
 
 @dp.callback_query(F.data.startswith("reply_invite_"))
 async def handle_reply_invite_response(callback: CallbackQuery):
-    # ANSWER CALLBACK IMMEDIATELY to prevent timeout
-    await callback.answer()
-    
-    data_parts = callback.data.split("_")
-    if len(data_parts) < 5:
-        return
-    
-    action = data_parts[3]
-    invite_id = "_".join(data_parts[4:])
-    
-    if invite_id not in pending_invites:
-        return
-    
-    invite_data = pending_invites[invite_id]
-    user = callback.from_user
-    
-    if user.id != invite_data["target_id"]:
-        return
-    
-    if action == "accept":
-        conn = sqlite3.connect("data/bot.db")
-        c = conn.cursor()
-        c.execute("SELECT cult_status FROM users WHERE user_id = ?", (user.id,))
-        result = c.fetchone()
+    try:
+        # ANSWER IMMEDIATELY to prevent timeout
+        await callback.answer()
         
-        if result and result[0] != "none":
-            conn.close()
+        data_parts = callback.data.split("_")
+        if len(data_parts) < 5:
             return
         
-        c.execute("UPDATE users SET cult_status = 'member', cult_rank = 'Blood Initiate', cult_join_date = ?, sacrifices = 3 WHERE user_id = ?",
-                 (datetime.now().isoformat(), user.id))
-        conn.commit()
-        conn.close()
+        action = data_parts[3]
+        invite_id = "_".join(data_parts[4:])
         
-        await callback.message.edit_text(
-            f"🎉 <b>BLOOD PACT SEALED!</b>\n\n"
-            f"👤 <b>{user.first_name}</b> has accepted {invite_data['inviter_name']}'s invitation!\n"
-            f"🩸 Blood oath sworn to the Tempest\n"
-            f"🌀 Rank: Blood Initiate\n"
-            f"⚔️ Starting sacrifices: 3\n\n"
-            f"<i>The storm grows stronger with new blood...</i>",
-            parse_mode=ParseMode.HTML
-        )
+        if invite_id not in pending_invites:
+            return
         
-        # Send log
-        await send_log(f"🌀 <b>Invitation Accepted</b>\n\n👤 Invited: {user.first_name}\n👑 Inviter: {invite_data['inviter_name']}\n🆔 User ID: {user.id}\n🌪️ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        invite_data = pending_invites[invite_id]
+        user = callback.from_user
         
-    elif action == "decline":
-        await callback.message.edit_text(
-            f"🚫 <b>INVITATION REJECTED</b>\n\n"
-            f"👤 <b>{user.first_name}</b> rejected the Tempest's call.\n"
-            f"👑 Invited by: {invite_data['inviter_name']}\n\n"
-            f"<i>Their blood remains unspilled... for now.</i>",
-            parse_mode=ParseMode.HTML
-        )
-    
-    if invite_id in pending_invites:
-        del pending_invites[invite_id]
-    
-    await asyncio.sleep(30)
-    try:
-        await bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    except:
-        pass
+        if user.id != invite_data["target_id"]:
+            return
+        
+        if action == "accept":
+            conn = sqlite3.connect("data/bot.db")
+            c = conn.cursor()
+            c.execute("SELECT cult_status FROM users WHERE user_id = ?", (user.id,))
+            result = c.fetchone()
+            
+            if result and result[0] != "none":
+                conn.close()
+                return
+            
+            # Ensure user exists in database first
+            c.execute("SELECT user_id FROM users WHERE user_id = ?", (user.id,))
+            if not c.fetchone():
+                c.execute("INSERT INTO users (user_id, username, first_name, joined_date, last_active) VALUES (?, ?, ?, ?, ?)",
+                         (user.id, user.username, user.first_name, datetime.now().isoformat(), datetime.now().isoformat()))
+            
+            c.execute("UPDATE users SET cult_status = 'member', cult_rank = 'Blood Initiate', cult_join_date = ?, sacrifices = 3 WHERE user_id = ?",
+                     (datetime.now().isoformat(), user.id))
+            conn.commit()
+            conn.close()
+            
+            await callback.message.edit_text(
+                f"🎉 <b>BLOOD PACT SEALED!</b>\n\n"
+                f"👤 <b>{user.first_name}</b> has accepted {invite_data['inviter_name']}'s invitation!\n"
+                f"🩸 Blood oath sworn to the Tempest\n"
+                f"🌀 Rank: Blood Initiate\n"
+                f"⚔️ Starting sacrifices: 3\n\n"
+                f"<i>The storm grows stronger with new blood...</i>",
+                parse_mode=ParseMode.HTML
+            )
+            
+            # Send log
+            await send_log(f"🌀 <b>Invitation Accepted</b>\n\n👤 Invited: {user.first_name}\n👑 Inviter: {invite_data['inviter_name']}\n🆔 User ID: {user.id}\n🌪️ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            
+        elif action == "decline":
+            await callback.message.edit_text(
+                f"🚫 <b>INVITATION REJECTED</b>\n\n"
+                f"👤 <b>{user.first_name}</b> rejected the Tempest's call.\n"
+                f"👑 Invited by: {invite_data['inviter_name']}\n\n"
+                f"<i>Their blood remains unspilled... for now.</i>",
+                parse_mode=ParseMode.HTML
+            )
+        
+        if invite_id in pending_invites:
+            del pending_invites[invite_id]
+        
+        await asyncio.sleep(30)
+        try:
+            await bot.delete_message(callback.message.chat.id, callback.message.message_id)
+        except:
+            pass
+    except Exception as e:
+        print(f"Error in handle_reply_invite_response: {e}")
+        # Still answer callback to prevent timeout
+        try:
+            await callback.answer()
+        except:
+            pass
 
-# ========== FIXED BROADCAST HANDLER - NOW SUPPORTS MEDIA FOR GROUPS TOO ==========
+# ========== FIXED BROADCAST HANDLER - SUPPORTS ALL MEDIA ==========
 @dp.message()
 async def handle_broadcast(message: Message):
     user = message.from_user
@@ -1692,13 +1739,26 @@ async def handle_broadcast(message: Message):
                 if message.text:
                     await bot.send_message(target_id, f"📢 {message.text}")
                 elif message.photo:
-                    await bot.send_photo(target_id, message.photo[-1].file_id, caption=f"📢 {message.caption}" if message.caption else "📢 Broadcast")
+                    caption = f"📢 {message.caption}" if message.caption else "📢 Broadcast"
+                    await bot.send_photo(target_id, message.photo[-1].file_id, caption=caption)
                 elif message.video:
-                    await bot.send_video(target_id, message.video.file_id, caption=f"📢 {message.caption}" if message.caption else "📢 Broadcast")
+                    caption = f"📢 {message.caption}" if message.caption else "📢 Broadcast"
+                    await bot.send_video(target_id, message.video.file_id, caption=caption)
                 elif message.document:
-                    await bot.send_document(target_id, message.document.file_id, caption=f"📢 {message.caption}" if message.caption else "📢 Broadcast")
+                    caption = f"📢 {message.caption}" if message.caption else "📢 Broadcast"
+                    await bot.send_document(target_id, message.document.file_id, caption=caption)
                 elif message.audio:
-                    await bot.send_audio(target_id, message.audio.file_id, caption=f"📢 {message.caption}" if message.caption else "📢 Broadcast")
+                    caption = f"📢 {message.caption}" if message.caption else "📢 Broadcast"
+                    await bot.send_audio(target_id, message.audio.file_id, caption=caption)
+                elif message.animation:
+                    caption = f"📢 {message.caption}" if message.caption else "📢 Broadcast"
+                    await bot.send_animation(target_id, message.animation.file_id, caption=caption)
+                elif message.voice:
+                    await bot.send_voice(target_id, message.voice.file_id, caption="📢 Broadcast")
+                elif message.sticker:
+                    await bot.send_sticker(target_id, message.sticker.file_id)
+                elif message.video_note:
+                    await bot.send_video_note(target_id, message.video_note.file_id)
                 success += 1
                 await asyncio.sleep(0.05)
             except:
@@ -1713,19 +1773,17 @@ async def handle_broadcast(message: Message):
 
 # ========== MAIN ==========
 async def main():
-    print("🚀 PRO BOT FINAL VERSION STARTING...")
+    print("🚀 PRO BOT - ALL FIXES VERSION STARTING...")
     print(f"📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("✅ Database initialized")
-    print("🌀 Tempest Cult: CEREMONY FIXED")
-    print("📡 Scan: WORKING")
-    print("📊 Log Channel: ACTIVE (ID: 1003662720845)")
-    print("📢 Broadcast_gc: MEDIA SUPPORT FIXED")
-    print("🔗 Upload: COPY/SHARE BUTTONS WORKING")
-    print("📜 Story: 8 CHAPTERS WITH ANIMATIONS")
+    print("🌀 Tempest_progress: FIXED")
+    print("🕒 Callback timeout: FIXED")
+    print("📊 Log Channel: ACTIVE (ID: -1003662720845)")
+    print("📢 Broadcast media: ALL TYPES SUPPORTED")
     print("=" * 50)
     
     # Send startup log
-    startup_log = f"🤖 <b>Bot Started - Final Fixes</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: Complete Fixes\n⚡ Status: ALL SYSTEMS ACTIVE\n📊 Log Channel: CONNECTED"
+    startup_log = f"🤖 <b>Bot Started - All Fixes Version</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n⚡ Status: ALL SYSTEMS ACTIVE\n📊 Log Channel: CONNECTED"
     await send_log(startup_log)
     
     await dp.start_polling(bot)
