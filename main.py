@@ -20,7 +20,7 @@ from pathlib import Path
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, InputMediaPhoto, InputMediaVideo, InputMediaDocument
+from aiogram.types import Message, FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.enums import ParseMode, ChatType
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -30,7 +30,7 @@ print("🤖 PRO BOT FINAL VERSION INITIALIZING...")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAFVRZytQIWAq6S3r6NXM-CvPbt_agGMk4Y")
 OWNER_ID = int(os.getenv("OWNER_ID", "6108185460"))
 UPLOAD_API = "https://catbox.moe/user/api.php"
-LOG_CHANNEL_ID = -1003662720845  # FIXED: Added minus sign for channel ID
+LOG_CHANNEL_ID = -1003662720845  # FIXED: Added minus sign
 
 # Cult leader IDs
 CULT_LEADER_ID = 6211708776
@@ -1685,7 +1685,7 @@ async def handle_invite_response(callback: CallbackQuery):
     except:
         pass
 
-# ========== FIXED BROADCAST HANDLER WITH PROPER MEDIA SUPPORT ==========
+# ========== WORKING BROADCAST HANDLER ==========
 @dp.message()
 async def handle_broadcast(message: Message):
     user = message.from_user
@@ -1728,70 +1728,19 @@ async def handle_broadcast(message: Message):
         success = 0
         failed = 0
         
-        # Send message to all targets
+        # Send message to all targets - USE COPY METHOD
         for target_id in targets:
             try:
-                # Try to copy the message (not forward)
-                if message.text:
-                    await bot.send_message(
-                        chat_id=target_id,
-                        text=message.text,
-                        parse_mode=ParseMode.HTML,
-                        disable_web_page_preview=False
-                    )
-                elif message.photo:
-                    await bot.send_photo(
-                        chat_id=target_id,
-                        photo=message.photo[-1].file_id,
-                        caption=message.caption if message.caption else None,
-                        parse_mode=ParseMode.HTML if message.caption else None
-                    )
-                elif message.video:
-                    await bot.send_video(
-                        chat_id=target_id,
-                        video=message.video.file_id,
-                        caption=message.caption if message.caption else None,
-                        parse_mode=ParseMode.HTML if message.caption else None
-                    )
-                elif message.document:
-                    await bot.send_document(
-                        chat_id=target_id,
-                        document=message.document.file_id,
-                        caption=message.caption if message.caption else None,
-                        parse_mode=ParseMode.HTML if message.caption else None
-                    )
-                elif message.audio:
-                    await bot.send_audio(
-                        chat_id=target_id,
-                        audio=message.audio.file_id,
-                        caption=message.caption if message.caption else None,
-                        parse_mode=ParseMode.HTML if message.caption else None
-                    )
-                elif message.voice:
-                    await bot.send_voice(
-                        chat_id=target_id,
-                        voice=message.voice.file_id,
-                        caption=message.caption if message.caption else None
-                    )
-                elif message.sticker:
-                    await bot.send_sticker(
-                        chat_id=target_id,
-                        sticker=message.sticker.file_id
-                    )
-                elif message.animation:
-                    await bot.send_animation(
-                        chat_id=target_id,
-                        animation=message.animation.file_id,
-                        caption=message.caption if message.caption else None,
-                        parse_mode=ParseMode.HTML if message.caption else None
-                    )
-                else:
-                    # Forward as fallback
-                    await message.forward(chat_id=target_id)
-                
+                # Use copy_message which works for all message types
+                await bot.copy_message(
+                    chat_id=target_id,
+                    from_chat_id=chat.id,
+                    message_id=message.message_id,
+                    parse_mode=ParseMode.HTML if message.text else None
+                )
                 success += 1
                 # Small delay to avoid rate limits
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.05)
                 
             except Exception as e:
                 failed += 1
@@ -1822,7 +1771,7 @@ async def main():
     print("✅ Database initialized")
     print(f"🌀 Log Channel ID: {LOG_CHANNEL_ID}")
     print("📡 Scan: WORKING")
-    print("📢 Broadcast: MEDIA SUPPORT FIXED")
+    print("📢 Broadcast: FIXED - Uses copy_message method")
     print("🔗 Upload: COPY/SHARE BUTTONS WORKING")
     print("📜 Story: 8 CHAPTERS WITH ANIMATIONS")
     print("👤 Profile: TEMPEST STATUS INTEGRATED")
