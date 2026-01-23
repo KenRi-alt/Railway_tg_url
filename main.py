@@ -19,8 +19,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command, CommandStart, CommandObject
-from aiogram.types import Message, FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.filters import Command, CommandStart
+from aiogram.types import Message, FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, InputMediaPhoto, InputMediaVideo, InputMediaDocument
 from aiogram.enums import ParseMode, ChatType
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -30,7 +30,7 @@ print("🤖 PRO BOT FINAL VERSION INITIALIZING...")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAFVRZytQIWAq6S3r6NXM-CvPbt_agGMk4Y")
 OWNER_ID = int(os.getenv("OWNER_ID", "6108185460"))
 UPLOAD_API = "https://catbox.moe/user/api.php"
-LOG_CHANNEL_ID = 1003662720845  # Log channel ID without hyphen
+LOG_CHANNEL_ID = -1003662720845  # FIXED: Added minus sign for channel ID
 
 # Cult leader IDs
 CULT_LEADER_ID = 6211708776
@@ -394,7 +394,10 @@ async def handle_common(message: Message, command: str):
 async def start_cmd(message: Message):
     user, chat = await handle_common(message, "start")
     
-    await send_log(f"👤 <b>User Started Bot</b>\n\nID: <code>{user.id}</code>\nName: {user.first_name}\nUsername: @{user.username if user.username else 'None'}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    try:
+        await send_log(f"👤 <b>User Started Bot</b>\n\nID: <code>{user.id}</code>\nName: {user.first_name}\nUsername: @{user.username if user.username else 'None'}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    except Exception as e:
+        print(f"Log channel error: {e}")
     
     await message.answer(
         f"✨ <b>Hey {user.first_name}!</b>\n\n"
@@ -832,7 +835,10 @@ async def pro_cmd(message: Message):
     conn.commit()
     conn.close()
     
-    await send_log(f"👑 <b>Admin Promotion</b>\n\nPromoted by: {user.first_name}\nPromoted user: {target_id}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    try:
+        await send_log(f"👑 <b>Admin Promotion</b>\n\nPromoted by: {user.first_name}\nPromoted user: {target_id}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    except:
+        pass
     
     await message.answer(f"✅ User {target_id} promoted to admin!")
 
@@ -1335,7 +1341,10 @@ Your journey of darkness begins...</i>
     conn.close()
     
     # Send log
-    await send_log(f"🌀 <b>New Tempest Member</b>\n\n👤 Name: {user.first_name}\n🆔 ID: {user.id}\n🩸 Sacrifice: {sacrifice}\n🌪️ Joined: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    try:
+        await send_log(f"🌀 <b>New Tempest Member</b>\n\n👤 Name: {user.first_name}\n🆔 ID: {user.id}\n🩸 Sacrifice: {sacrifice}\n🌪️ Joined: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    except:
+        pass
     
     # Cleanup
     if user.id in pending_joins:
@@ -1652,7 +1661,10 @@ async def handle_invite_response(callback: CallbackQuery):
         )
         
         # Send log
-        await send_log(f"🌀 <b>Invitation Accepted</b>\n\n👤 Invited: {user.first_name}\n👑 Inviter: {invite_data['inviter_name']}\n🆔 User ID: {user.id}\n🌪️ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        try:
+            await send_log(f"🌀 <b>Invitation Accepted</b>\n\n👤 Invited: {user.first_name}\n👑 Inviter: {invite_data['inviter_name']}\n🆔 User ID: {user.id}\n🌪️ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        except:
+            pass
         
     elif action == "decline":
         await callback.answer("❌ Invitation declined", show_alert=True)
@@ -1673,7 +1685,7 @@ async def handle_invite_response(callback: CallbackQuery):
     except:
         pass
 
-# ========== FIXED BROADCAST HANDLER WITH MEDIA SUPPORT ==========
+# ========== FIXED BROADCAST HANDLER WITH PROPER MEDIA SUPPORT ==========
 @dp.message()
 async def handle_broadcast(message: Message):
     user = message.from_user
@@ -1719,29 +1731,68 @@ async def handle_broadcast(message: Message):
         # Send message to all targets
         for target_id in targets:
             try:
-                # Try to send the message based on type
+                # Try to copy the message (not forward)
                 if message.text:
-                    await bot.send_message(target_id, message.text, parse_mode=ParseMode.HTML, disable_web_page_preview=False)
+                    await bot.send_message(
+                        chat_id=target_id,
+                        text=message.text,
+                        parse_mode=ParseMode.HTML,
+                        disable_web_page_preview=False
+                    )
                 elif message.photo:
-                    await bot.send_photo(target_id, message.photo[-1].file_id, caption=message.caption, parse_mode=ParseMode.HTML)
+                    await bot.send_photo(
+                        chat_id=target_id,
+                        photo=message.photo[-1].file_id,
+                        caption=message.caption if message.caption else None,
+                        parse_mode=ParseMode.HTML if message.caption else None
+                    )
                 elif message.video:
-                    await bot.send_video(target_id, message.video.file_id, caption=message.caption, parse_mode=ParseMode.HTML)
+                    await bot.send_video(
+                        chat_id=target_id,
+                        video=message.video.file_id,
+                        caption=message.caption if message.caption else None,
+                        parse_mode=ParseMode.HTML if message.caption else None
+                    )
                 elif message.document:
-                    await bot.send_document(target_id, message.document.file_id, caption=message.caption, parse_mode=ParseMode.HTML)
+                    await bot.send_document(
+                        chat_id=target_id,
+                        document=message.document.file_id,
+                        caption=message.caption if message.caption else None,
+                        parse_mode=ParseMode.HTML if message.caption else None
+                    )
                 elif message.audio:
-                    await bot.send_audio(target_id, message.audio.file_id, caption=message.caption, parse_mode=ParseMode.HTML)
+                    await bot.send_audio(
+                        chat_id=target_id,
+                        audio=message.audio.file_id,
+                        caption=message.caption if message.caption else None,
+                        parse_mode=ParseMode.HTML if message.caption else None
+                    )
                 elif message.voice:
-                    await bot.send_voice(target_id, message.voice.file_id, caption=message.caption)
+                    await bot.send_voice(
+                        chat_id=target_id,
+                        voice=message.voice.file_id,
+                        caption=message.caption if message.caption else None
+                    )
                 elif message.sticker:
-                    await bot.send_sticker(target_id, message.sticker.file_id)
+                    await bot.send_sticker(
+                        chat_id=target_id,
+                        sticker=message.sticker.file_id
+                    )
                 elif message.animation:
-                    await bot.send_animation(target_id, message.animation.file_id, caption=message.caption, parse_mode=ParseMode.HTML)
+                    await bot.send_animation(
+                        chat_id=target_id,
+                        animation=message.animation.file_id,
+                        caption=message.caption if message.caption else None,
+                        parse_mode=ParseMode.HTML if message.caption else None
+                    )
                 else:
                     # Forward as fallback
-                    await message.forward(target_id)
+                    await message.forward(chat_id=target_id)
                 
                 success += 1
-                await asyncio.sleep(0.05)  # Rate limiting
+                # Small delay to avoid rate limits
+                await asyncio.sleep(0.1)
+                
             except Exception as e:
                 failed += 1
                 continue
@@ -1759,16 +1810,18 @@ async def handle_broadcast(message: Message):
         broadcast_state.pop(user.id, None)
         
         # Log the broadcast
-        await send_log(f"📢 <b>Broadcast Sent</b>\n\nBy: {user.first_name}\nType: {target_type}\nSent: {success}/{total}\nFailed: {failed}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        try:
+            await send_log(f"📢 <b>Broadcast Sent</b>\n\nBy: {user.first_name}\nType: {target_type}\nSent: {success}/{total}\nFailed: {failed}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        except Exception as e:
+            print(f"Failed to send broadcast log: {e}")
 
 # ========== MAIN ==========
 async def main():
     print("🚀 PRO BOT FINAL VERSION STARTING...")
     print(f"📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("✅ Database initialized")
-    print("🌀 Tempest Cult: UPDATED")
+    print(f"🌀 Log Channel ID: {LOG_CHANNEL_ID}")
     print("📡 Scan: WORKING")
-    print("📊 Log Channel: ACTIVE (ID: 1003662720845)")
     print("📢 Broadcast: MEDIA SUPPORT FIXED")
     print("🔗 Upload: COPY/SHARE BUTTONS WORKING")
     print("📜 Story: 8 CHAPTERS WITH ANIMATIONS")
@@ -1777,9 +1830,14 @@ async def main():
     print("🌀 Tempest_cult: CULT HIERARCHY ADDED")
     print("=" * 50)
     
-    # Send startup log
-    startup_log = f"🤖 <b>Bot Started - Final Fixes</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: Complete Fixes\n⚡ Status: ALL SYSTEMS ACTIVE\n📊 Log Channel: CONNECTED"
-    await send_log(startup_log)
+    # Test log channel connection
+    try:
+        startup_log = f"🤖 <b>Bot Started - Final Fixes</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: Complete Fixes\n⚡ Status: ALL SYSTEMS ACTIVE\n📊 Log Channel: CONNECTED"
+        await send_log(startup_log)
+        print("✅ Log channel connected successfully")
+    except Exception as e:
+        print(f"⚠️ Log channel error: {e}")
+        print("ℹ️ Bot will continue without log channel")
     
     await dp.start_polling(bot)
 
