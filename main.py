@@ -798,16 +798,12 @@ async def broadcast_cmd(message: Message):
     if not await is_admin(user.id):
         return
     
-    broadcast_state[user.id] = {"type": "users", "step": 1}
+    # Enter broadcast mode
+    broadcast_state[user.id] = {"type": "users", "step": "waiting_for_message"}
     await message.answer(
-        "📢 <b>BROADCAST TO ALL USERS</b>\n\n"
-        "Send any message now:\n"
-        "• Text message\n"
-        "• Photo with caption\n"
-        "• Video with caption\n"
-        "• Document with caption\n\n"
-        "⚠️ <b>Next message will be sent to ALL USERS</b>\n"
-        "❌ <code>/cancel</code> to abort",
+        "🎙️ <b>Send any message to forward broadcast</b>\n\n"
+        "To cancel: /cancel\n\n"
+        "<i>Supports all message types: text, photos, videos, documents, audio, etc.</i>",
         parse_mode=ParseMode.HTML
     )
 
@@ -818,16 +814,12 @@ async def broadcast_gc_cmd(message: Message):
     if not await is_admin(user.id):
         return
     
-    broadcast_state[user.id] = {"type": "groups", "step": 1}
+    # Enter broadcast mode for groups
+    broadcast_state[user.id] = {"type": "groups", "step": "waiting_for_message"}
     await message.answer(
-        "📢 <b>BROADCAST TO ALL GROUPS</b>\n\n"
-        "Send any message now:\n"
-        "• Text message\n"
-        "• Photo with caption\n"
-        "• Video with caption\n"
-        "• Document with caption\n\n"
-        "⚠️ <b>Next message will be sent to ALL GROUPS</b>\n"
-        "❌ <code>/cancel</code> to abort",
+        "🎙️ <b>Send any message to forward broadcast to groups</b>\n\n"
+        "To cancel: /cancel\n\n"
+        "<i>Supports all message types: text, photos, videos, documents, audio, etc.</i>",
         parse_mode=ParseMode.HTML
     )
 
@@ -1103,7 +1095,7 @@ async def flip_cmd(message: Message):
     result = random.choice(["HEADS 🟡", "TAILS 🟤"])
     await msg.edit_text(f"🪙 <b>{result}</b>", parse_mode=ParseMode.HTML)
 
-# ========== HIDDEN TEMPEST PROGRESS ==========
+# ========== FIXED TEMPEST PROGRESS COMMAND ==========
 @dp.message(Command("Tempest_progress"))
 async def tempest_progress_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_progress")
@@ -1113,36 +1105,48 @@ async def tempest_progress_cmd(message: Message):
     c.execute("SELECT cult_status, cult_rank, sacrifices, cult_join_date FROM users WHERE user_id = ?", (user.id,))
     result = c.fetchone()
     
-    if result and result[0] != "none":
+    if result:
         status, rank, sacrifices, join_date = result
         
-        try:
-            join_dt = datetime.fromisoformat(join_date)
-            days = (datetime.now() - join_dt).days
-            time_text = f"{days} days" if days > 0 else "Today"
-        except:
-            time_text = "Recently"
-        
-        if rank == "Blood Initiate":
-            next_rank = "Blood Adept"
-            needed = max(0, 15 - sacrifices)
-            progress = min(sacrifices * 6.67, 100)
-        elif rank == "Blood Adept":
-            next_rank = "Blood Master"
-            needed = max(0, 50 - sacrifices)
-            progress = min(sacrifices * 2, 100)
-        elif rank == "Blood Master":
-            next_rank = "Storm Lord"
-            needed = max(0, 150 - sacrifices)
-            progress = min(sacrifices * 0.67, 100)
+        if status == "none" or not status:
+            progress_text = """
+🌀 <b>TEMPEST PROGRESS</b>
+
+👤 <b>Status:</b> Not initiated
+👁️ <b>Vision:</b> Blind to the storm
+
+⚡ Use /Tempest_join to begin your journey
+🌩️ The storm awaits worthy blood...
+💀 Warning: Fake offerings will be rejected!
+            """
         else:
-            next_rank = "MAX RANK"
-            needed = 0
-            progress = 100
-        
-        progress_bar = "🩸" * (progress // 10) + "⚫" * (10 - progress // 10)
-        
-        progress_text = f"""
+            try:
+                join_dt = datetime.fromisoformat(join_date)
+                days = (datetime.now() - join_dt).days
+                time_text = f"{days} days" if days > 0 else "Today"
+            except:
+                time_text = "Recently"
+            
+            if rank == "Blood Initiate":
+                next_rank = "Blood Adept"
+                needed = max(0, 15 - sacrifices)
+                progress = min(sacrifices * 6.67, 100)
+            elif rank == "Blood Adept":
+                next_rank = "Blood Master"
+                needed = max(0, 50 - sacrifices)
+                progress = min(sacrifices * 2, 100)
+            elif rank == "Blood Master":
+                next_rank = "Storm Lord"
+                needed = max(0, 150 - sacrifices)
+                progress = min(sacrifices * 0.67, 100)
+            else:
+                next_rank = "MAX RANK"
+                needed = 0
+                progress = 100
+            
+            progress_bar = "🩸" * (progress // 10) + "⚫" * (10 - progress // 10)
+            
+            progress_text = f"""
 🌀 <b>TEMPEST BLOOD PROGRESS</b>
 
 👤 <b>Storm-Born:</b> {user.first_name}
@@ -1156,7 +1160,7 @@ async def tempest_progress_cmd(message: Message):
 
 ⚡ <i>Each upload = 1 sacrifice to the storm</i>
 🌪️ <i>Feed the tempest, grow in power...</i>
-        """
+            """
     else:
         progress_text = """
 🌀 <b>TEMPEST PROGRESS</b>
@@ -1643,7 +1647,7 @@ async def handle_reply_invite_response(callback: CallbackQuery):
     except:
         pass
 
-# ========== FIXED BROADCAST HANDLER ==========
+# ========== ENHANCED BROADCAST HANDLER ==========
 @dp.message()
 async def handle_broadcast(message: Message):
     user = message.from_user
@@ -1654,11 +1658,14 @@ async def handle_broadcast(message: Message):
         update_group(chat)
     
     # Check if user is in broadcast state
-    if user.id in broadcast_state and broadcast_state[user.id]["step"] == 1:
+    if user.id in broadcast_state and broadcast_state[user.id]["step"] == "waiting_for_message":
         broadcast_data = broadcast_state[user.id]
         broadcast_type = broadcast_data["type"]
-        broadcast_state[user.id]["step"] = 2
         
+        # Start processing
+        status_msg = await message.answer("🔁 <b>Broadcast Processing...</b>", parse_mode=ParseMode.HTML)
+        
+        # Get targets
         if broadcast_type == "users":
             conn = sqlite3.connect("data/bot.db")
             c = conn.cursor()
@@ -1676,34 +1683,34 @@ async def handle_broadcast(message: Message):
         
         total = len(targets)
         if total == 0:
-            await message.answer(f"❌ No {target_type} found to broadcast!")
+            await status_msg.edit_text(f"❌ No {target_type} found to broadcast!")
             broadcast_state.pop(user.id, None)
             return
-        
-        status_msg = await message.answer(f"📤 Sending to {total} {target_type}...")
         
         success = 0
         failed = 0
         
+        # Forward the message to all targets
         for target_id in targets:
             try:
-                if message.text:
-                    await bot.send_message(target_id, f"📢 {message.text}")
-                elif message.photo:
-                    await bot.send_photo(target_id, message.photo[-1].file_id, caption=message.caption or "📢 Broadcast")
-                elif message.video:
-                    await bot.send_video(target_id, message.video.file_id, caption=message.caption or "📢 Broadcast")
-                elif message.document:
-                    await bot.send_document(target_id, message.document.file_id, caption=message.caption or "📢 Broadcast")
-                elif message.audio:
-                    await bot.send_audio(target_id, message.audio.file_id, caption=message.caption or "📢 Broadcast")
+                # Forward the message as-is
+                await message.forward(chat_id=target_id)
                 success += 1
-                await asyncio.sleep(0.05)
-            except:
+                await asyncio.sleep(0.05)  # Rate limiting
+            except Exception as e:
                 failed += 1
                 continue
         
-        await status_msg.edit_text(f"✅ Sent to {success}/{total} {target_type}\n❌ Failed: {failed}")
+        # Show results
+        result_text = f"""🎙️ <b>Broadcast Done</b>
+
+👥 Total: {total}
+✅ Success: {success}
+❌ Failed: {failed}"""
+        
+        await status_msg.edit_text(result_text, parse_mode=ParseMode.HTML)
+        
+        # Clear broadcast state
         broadcast_state.pop(user.id, None)
         
         # Log the broadcast
@@ -1717,7 +1724,7 @@ async def main():
     print("🌀 Tempest Cult: CEREMONY FIXED")
     print("📡 Scan: WORKING")
     print("📊 Log Channel: ACTIVE (ID: 1003662720845)")
-    print("📢 Broadcast_gc: MEDIA SUPPORT FIXED")
+    print("📢 Broadcast: MEDIA SUPPORT FIXED")
     print("🔗 Upload: COPY/SHARE BUTTONS WORKING")
     print("📜 Story: 8 CHAPTERS WITH ANIMATIONS")
     print("=" * 50)
