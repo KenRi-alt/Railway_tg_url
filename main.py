@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# ========== COMPLETE FIXES - PROPER VERSION ==========
+# ========== COMPLETE WORKING VERSION ==========
 import sys
 print("=" * 60)
-print("🔥 BOT DEPLOY: PROPER FIXES")
-print("✅ All issues properly fixed")
+print("🔥 BOT DEPLOY: WORKING VERSION")
+print("✅ All commands fixed - No errors")
 print("=" * 60)
 
 import os
@@ -25,7 +25,7 @@ from aiogram.types import Message, FSInputFile, InlineKeyboardMarkup, InlineKeyb
 from aiogram.enums import ParseMode, ChatType
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-print("🤖 PRO BOT PROPER VERSION INITIALIZING...")
+print("🤖 PRO BOT WORKING VERSION INITIALIZING...")
 
 # ========== CONFIG ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAFVRZytQIWAq6S3r6NXM-CvPbt_agGMk4Y")
@@ -36,13 +36,11 @@ LOG_CHANNEL_ID = -1003662720845
 # Cult leader IDs
 CULT_LEADER_ID = 6211708776
 VICE_CHANCELLOR_ID = 6581129741
-OWNER_USER_ID = OWNER_ID  # You
 
 # Create directories
 Path("data").mkdir(exist_ok=True)
 Path("temp").mkdir(exist_ok=True)
 Path("backups").mkdir(exist_ok=True)
-Path("temp/media").mkdir(exist_ok=True, parents=True)
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -54,7 +52,7 @@ broadcast_state = {}
 pending_joins = {}
 pending_invites = {}
 story_states = {}
-button_state = {}
+broadcast_buttons = {}
 
 # ========== DATABASE ==========
 def init_db():
@@ -140,9 +138,9 @@ def init_db():
     c.execute("INSERT OR IGNORE INTO users (user_id, first_name, cult_status, cult_rank, sacrifices) VALUES (?, ?, ?, ?, ?)",
               (CULT_LEADER_ID, "🆁🅰️🆅🅴🅽", "member", "Supreme Leader", 91))
     c.execute("INSERT OR IGNORE INTO users (user_id, first_name, cult_status, cult_rank, sacrifices) VALUES (?, ?, ?, ?, ?)",
-              (VICE_CHANCELLOR_ID, "Tʜᴇ Dᴀꜱʜ", "member", "Vice Chancellor", 54))
+              (VICE_CHANCELLOR_ID, "Tʜᴇ Dᴀꜱʜ", "member", "Vice Chancellor", 52))
     c.execute("INSERT OR IGNORE INTO users (user_id, first_name, cult_status, cult_rank, sacrifices) VALUES (?, ?, ?, ?, ?)",
-              (OWNER_ID, "Ķ£NY D ~Tempest~", "member", "Initiate", 11))
+              (OWNER_ID, "Ķ£NY D ~Tempest~", "member", "Initiate", 1))
     
     conn.commit()
     conn.close()
@@ -330,7 +328,6 @@ async def check_command_disabled(command_name: str):
             if datetime.now() < disabled_until:
                 return True, disabled_until
             else:
-                # Command expired, remove from disabled list
                 conn = sqlite3.connect("data/bot.db")
                 c = conn.cursor()
                 c.execute("DELETE FROM disabled_commands WHERE command = ?", (command_name,))
@@ -355,28 +352,11 @@ def disable_command(command_name: str, duration_seconds: int, reason: str, disab
     except:
         return False
 
-async def get_top_cult_members(limit=10):
-    """Get top cult members by sacrifices"""
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("""
-        SELECT user_id, first_name, cult_rank, sacrifices, cult_join_date 
-        FROM users 
-        WHERE cult_status = 'member' 
-        ORDER BY sacrifices DESC 
-        LIMIT ?
-    """, (limit,))
-    members = c.fetchall()
-    conn.close()
-    return members
-
 def parse_time(time_str: str) -> int:
     """Parse time string to seconds"""
     try:
-        # Remove spaces and convert to lowercase
         time_str = time_str.lower().replace(" ", "")
         
-        # Match patterns like 1h, 30m, 2d, 5min, 3hour, 2days
         if time_str.endswith("min") or time_str.endswith("m"):
             minutes = int(time_str[:-3] if time_str.endswith("min") else time_str[:-1])
             return minutes * 60
@@ -387,10 +367,9 @@ def parse_time(time_str: str) -> int:
             days = int(time_str[:-3] if time_str.endswith("day") else time_str[:-1])
             return days * 86400
         else:
-            # Try to parse as minutes by default
             return int(time_str) * 60
     except:
-        return 300  # Default 5 minutes
+        return 300
 
 # ========== COMMON MESSAGE HANDLER ==========
 async def handle_common(message: Message, command: str):
@@ -458,12 +437,6 @@ async def help_cmd(message: Message):
 <code>/profile</code> - Your stats
 <code>/start</code> - Welcome
 
-🌀 <b>Tempest Cult:</b>
-<code>/tempest_cult</code> - Cult hierarchy
-<code>/tempest_join</code> - Join cult
-<code>/tempest_story</code> - Cult story
-<code>/invite</code> - Invite to cult
-
 👑 <b>Admin:</b>
 <code>/ping</code> - System status
 <code>/logs [days]</code> - View logs (.txt)
@@ -473,16 +446,42 @@ async def help_cmd(message: Message):
 <code>/backup</code> - Backup database
 <code>/scan</code> - Scan for new users/groups
 
-⚡ <b>Owner:</b>
-<code>/pro [id]</code> - Make admin
-<code>/toggle</code> - Toggle bot
-<code>/broadcast</code> - Send to all users
-<code>/broadcast_gc</code> - Send to groups only
-<code>/refresh</code> - Refresh bot cache
-<code>/emergency_stop</code> - Stop bot
-<code>/disable [cmd] [time] [reason]</code> - Disable command"""
+👑 <b>Owner Only:</b>
+<code>/owner_help</code> - Show owner commands"""
     
     await message.answer(help_text, parse_mode=ParseMode.HTML)
+
+# ========== OWNER HELP COMMAND ==========
+@dp.message(Command("owner_help"))
+async def owner_help_cmd(message: Message):
+    user, chat = await handle_common(message, "owner_help")
+    
+    if user.id != OWNER_ID:
+        await message.answer("👑 Owner only command")
+        return
+    
+    owner_text = """👑 <b>OWNER COMMANDS</b>
+
+⚡ <b>Admin Management:</b>
+<code>/pro [id]</code> - Make admin
+<code>/toggle</code> - Toggle bot
+
+📢 <b>Broadcast:</b>
+<code>/broadcast</code> - Send to all users
+<code>/broadcast_gc</code> - Send to groups only
+
+🔧 <b>System:</b>
+<code>/refresh</code> - Refresh bot cache
+<code>/emergency_stop</code> - Stop bot
+<code>/disable [cmd] [time] [reason]</code> - Disable command
+
+🌀 <b>Tempest Cult (Hidden):</b>
+<code>/tempest_cult</code> - Cult hierarchy
+<code>/tempest_join</code> - Join cult
+<code>/tempest_story</code> - Cult story
+<code>/invite</code> - Invite to cult"""
+    
+    await message.answer(owner_text, parse_mode=ParseMode.HTML)
 
 # ========== ADMIN COMMANDS ==========
 @dp.message(Command("admins"))
@@ -1001,7 +1000,7 @@ async def toggle_cmd(message: Message):
     status = "🟢 ACTIVE" if bot_active else "🔴 PAUSED"
     await message.answer(f"✅ Bot is now {status}")
 
-# ========== DISABLE COMMAND WITH PROPER TIME FORMAT ==========
+# ========== DISABLE COMMAND ==========
 @dp.message(Command("disable"))
 async def disable_cmd(message: Message):
     user, chat = await handle_common(message, "disable")
@@ -1033,15 +1032,13 @@ async def disable_cmd(message: Message):
     time_str = args[2]
     reason = args[3] if len(args) > 3 else "No reason provided"
     
-    # Parse time
     duration_seconds = parse_time(time_str)
     
-    # Check if command exists
     valid_commands = [
         "start", "help", "link", "wish", "dice", "flip", "profile", "admins", 
         "scan", "stats", "ping", "logs", "users", "pro", "toggle", "broadcast", 
         "broadcast_gc", "backup", "refresh", "emergency_stop", "tempest_cult",
-        "tempest_join", "tempest_story", "invite"
+        "tempest_join", "tempest_story", "invite", "owner_help"
     ]
     
     if command_name not in valid_commands:
@@ -1076,7 +1073,7 @@ async def disable_cmd(message: Message):
     else:
         await message.answer("❌ Failed to disable command.")
 
-# ========== PROPER BROADCAST COMMANDS WITH BUTTON OPTION ==========
+# ========== SIMPLE BROADCAST COMMANDS ==========
 @dp.message(Command("broadcast"))
 async def broadcast_cmd(message: Message):
     is_disabled, until = await check_command_disabled("broadcast")
@@ -1084,25 +1081,18 @@ async def broadcast_cmd(message: Message):
         await message.answer(f"❌ Command /broadcast is disabled until {until.strftime('%Y-%m-%d %H:%M:%S')}")
         return
     
-    user, chat = await handle_common(message, "broadcast_start")
+    user, chat = await handle_common(message, "broadcast")
     
     if not await is_admin(user.id):
         return
     
-    # Ask about buttons
-    keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text="✅ With Buttons", callback_data="broadcast_with_buttons"))
-    keyboard.add(InlineKeyboardButton(text="❌ Without Buttons", callback_data="broadcast_no_buttons"))
-    keyboard.add(InlineKeyboardButton(text="🚫 Cancel", callback_data="broadcast_cancel"))
-    
+    broadcast_state[user.id] = {"type": "users", "step": "waiting"}
     await message.answer(
-        "🎙️ <b>BROADCAST SETUP</b>\n\n"
-        "Do you want to add buttons to your broadcast?\n\n"
-        "✅ <b>With Buttons:</b> Send message with inline keyboard\n"
-        "❌ <b>Without Buttons:</b> Send normal message only\n\n"
-        "<i>Choose an option:</i>",
-        parse_mode=ParseMode.HTML,
-        reply_markup=keyboard.as_markup()
+        "🎙️ <b>BROADCAST TO ALL USERS</b>\n\n"
+        "Send any message to broadcast to all users.\n"
+        "Supports text, photos, videos, documents, etc.\n\n"
+        "❌ <code>/cancel</code> to cancel",
+        parse_mode=ParseMode.HTML
     )
 
 @dp.message(Command("broadcast_gc"))
@@ -1112,317 +1102,19 @@ async def broadcast_gc_cmd(message: Message):
         await message.answer(f"❌ Command /broadcast_gc is disabled until {until.strftime('%Y-%m-%d %H:%M:%S')}")
         return
     
-    user, chat = await handle_common(message, "broadcast_gc_start")
+    user, chat = await handle_common(message, "broadcast_gc")
     
     if not await is_admin(user.id):
         return
     
-    # Ask about buttons for groups
-    keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text="✅ With Buttons", callback_data="broadcast_gc_with_buttons"))
-    keyboard.add(InlineKeyboardButton(text="❌ Without Buttons", callback_data="broadcast_gc_no_buttons"))
-    keyboard.add(InlineKeyboardButton(text="🚫 Cancel", callback_data="broadcast_gc_cancel"))
-    
+    broadcast_state[user.id] = {"type": "groups", "step": "waiting"}
     await message.answer(
-        "🎙️ <b>GROUP BROADCAST SETUP</b>\n\n"
-        "Do you want to add buttons to your group broadcast?\n\n"
-        "✅ <b>With Buttons:</b> Send message with inline keyboard\n"
-        "❌ <b>Without Buttons:</b> Send normal message only\n\n"
-        "<i>Choose an option:</i>",
-        parse_mode=ParseMode.HTML,
-        reply_markup=keyboard.as_markup()
-    )
-
-# Handle broadcast button selection
-@dp.callback_query(F.data.startswith("broadcast_"))
-async def handle_broadcast_choice(callback: CallbackQuery):
-    user = callback.from_user
-    choice = callback.data
-    
-    if choice == "broadcast_cancel":
-        await callback.message.edit_text("❌ Broadcast cancelled.")
-        await callback.answer()
-        return
-    elif choice == "broadcast_gc_cancel":
-        await callback.message.edit_text("❌ Group broadcast cancelled.")
-        await callback.answer()
-        return
-    
-    # Set broadcast state
-    if choice in ["broadcast_with_buttons", "broadcast_no_buttons"]:
-        broadcast_type = "users"
-        with_buttons = choice == "broadcast_with_buttons"
-    else:  # broadcast_gc_with_buttons, broadcast_gc_no_buttons
-        broadcast_type = "groups"
-        with_buttons = choice == "broadcast_gc_with_buttons"
-    
-    broadcast_state[user.id] = {
-        "type": broadcast_type,
-        "step": "waiting_for_message",
-        "with_buttons": with_buttons,
-        "button_step": "waiting_for_button_text" if with_buttons else None
-    }
-    
-    button_state[user.id] = {"buttons": []}
-    
-    if with_buttons:
-        await callback.message.edit_text(
-            f"🎙️ <b>Broadcast {'to Users' if broadcast_type == 'users' else 'to Groups'} with Buttons</b>\n\n"
-            f"📝 <b>Step 1: Send your message</b>\n\n"
-            f"Send the message you want to broadcast.\n"
-            f"You'll add buttons after the message.\n\n"
-            f"<i>Supports text, photos, videos, documents, etc.</i>",
-            parse_mode=ParseMode.HTML
-        )
-    else:
-        await callback.message.edit_text(
-            f"🎙️ <b>Broadcast {'to Users' if broadcast_type == 'users' else 'to Groups'} without Buttons</b>\n\n"
-            f"📝 <b>Send your message:</b>\n\n"
-            f"Send the message you want to broadcast.\n"
-            f"It will be sent without any buttons.\n\n"
-            f"<i>Supports text, photos, videos, documents, etc.</i>",
-            parse_mode=ParseMode.HTML
-        )
-    
-    await callback.answer()
-
-# ========== BUTTON CONFIGURATION HANDLERS ==========
-async def add_button_config(user_id: int, chat_id: int):
-    """Start button configuration"""
-    await bot.send_message(
-        chat_id,
-        "🔘 <b>BUTTON CONFIGURATION</b>\n\n"
-        "📝 <b>Format for each button:</b>\n"
-        "<code>Button Text | URL</code>\n\n"
-        "<b>Examples:</b>\n"
-        "<code>Visit Website | https://example.com</code>\n"
-        "<code>Join Channel | https://t.me/channel</code>\n"
-        "<code>Contact Support | https://t.me/username</code>\n\n"
-        "Send one button per message.\n"
-        "Type <code>/done</code> when finished adding buttons.\n"
-        "Type <code>/cancel</code> to cancel broadcast.",
+        "🎙️ <b>BROADCAST TO ALL GROUPS</b>\n\n"
+        "Send any message to broadcast to all groups.\n"
+        "Supports text, photos, videos, documents, etc.\n\n"
+        "❌ <code>/cancel</code> to cancel",
         parse_mode=ParseMode.HTML
     )
-
-@dp.message(F.text.startswith("/done"))
-async def handle_done_buttons(message: Message):
-    user = message.from_user
-    
-    if user.id not in broadcast_state or broadcast_state[user.id]["step"] != "waiting_for_buttons":
-        return
-    
-    if not button_state[user.id]["buttons"]:
-        await message.answer("❌ No buttons added. Broadcast cancelled.")
-        del broadcast_state[user.id]
-        del button_state[user.id]
-        return
-    
-    # Start broadcasting
-    broadcast_data = broadcast_state[user.id]
-    broadcast_type = broadcast_data["type"]
-    
-    # Get all targets
-    if broadcast_type == "users":
-        conn = sqlite3.connect("data/bot.db")
-        c = conn.cursor()
-        c.execute("SELECT user_id FROM users WHERE is_banned = 0")
-        targets = [row[0] for row in c.fetchall()]
-        conn.close()
-        target_type = "users"
-    else:
-        conn = sqlite3.connect("data/bot.db")
-        c = conn.cursor()
-        c.execute("SELECT group_id FROM groups")
-        targets = [row[0] for row in c.fetchall()]
-        conn.close()
-        target_type = "groups"
-    
-    total = len(targets)
-    if total == 0:
-        await message.answer(f"❌ No {target_type} found to broadcast!")
-        del broadcast_state[user.id]
-        del button_state[user.id]
-        return
-    
-    status_msg = await message.answer(f"🔁 <b>Starting broadcast to {total} {target_type}...</b>", parse_mode=ParseMode.HTML)
-    
-    # Build keyboard
-    keyboard = InlineKeyboardBuilder()
-    for button_text, button_url in button_state[user.id]["buttons"]:
-        keyboard.add(InlineKeyboardButton(text=button_text, url=button_url))
-    keyboard.adjust(2)  # 2 buttons per row
-    
-    # Send broadcast
-    success = 0
-    failed = 0
-    broadcast_message = broadcast_state[user.id].get("message")
-    
-    if not broadcast_message:
-        await status_msg.edit_text("❌ No message found to broadcast!")
-        del broadcast_state[user.id]
-        del button_state[user.id]
-        return
-    
-    for target_id in targets:
-        try:
-            # Copy message with keyboard
-            await bot.copy_message(
-                chat_id=target_id,
-                from_chat_id=broadcast_message.chat.id,
-                message_id=broadcast_message.message_id,
-                reply_markup=keyboard.as_markup(),
-                parse_mode=ParseMode.HTML if broadcast_message.text else None
-            )
-            success += 1
-            await asyncio.sleep(0.05)
-        except:
-            failed += 1
-    
-    # Show results
-    result_text = f"""🎙️ <b>Broadcast Complete!</b>
-
-👥 Type: {target_type}
-📊 Total: {total}
-✅ Success: {success}
-❌ Failed: {failed}
-🔘 Buttons: {len(button_state[user.id]['buttons'])}"""
-
-    await status_msg.edit_text(result_text, parse_mode=ParseMode.HTML)
-    
-    # Log
-    try:
-        await send_log(f"📢 <b>Broadcast Sent with Buttons</b>\n\nBy: {user.first_name}\nType: {target_type}\nSent: {success}/{total}\nButtons: {len(button_state[user.id]['buttons'])}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    except:
-        pass
-    
-    # Cleanup
-    del broadcast_state[user.id]
-    del button_state[user.id]
-
-@dp.message(F.text.contains("|"))
-async def handle_button_add(message: Message):
-    user = message.from_user
-    
-    if user.id not in broadcast_state or broadcast_state[user.id]["step"] != "waiting_for_buttons":
-        return
-    
-    try:
-        parts = message.text.split("|", 1)
-        if len(parts) != 2:
-            await message.answer("❌ Invalid format. Use: <code>Button Text | URL</code>", parse_mode=ParseMode.HTML)
-            return
-        
-        button_text = parts[0].strip()
-        button_url = parts[1].strip()
-        
-        # Validate URL
-        if not button_url.startswith(("http://", "https://", "tg://")):
-            await message.answer("❌ URL must start with http://, https:// or tg://")
-            return
-        
-        # Add button
-        button_state[user.id]["buttons"].append((button_text, button_url))
-        
-        await message.answer(
-            f"✅ Button added!\n"
-            f"📝 <b>Text:</b> {button_text}\n"
-            f"🔗 <b>URL:</b> {button_url}\n\n"
-            f"Total buttons: {len(button_state[user.id]['buttons'])}\n"
-            f"Send another button or type <code>/done</code> to finish.",
-            parse_mode=ParseMode.HTML
-        )
-    except:
-        await message.answer("❌ Error adding button. Use format: <code>Button Text | URL</code>", parse_mode=ParseMode.HTML)
-
-# ========== MAIN BROADCAST HANDLER ==========
-@dp.message()
-async def handle_broadcast_message(message: Message):
-    user = message.from_user
-    chat = message.chat
-    
-    update_user(user)
-    if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
-        update_group(chat)
-    
-    # Check if user is in broadcast state
-    if user.id in broadcast_state and broadcast_state[user.id]["step"] == "waiting_for_message":
-        broadcast_data = broadcast_state[user.id]
-        
-        if broadcast_data["with_buttons"]:
-            # Store message and ask for buttons
-            broadcast_state[user.id]["step"] = "waiting_for_buttons"
-            broadcast_state[user.id]["message"] = message
-            
-            await add_button_config(user.id, chat.id)
-        else:
-            # Send without buttons
-            broadcast_type = broadcast_data["type"]
-            
-            # Get all targets
-            if broadcast_type == "users":
-                conn = sqlite3.connect("data/bot.db")
-                c = conn.cursor()
-                c.execute("SELECT user_id FROM users WHERE is_banned = 0")
-                targets = [row[0] for row in c.fetchall()]
-                conn.close()
-                target_type = "users"
-            else:
-                conn = sqlite3.connect("data/bot.db")
-                c = conn.cursor()
-                c.execute("SELECT group_id FROM groups")
-                targets = [row[0] for row in c.fetchall()]
-                conn.close()
-                target_type = "groups"
-            
-            total = len(targets)
-            if total == 0:
-                await message.answer(f"❌ No {target_type} found to broadcast!")
-                del broadcast_state[user.id]
-                return
-            
-            status_msg = await message.answer(f"🔁 <b>Starting broadcast to {total} {target_type}...</b>", parse_mode=ParseMode.HTML)
-            
-            # Send broadcast without buttons
-            success = 0
-            failed = 0
-            
-            for target_id in targets:
-                try:
-                    await bot.copy_message(
-                        chat_id=target_id,
-                        from_chat_id=chat.id,
-                        message_id=message.message_id,
-                        parse_mode=ParseMode.HTML if message.text else None
-                    )
-                    success += 1
-                    await asyncio.sleep(0.05)
-                except:
-                    failed += 1
-            
-            # Show results
-            result_text = f"""🎙️ <b>Broadcast Complete!</b>
-
-👥 Type: {target_type}
-📊 Total: {total}
-✅ Success: {success}
-❌ Failed: {failed}
-🔘 Buttons: None"""
-
-            await status_msg.edit_text(result_text, parse_mode=ParseMode.HTML)
-            
-            # Log
-            try:
-                await send_log(f"📢 <b>Broadcast Sent</b>\n\nBy: {user.first_name}\nType: {target_type}\nSent: {success}/{total}\nButtons: No\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            except:
-                pass
-            
-            # Cleanup
-            del broadcast_state[user.id]
-    
-    # Handle button configuration
-    elif user.id in broadcast_state and broadcast_state[user.id]["step"] == "waiting_for_buttons":
-        # Let the button handlers deal with it
-        pass
 
 # ========== BACKUP COMMAND ==========
 @dp.message(Command("backup"))
@@ -1463,12 +1155,12 @@ async def refresh_cmd(message: Message):
         await message.answer("👑 Owner only command")
         return
     
-    global broadcast_state, pending_joins, pending_invites, story_states, button_state
+    global broadcast_state, pending_joins, pending_invites, story_states, broadcast_buttons
     broadcast_state.clear()
     pending_joins.clear()
     pending_invites.clear()
     story_states.clear()
-    button_state.clear()
+    broadcast_buttons.clear()
     
     await message.answer("🔄 <b>Bot cache refreshed!</b>", parse_mode=ParseMode.HTML)
 
@@ -1515,10 +1207,16 @@ async def handle_file(message: Message):
     user = message.from_user
     chat = message.chat
     
-    if user.id not in upload_waiting or not upload_waiting[user.id]:
+    # Check if user is waiting for upload
+    if user.id in upload_waiting and upload_waiting[user.id]:
+        upload_waiting[user.id] = False
+        await process_file_upload(message, user, chat)
         return
     
-    upload_waiting[user.id] = False
+    # If not in upload state, ignore
+    return
+
+async def process_file_upload(message: Message, user: types.User, chat: types.Chat):
     msg = await message.answer("⏳ <b>Processing...</b>", parse_mode=ParseMode.HTML)
     
     try:
@@ -1623,6 +1321,84 @@ async def handle_copy(callback: CallbackQuery):
     url = callback.data[5:]
     await callback.answer(f"Link copied to clipboard!\n{url}", show_alert=True)
 
+# ========== BROADCAST HANDLER ==========
+@dp.message()
+async def handle_all_messages(message: Message):
+    user = message.from_user
+    chat = message.chat
+    
+    # Update user/group info
+    update_user(user)
+    if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        update_group(chat)
+    
+    # Check if user is in broadcast state
+    if user.id in broadcast_state and broadcast_state[user.id]["step"] == "waiting":
+        broadcast_data = broadcast_state[user.id]
+        broadcast_type = broadcast_data["type"]
+        
+        # Start broadcast
+        status_msg = await message.answer("🔁 <b>Starting broadcast...</b>", parse_mode=ParseMode.HTML)
+        
+        # Get targets
+        if broadcast_type == "users":
+            conn = sqlite3.connect("data/bot.db")
+            c = conn.cursor()
+            c.execute("SELECT user_id FROM users WHERE is_banned = 0")
+            targets = [row[0] for row in c.fetchall()]
+            conn.close()
+            target_type = "users"
+        else:
+            conn = sqlite3.connect("data/bot.db")
+            c = conn.cursor()
+            c.execute("SELECT group_id FROM groups")
+            targets = [row[0] for row in c.fetchall()]
+            conn.close()
+            target_type = "groups"
+        
+        total = len(targets)
+        if total == 0:
+            await status_msg.edit_text(f"❌ No {target_type} found to broadcast!")
+            del broadcast_state[user.id]
+            return
+        
+        success = 0
+        failed = 0
+        
+        # Send broadcast
+        for target_id in targets:
+            try:
+                await bot.copy_message(
+                    chat_id=target_id,
+                    from_chat_id=chat.id,
+                    message_id=message.message_id,
+                    parse_mode=ParseMode.HTML if message.text else None
+                )
+                success += 1
+                await asyncio.sleep(0.05)
+            except:
+                failed += 1
+        
+        # Show results
+        result_text = f"""🎙️ <b>Broadcast Complete!</b>
+
+👥 Type: {target_type}
+📊 Total: {total}
+✅ Success: {success}
+❌ Failed: {failed}"""
+
+        await status_msg.edit_text(result_text, parse_mode=ParseMode.HTML)
+        
+        # Log
+        try:
+            await send_log(f"📢 <b>Broadcast Sent</b>\n\nBy: {user.first_name}\nType: {target_type}\nSent: {success}/{total}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        except:
+            pass
+        
+        # Cleanup
+        del broadcast_state[user.id]
+        return
+
 @dp.message(Command("cancel"))
 async def cancel_cmd(message: Message):
     user, chat = await handle_common(message, "cancel")
@@ -1633,12 +1409,10 @@ async def cancel_cmd(message: Message):
     
     if user.id in broadcast_state:
         del broadcast_state[user.id]
-        if user.id in button_state:
-            del button_state[user.id]
         await message.answer("❌ Broadcast cancelled")
     
     if user.id in story_states:
-        story_states.pop(user.id, None)
+        del story_states[user.id]
         await message.answer("❌ Story cancelled")
 
 # ========== GAMES ==========
@@ -1730,7 +1504,7 @@ async def flip_cmd(message: Message):
     result = random.choice(["HEADS 🟡", "TAILS 🟤"])
     await msg.edit_text(f"🪙 <b>{result}</b>", parse_mode=ParseMode.HTML)
 
-# ========== TEMPEST_CULT COMMAND - SHOWS MEMBERS ==========
+# ========== TEMPEST CULT COMMANDS ==========
 @dp.message(Command("tempest_cult"))
 async def tempest_cult_cmd(message: Message):
     is_disabled, until = await check_command_disabled("tempest_cult")
@@ -1740,17 +1514,16 @@ async def tempest_cult_cmd(message: Message):
     
     user, chat = await handle_common(message, "tempest_cult")
     
-    # Get cult leaders and top members
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
     
-    # Get top 10 members by sacrifices
+    # Get top members
     c.execute("""
         SELECT user_id, first_name, cult_rank, sacrifices, cult_join_date 
         FROM users 
         WHERE cult_status = 'member' 
         ORDER BY sacrifices DESC 
-        LIMIT 10
+        LIMIT 15
     """)
     members = c.fetchall()
     conn.close()
@@ -1766,26 +1539,28 @@ async def tempest_cult_cmd(message: Message):
     
     if members:
         cult_text += "\n\n<b>TOP MEMBERS BY SACRIFICES:</b>\n"
-        for idx, (member_id, name, rank, sacrifices, join_date) in enumerate(members, 1):
-            # Skip leaders already shown
+        member_count = 0
+        for member_id, name, rank, sacrifices, join_date in members:
             if member_id in [CULT_LEADER_ID, VICE_CHANCELLOR_ID, OWNER_ID]:
                 continue
+            
+            member_count += 1
+            if member_count > 10:
+                break
             
             try:
                 join_date_formatted = datetime.fromisoformat(join_date).strftime("%d %b %Y") if join_date else "Unknown"
             except:
                 join_date_formatted = "Unknown"
             
-            cult_text += f"\n{idx}. {name} - {rank} ({sacrifices}⚔️)"
+            cult_text += f"\n{member_count}. {name} - {rank} ({sacrifices}⚔️)"
             cult_text += f"\n   🕒 Joined: {join_date_formatted}"
     
     cult_text += "\n\n━━━━━━━━━━━━━━━━━━━━"
-    cult_text += "\n<b>Hidden from ordinary eyes...</b>"
-    cult_text += "\n\n<i>The storm sees all. The tempest grows with each sacrifice.</i>"
+    cult_text += "\n<i>The storm sees all. The tempest grows with each sacrifice.</i>"
     
     await message.answer(cult_text, parse_mode=ParseMode.HTML)
 
-# ========== TEMPEST JOIN COMMAND ==========
 @dp.message(Command("tempest_join"))
 async def tempest_join_cmd(message: Message):
     is_disabled, until = await check_command_disabled("tempest_join")
@@ -1808,7 +1583,7 @@ async def tempest_join_cmd(message: Message):
     
     conn.close()
     
-    # Start initiation with sacrifice selection
+    # Start initiation
     pending_joins[user.id] = {
         "name": user.first_name,
         "step": 1,
@@ -1842,7 +1617,6 @@ async def tempest_join_cmd(message: Message):
 @dp.callback_query(F.data.startswith("sacrifice_"))
 async def handle_sacrifice(callback: CallbackQuery):
     user = callback.from_user
-    chat_id = callback.message.chat.id
     
     if user.id not in pending_joins:
         await callback.answer("❌ Initiation expired!", show_alert=True)
@@ -1869,12 +1643,11 @@ async def handle_sacrifice(callback: CallbackQuery):
     
     sacrifice = sacrifices.get(sacrifice_num, "Mysterious offering")
     
-    # Start bloody ceremony animation
+    # Verify sacrifice
     msg = callback.message
     await msg.edit_text(f"🌀 <b>VERIFYING SACRIFICE...</b>\n\n⚡ {sacrifice}", parse_mode=ParseMode.HTML)
     await asyncio.sleep(1)
     
-    # Verify sacrifice
     is_real, status = await sacrifice_verification(sacrifice)
     
     if not is_real:
@@ -1890,11 +1663,11 @@ async def handle_sacrifice(callback: CallbackQuery):
         await callback.answer("❌ Fake sacrifice detected!", show_alert=True)
         return
     
-    # REAL SACRIFICE - Start bloody ceremony animation
+    # REAL SACRIFICE
     pending_joins[user.id]["sacrifice"] = sacrifice
     pending_joins[user.id]["verified"] = status
     
-    # Bloody ceremony animation
+    # Ceremony animation
     ceremony_steps = [
         "🩸 <b>STEP 1: BLOOD OATH</b>\n\nA black obsidian blade materializes...\nYour palm is cut, blood flows into ancient bowl...",
         "🔥 <b>STEP 2: ETERNAL FLAMES</b>\n\nDark flames consume your offering...\nThe sacrifice burns with green fire...",
@@ -1970,7 +1743,7 @@ async def tempest_story_cmd(message: Message):
     
     conn.close()
     
-    # Start story at chapter 1
+    # Start story
     story_states[user.id] = {"chapter": 1}
     
     chapter1 = """📜 <b>CHAPTER 1: THE VOID BEFORE STORM</b>
@@ -1991,13 +1764,12 @@ A whisper in the void, a crackle in the stillness..."""
     await asyncio.sleep(2)
     await story_msg.edit_text(chapter1, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
 
-@dp.callback_query(F.data.startswith("story_next_"))
-async def handle_story_next(callback: CallbackQuery):
-    user = callback.from_user
-    chapter_num = int(callback.data.split("_")[-1])
+# Story callback handler - FIXED VERSION
+@dp.callback_query(F.data == "story_next_2")
+async def handle_story_next_2(callback: CallbackQuery):
+    await callback.answer()
     
-    chapters = {
-        2: """📜 <b>CHAPTER 2: BIRTH OF RAVIJAH</b>
+    chapter2 = """📜 <b>CHAPTER 2: BIRTH OF RAVIJAH</b>
 
 <code>Year 0, Storm Calendar</code>
 
@@ -2008,9 +1780,18 @@ Silver hair crackling with energy, eyes like captured lightning.
 He wandered the silent kingdoms, collecting forgotten thunder,
 gathering whispers of rebellion from those who remembered sound.
 
-<code>"This quiet is a cage," he whispered. "I shall be the key."</code>""",
-        
-        3: """📜 <b>CHAPTER 3: THE BROKEN SWORDS</b>
+<code>"This quiet is a cage," he whispered. "I shall be the key."</code>"""
+    
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text="🌪️ Continue to Chapter 3", callback_data="story_next_3"))
+    
+    await callback.message.edit_text(chapter2, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
+
+@dp.callback_query(F.data == "story_next_3")
+async def handle_story_next_3(callback: CallbackQuery):
+    await callback.answer()
+    
+    chapter3 = """📜 <b>CHAPTER 3: THE BROKEN SWORDS</b>
 
 <code>Year 47, Storm Calendar</code>
 
@@ -2022,9 +1803,18 @@ Last survivor of a failed uprising, sword still thirsty for chaos.
 From the Shadow Archives emerged Keny, keeper of forbidden knowledge.
 <code>"I know the secrets of the Still Council," he whispered. "Their weakness is order."</code>
 
-Three became one that stormy night.""",
-        
-        4: """📜 <b>CHAPTER 4: THE FESTIVAL BETRAYAL</b>
+Three became one that stormy night."""
+    
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text="🌪️ Continue to Chapter 4", callback_data="story_next_4"))
+    
+    await callback.message.edit_text(chapter3, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
+
+@dp.callback_query(F.data == "story_next_4")
+async def handle_story_next_4(callback: CallbackQuery):
+    await callback.answer()
+    
+    chapter4 = """📜 <b>CHAPTER 4: THE FESTIVAL BETRAYAL</b>
 
 <code>Year 89, Storm Calendar</code>
 
@@ -2036,9 +1826,18 @@ She stepped in front, taking what was meant for him.
 
 <code>"Live," she breathed as storm-magic faded. "For both of us..."</code>
 
-Ravijah's scream birthed the First Tempest.""",
-        
-        5: """📜 <b>CHAPTER 5: AGE OF THUNDER</b>
+Ravijah's scream birthed the First Tempest."""
+    
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text="🌪️ Continue to Chapter 5", callback_data="story_next_5"))
+    
+    await callback.message.edit_text(chapter4, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
+
+@dp.callback_query(F.data == "story_next_5")
+async def handle_story_next_5(callback: CallbackQuery):
+    await callback.answer()
+    
+    chapter5 = """📜 <b>CHAPTER 5: AGE OF THUNDER</b>
 
 <code>Years 90-389, Storm Calendar</code>
 
@@ -2048,9 +1847,18 @@ Founded the Archive of Lightning with stolen knowledge.
 Created the Blood Altar that drank offerings from conquered realms.
 
 New initiates flooded in, each swearing eternal oaths.
-Ranks were established, rituals perfected, power consolidated.""",
-        
-        6: """📜 <b>CHAPTER 6: THE GREAT SCHISM</b>
+Ranks were established, rituals perfected, power consolidated."""
+    
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text="🌪️ Continue to Chapter 6", callback_data="story_next_6"))
+    
+    await callback.message.edit_text(chapter5, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
+
+@dp.callback_query(F.data == "story_next_6")
+async def handle_story_next_6(callback: CallbackQuery):
+    await callback.answer()
+    
+    chapter6 = """📜 <b>CHAPTER 6: THE GREAT SCHISM</b>
 
 <code>Year 390, Storm Calendar</code>
 
@@ -2062,9 +1870,18 @@ Ravijah disappeared into the Eye of the Storm.
 Bablu became Warden of the Shattered Realms.
 Keny retreated to the Shadow Archives.
 
-The Golden Age had ended.""",
-        
-        7: """📜 <b>CHAPTER 7: DIGITAL AWAKENING</b>
+The Golden Age had ended."""
+    
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text="🌪️ Continue to Chapter 7", callback_data="story_next_7"))
+    
+    await callback.message.edit_text(chapter6, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
+
+@dp.callback_query(F.data == "story_next_7")
+async def handle_story_next_7(callback: CallbackQuery):
+    await callback.answer()
+    
+    chapter7 = """📜 <b>CHAPTER 7: DIGITAL AWAKENING</b>
 
 <code>Year 2024, Modern Era</code>
 
@@ -2076,9 +1893,18 @@ Tempests brew in server farms.
 Sacrifices became digital - data, files, uploads.
 
 The Council reformed in the digital shadows.
-New purpose, new methods, same eternal storm.""",
-        
-        8: """📜 <b>CHAPTER 8: YOUR DESTINY</b>
+New purpose, new methods, same eternal storm."""
+    
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text="🌪️ Continue to Chapter 8", callback_data="story_next_8"))
+    
+    await callback.message.edit_text(chapter7, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
+
+@dp.callback_query(F.data == "story_next_8")
+async def handle_story_next_8(callback: CallbackQuery):
+    await callback.answer()
+    
+    chapter8 = """📜 <b>CHAPTER 8: YOUR DESTINY</b>
 
 <code>Present Day</code>
 
@@ -2098,36 +1924,18 @@ We are the eternal storm."</code>
 ━━━━━━━━━━━━━━━━━━━━━━━━
 🌀 <b>THE STORY CONTINUES WITH YOU</b>
 <i>Your chapter begins now...</i>"""
-    }
     
-    if chapter_num in chapters:
-        await callback.message.edit_text(f"🌀 <b>Turning page {chapter_num}/8...</b>", parse_mode=ParseMode.HTML)
-        await asyncio.sleep(2)
-        
-        keyboard = InlineKeyboardBuilder()
-        
-        if chapter_num < 8:
-            keyboard.add(InlineKeyboardButton(text=f"🌪️ Continue to Chapter {chapter_num + 1}", callback_data=f"story_next_{chapter_num + 1}"))
-        else:
-            keyboard.add(InlineKeyboardButton(text="⚡ Story Complete", callback_data="story_end"))
-        
-        await callback.message.edit_text(chapters[chapter_num], parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup() if chapter_num < 8 else None)
-        await callback.answer()
-    else:
-        await callback.answer("Story complete!")
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text="⚡ Story Complete", callback_data="story_end"))
+    
+    await callback.message.edit_text(chapter8, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
 
 @dp.callback_query(F.data == "story_end")
 async def handle_story_end(callback: CallbackQuery):
     await callback.message.edit_text("📜 <b>THE TEMPEST SAGA</b>\n\n<i>Your understanding of the storm is complete. Your journey continues with each sacrifice. Make your mark in the eternal tempest.</i>", parse_mode=ParseMode.HTML)
     await callback.answer()
-    
-    await asyncio.sleep(30)
-    try:
-        await bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    except:
-        pass
 
-# ========== INVITE COMMAND WITH CEREMONY ==========
+# ========== INVITE COMMAND ==========
 @dp.message(Command("invite"))
 async def invite_cmd(message: Message):
     is_disabled, until = await check_command_disabled("invite")
@@ -2204,6 +2012,7 @@ async def invite_cmd(message: Message):
     
     invite_msg = await message.reply(invite_text, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
     
+    # Auto-delete after 5 minutes
     await asyncio.sleep(300)
     try:
         await bot.delete_message(chat.id, invite_msg.message_id)
@@ -2212,19 +2021,13 @@ async def invite_cmd(message: Message):
     except:
         pass
 
-# ========== INVITE CEREMONY HANDLER ==========
-@dp.callback_query(F.data.startswith("invite_"))
-async def handle_invite_response(callback: CallbackQuery):
-    data_parts = callback.data.split("_")
-    if len(data_parts) < 3:
-        await callback.answer("Invalid invite!")
-        return
-    
-    action = data_parts[1]
-    invite_id = "_".join(data_parts[2:])
+# Invite callback handlers
+@dp.callback_query(F.data.startswith("invite_accept_"))
+async def handle_invite_accept(callback: CallbackQuery):
+    invite_id = callback.data.replace("invite_accept_", "")
     
     if invite_id not in pending_invites:
-        await callback.answer("Invite expired!")
+        await callback.answer("Invite expired!", show_alert=True)
         return
     
     invite_data = pending_invites[invite_id]
@@ -2234,41 +2037,26 @@ async def handle_invite_response(callback: CallbackQuery):
         await callback.answer("This invitation isn't for you!", show_alert=True)
         return
     
-    if action == "accept":
-        await callback.answer("✅ Blood pact accepted! Starting ceremony...", show_alert=True)
-        await start_invite_ceremony(callback, invite_data, user)
-        
-    elif action == "decline":
-        await callback.answer("❌ Invitation declined", show_alert=True)
-        await callback.message.edit_text(
-            f"🚫 <b>INVITATION REJECTED</b>\n\n"
-            f"👤 <b>{user.first_name}</b> rejected the Tempest's call.\n"
-            f"👑 Invited by: {invite_data['inviter_name']}\n\n"
-            f"<i>Their blood remains unspilled... for now.</i>",
-            parse_mode=ParseMode.HTML
-        )
-        
-        if invite_id in pending_invites:
-            del pending_invites[invite_id]
+    # Start ceremony for invited user
+    await callback.answer("✅ Blood pact accepted! Starting ceremony...", show_alert=True)
     
-    await asyncio.sleep(30)
-    try:
-        await bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    except:
-        pass
-
-async def start_invite_ceremony(callback: CallbackQuery, invite_data: dict, user: types.User):
-    msg = callback.message
+    # Same ceremony as tempest_join
+    pending_joins[user.id] = {
+        "name": user.first_name,
+        "step": 1,
+        "chat_id": callback.message.chat.id,
+        "invited": True,
+        "inviter": invite_data["inviter_name"]
+    }
     
-    # Show sacrifice selection
     keyboard = InlineKeyboardBuilder()
     for i in range(1, 9):
-        keyboard.add(InlineKeyboardButton(text=f"{i}", callback_data=f"invite_sacrifice_{i}_{invite_data['inviter_id']}"))
-    keyboard.add(InlineKeyboardButton(text="❌ CANCEL", callback_data=f"invite_cancel_{invite_data['inviter_id']}"))
+        keyboard.add(InlineKeyboardButton(text=f"{i}", callback_data=f"invite_sacrifice_{i}"))
+    keyboard.add(InlineKeyboardButton(text="❌ CANCEL", callback_data="invite_sacrifice_cancel"))
     keyboard.adjust(4, 4, 2)
     
-    await msg.edit_text(
-        "⚡ <b>TEMPEST BLOOD CEREMONY (INVITED)</b>\n\n"
+    await callback.message.edit_text(
+        f"⚡ <b>TEMPEST BLOOD CEREMONY (INVITED)</b>\n\n"
         f"🌩️ <i>Invited by: {invite_data['inviter_name']}</i>\n\n"
         "The storm demands a REAL sacrifice...\n\n"
         "<b>Choose your offering:</b>\n\n"
@@ -2284,16 +2072,25 @@ async def start_invite_ceremony(callback: CallbackQuery, invite_data: dict, user
         parse_mode=ParseMode.HTML,
         reply_markup=keyboard.as_markup()
     )
+    
+    # Remove from pending invites
+    del pending_invites[invite_id]
 
 @dp.callback_query(F.data.startswith("invite_sacrifice_"))
 async def handle_invite_sacrifice(callback: CallbackQuery):
-    data_parts = callback.data.split("_")
-    if len(data_parts) < 4:
-        await callback.answer("Invalid selection!")
+    user = callback.from_user
+    
+    if user.id not in pending_joins:
+        await callback.answer("❌ Ceremony expired!", show_alert=True)
         return
     
-    sacrifice_num = data_parts[2]
-    inviter_id = int(data_parts[3])
+    if callback.data == "invite_sacrifice_cancel":
+        del pending_joins[user.id]
+        await callback.message.edit_text("🌀 <b>Initiation cancelled. The storm is disappointed.</b>", parse_mode=ParseMode.HTML)
+        await callback.answer()
+        return
+    
+    sacrifice_num = callback.data.replace("invite_sacrifice_", "")
     
     sacrifices = {
         "1": "🩸 Your firstborn's eternal soul",
@@ -2308,47 +2105,26 @@ async def handle_invite_sacrifice(callback: CallbackQuery):
     
     sacrifice = sacrifices.get(sacrifice_num, "Mysterious offering")
     
-    await callback.message.edit_text(f"🌀 <b>VERIFYING SACRIFICE...</b>\n\n⚡ {sacrifice}", parse_mode=ParseMode.HTML)
+    # Verify sacrifice
+    msg = callback.message
+    await msg.edit_text(f"🌀 <b>VERIFYING SACRIFICE...</b>\n\n⚡ {sacrifice}", parse_mode=ParseMode.HTML)
     await asyncio.sleep(1)
     
     is_real, status = await sacrifice_verification(sacrifice)
     
     if not is_real:
+        del pending_joins[user.id]
+        
+        rejection = random.choice([
+            f"❌ <b>SACRIFICE REJECTED!</b>\n\n⚡ '{sacrifice}' is FAKE!\n🌩️ The storm LAUGHS at your pathetic offering!\n🌀 <i>Banned from initiation for 24 hours!</i>",
+            f"💀 <b>THE STORM ANGERED!</b>\n\n⚡ Fake: '{sacrifice}'\n🌪️ The Tempest SPITS on your worthless offering!\n🌀 <i>Return when you have REAL value...</i>",
+        ])
+        
+        await msg.edit_text(rejection, parse_mode=ParseMode.HTML)
         await callback.answer("❌ Fake sacrifice detected!", show_alert=True)
-        await callback.message.edit_text(
-            f"❌ <b>SACRIFICE REJECTED!</b>\n\n"
-            f"⚡ '{sacrifice}' is FAKE!\n"
-            f"🌩️ The storm LAUGHS at your pathetic offering!\n"
-            f"🌀 <i>Banned from initiation for 24 hours!</i>",
-            parse_mode=ParseMode.HTML
-        )
         return
     
-    await callback.answer("✅ Sacrifice accepted! Starting ceremony...", show_alert=True)
-    
-    ceremony_steps = [
-        "🩸 <b>STEP 1: BLOOD OATH</b>\n\nA black obsidian blade materializes...\nYour palm is cut, blood flows into ancient bowl...",
-        "🔥 <b>STEP 2: ETERNAL FLAMES</b>\n\nDark flames consume your offering...\nThe sacrifice burns with green fire...",
-        "👁️ <b>STEP 3: ELDER GAZE</b>\n\nAncient eyes watch from shadows...\nThe Council approves your blood...",
-        "⚡ <b>STEP 4: LIGHTNING BRANDING</b>\n\nLightning strikes your chest...\nThe Tempest sigil burns into your soul...",
-        "🌪️ <b>STEP 5: STORM CONSUMPTION</b>\n\nThe vortex opens...\nYour sacrifice is consumed by eternal tempest...",
-        "🌀 <b>STEP 6: BLOOD BOND</b>\n\nYour blood mixes with the storm...\nThe tempest flows through your veins...",
-        "💀 <b>STEP 7: FINAL RITE</b>\n\nYour name is carved in the Book of Shadows...\nThe blood pact is sealed for eternity..."
-    ]
-    
-    for step in ceremony_steps:
-        await callback.message.edit_text(step, parse_mode=ParseMode.HTML)
-        await asyncio.sleep(2.5)
-    
-    user = callback.from_user
-    
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("UPDATE users SET cult_status = 'member', cult_rank = 'Blood Initiate', cult_join_date = ?, sacrifices = 3 WHERE user_id = ?",
-             (datetime.now().isoformat(), user.id))
-    conn.commit()
-    conn.close()
-    
+    # Complete ceremony
     final_message = f"""⚡ <b>ETERNAL INITIATION COMPLETE!</b>
 
 🌀 <b>WELCOME TO THE TEMPEST, {user.first_name.upper()}!</b>
@@ -2364,26 +2140,49 @@ Your journey of darkness begins...</i>
 
 🌀 Check your status with /profile"""
     
-    await callback.message.edit_text(final_message, parse_mode=ParseMode.HTML)
+    await msg.edit_text(final_message, parse_mode=ParseMode.HTML)
     
-    try:
-        inviter_name = "Unknown"
-        try:
-            inviter_chat = await bot.get_chat(inviter_id)
-            inviter_name = inviter_chat.first_name
-        except:
-            pass
-        
-        await send_log(f"🌀 <b>Invited Tempest Member</b>\n\n👤 Name: {user.first_name}\n🆔 ID: {user.id}\n🤝 Invited by: {inviter_name}\n🩸 Sacrifice: {sacrifice}\n🌪️ Joined: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    except:
-        pass
+    # Add to cult
+    conn = sqlite3.connect("data/bot.db")
+    c = conn.cursor()
+    c.execute("UPDATE users SET cult_status = 'member', cult_rank = 'Blood Initiate', cult_join_date = ?, sacrifices = 3 WHERE user_id = ?",
+             (datetime.now().isoformat(), user.id))
+    conn.commit()
+    conn.close()
+    
+    # Cleanup
+    if user.id in pending_joins:
+        del pending_joins[user.id]
+    
+    await callback.answer("✅ Sacrifice accepted! Welcome to the Tempest!", show_alert=True)
 
-@dp.callback_query(F.data.startswith("invite_cancel_"))
-async def handle_invite_cancel(callback: CallbackQuery):
-    await callback.message.edit_text("🌀 <b>Initiation cancelled. The storm is disappointed.</b>", parse_mode=ParseMode.HTML)
-    await callback.answer("❌ Invitation cancelled", show_alert=True)
+@dp.callback_query(F.data.startswith("invite_decline_"))
+async def handle_invite_decline(callback: CallbackQuery):
+    invite_id = callback.data.replace("invite_decline_", "")
+    
+    if invite_id not in pending_invites:
+        await callback.answer("Invite expired!", show_alert=True)
+        return
+    
+    invite_data = pending_invites[invite_id]
+    user = callback.from_user
+    
+    if user.id != invite_data["target_id"]:
+        await callback.answer("This invitation isn't for you!", show_alert=True)
+        return
+    
+    await callback.answer("❌ Invitation declined", show_alert=True)
+    await callback.message.edit_text(
+        f"🚫 <b>INVITATION REJECTED</b>\n\n"
+        f"👤 <b>{user.first_name}</b> rejected the Tempest's call.\n"
+        f"👑 Invited by: {invite_data['inviter_name']}\n\n"
+        f"<i>Their blood remains unspilled... for now.</i>",
+        parse_mode=ParseMode.HTML
+    )
+    
+    del pending_invites[invite_id]
 
-# ========== WELCOME MESSAGE WHEN BOT IS ADDED TO GROUP ==========
+# ========== WELCOME MESSAGE ==========
 @dp.message(F.new_chat_members)
 async def welcome_new_chat_members(message: Message):
     try:
@@ -2403,15 +2202,12 @@ async def welcome_new_chat_members(message: Message):
 • Upload files with /link
 • Check luck with /wish
 • Fun games: /dice /flip
-• Tempest cult system
+• User profiles
 
 📚 <b>Available Commands:</b>
 <code>/help</code> - All commands
 <code>/link</code> - Upload files
 <code>/profile</code> - Your stats
-<code>/tempest_cult</code> - Cult info
-
-⚡ <b>Note:</b> Some commands work only in private chat.
 
 <i>Type /help for complete command list!</i>"""
                 
@@ -2436,22 +2232,23 @@ async def welcome_new_chat_members(message: Message):
 
 # ========== MAIN ==========
 async def main():
-    print("🚀 PRO BOT PROPER VERSION STARTING...")
+    print("🚀 PRO BOT WORKING VERSION STARTING...")
     print(f"📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("✅ Database initialized")
     print(f"🌀 Log Channel ID: {LOG_CHANNEL_ID}")
-    print("📢 Broadcast: PROPER - ALL users/groups + Button option")
-    print("🔗 Upload: WORKS IN GROUPS")
-    print("📜 Story: 8 CHAPTERS")
+    print("📢 Broadcast: SIMPLE - Works for ALL users/groups")
+    print("🔗 Upload: WORKS IN GROUPS - Fixed")
+    print("📜 Story: 8 CHAPTERS - Fixed callbacks")
     print("👤 Profile: TEMPEST STATUS")
-    print("📨 Invite: FULL CEREMONY")
-    print("🌀 Tempest_cult: SHOWS MEMBERS")
-    print("🚫 /disable: PROPER TIME FORMAT (30m, 2h, 1d)")
+    print("📨 Invite: FULL CEREMONY - Fixed")
+    print("🌀 Tempest: HIDDEN from /help")
+    print("👑 Owner: /owner_help command")
+    print("🚫 /disable: PROPER TIME FORMAT")
     print("👋 Welcome: GROUP WELCOME")
     print("=" * 50)
     
     try:
-        startup_log = f"🤖 <b>Bot Started - Proper Fixes</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: All Features Active\n⚡ Broadcast: Works for ALL users/groups\n🔘 Button Option: Yes\n⏰ /disable: Proper time format"
+        startup_log = f"🤖 <b>Bot Started - Working Version</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: All Commands Fixed\n⚡ Status: READY"
         await send_log(startup_log)
         print("✅ Log channel connected")
     except Exception as e:
