@@ -134,11 +134,11 @@ def init_db():
     
     # Initialize cult leaders
     c.execute("INSERT OR IGNORE INTO users (user_id, first_name, cult_status, cult_rank, sacrifices) VALUES (?, ?, ?, ?, ?)",
-              (CULT_LEADER_ID, "🆁🅰️🆅🅴🅽", "member", "Supreme Leader", 999))
+              (CULT_LEADER_ID, "🆁🅰️🆅🅴🅽", "member", "Supreme Leader", 79))
     c.execute("INSERT OR IGNORE INTO users (user_id, first_name, cult_status, cult_rank, sacrifices) VALUES (?, ?, ?, ?, ?)",
-              (VICE_CHANCELLOR_ID, "Tʜᴇ Dᴀꜱʜ", "member", "Vice Chancellor", 500))
+              (VICE_CHANCELLOR_ID, "Tʜᴇ Dᴀꜱʜ", "member", "Vice Chancellor", 51))
     c.execute("INSERT OR IGNORE INTO users (user_id, first_name, cult_status, cult_rank, sacrifices) VALUES (?, ?, ?, ?, ?)",
-              (OWNER_ID, "Ķ£NY D ~Tempest~", "member", "Initiate", 1))
+              (OWNER_ID, "Ķ£NY D ~Tempest~", "member", "Pro", 11))
     
     conn.commit()
     conn.close()
