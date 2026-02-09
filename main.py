@@ -2,7 +2,7 @@
 # ========== COMPLETE FIXED CODE - FINAL VERSION ==========
 import sys
 print("=" * 60)
-print("🚀 URGENT FIXES APPLIED")
+print("🚀 PRO BOT - COMPLETE FIXES")
 print("✅ Callback errors fixed")
 print("✅ Case-sensitive commands fixed")
 print("✅ Broadcast media fixed")
@@ -23,8 +23,8 @@ import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# NEW: Add Pillow for profile cards
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+# Add Pillow for profile cards
+from PIL import Image, ImageDraw, ImageFont
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandStart
@@ -39,13 +39,13 @@ print("🤖 PRO BOT FINAL FIXES INITIALIZING...")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAFVRZytQIWAq6S3r6NXM-CvPbt_agGMk4Y")
 OWNER_ID = int(os.getenv("OWNER_ID", "6108185460"))
 UPLOAD_API = "https://catbox.moe/user/api.php"
-LOG_CHANNEL_ID = 1003662720845  # Log channel ID without hyphen
+LOG_CHANNEL_ID = 1003662720845
 
 # Create directories
 Path("data").mkdir(exist_ok=True)
 Path("temp").mkdir(exist_ok=True)
 Path("backups").mkdir(exist_ok=True)
-Path("profile_cards").mkdir(exist_ok=True)  # NEW: For profile card images
+Path("profile_cards").mkdir(exist_ok=True)  # For profile card images
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -167,33 +167,34 @@ def create_profile_card(user_data):
             b = max(26, int(26 + i * 0.15))
             draw.line([(0, i), (width, i)], fill=(r, g, b))
         
-        # Add storm effect lines (lightning effects)
+        # Add storm effect lines
         for _ in range(30):
             x1 = random.randint(0, width)
             y1 = random.randint(0, height)
             x2 = x1 + random.randint(-50, 50)
             y2 = y1 + random.randint(20, 100)
-            draw.line([(x1, y1), (x2, y2)], fill=(100, 100, 200, 100), width=2)
+            draw.line([(x1, y1), (x2, y2)], fill=(100, 100, 200), width=2)
         
-        # Load fonts (try system fonts, fallback to default)
+        # FIXED: Use default font instead of trying system fonts that might not exist
         try:
-            title_font = ImageFont.truetype("arialbd.ttf", 32)
-            name_font = ImageFont.truetype("arialbd.ttf", 28)
-            stat_font = ImageFont.truetype("arial.ttf", 22)
-            small_font = ImageFont.truetype("arial.ttf", 18)
+            # Try to get a default font - this is the SAFE FIX
+            title_font = ImageFont.load_default(size=32)
+            name_font = ImageFont.load_default(size=28)
+            stat_font = ImageFont.load_default(size=22)
+            small_font = ImageFont.load_default(size=18)
         except:
-            # Use default font if system fonts not available
+            # Ultimate fallback
             title_font = ImageFont.load_default()
             name_font = ImageFont.load_default()
             stat_font = ImageFont.load_default()
             small_font = ImageFont.load_default()
         
-        # Draw Tempest Creed Title
-        draw.text((width // 2, 30), "🌀 TEMPEST CREED PROFILE", fill=(100, 200, 255), font=title_font, anchor="mm")
+        # Draw title WITHOUT EMOJI to avoid font issues
+        draw.text((width // 2, 30), "TEMPEST CREED PROFILE", fill=(100, 200, 255), font=title_font, anchor="mm")
         
-        # Draw user name
-        name = first_name[:20]
-        draw.text((width // 2, 80), f"👤 {name}", fill=(255, 255, 255), font=name_font, anchor="mm")
+        # Draw user name (first 15 chars only)
+        name = first_name[:15]
+        draw.text((width // 2, 80), f"{name}", fill=(255, 255, 255), font=name_font, anchor="mm")
         
         # Draw username
         uname = f"@{username}" if username else "No username"
@@ -205,20 +206,20 @@ def create_profile_card(user_data):
         spacing = 20
         
         # Uploads
-        draw.rectangle([(50, stats_y), (50 + stat_width, stats_y + 60)], fill=(20, 40, 80, 150), outline=(0, 150, 255))
-        draw.text((50 + stat_width // 2, stats_y + 15), "📁 UPLOADS", fill=(100, 200, 255), font=stat_font, anchor="mm")
+        draw.rectangle([(50, stats_y), (50 + stat_width, stats_y + 60)], fill=(20, 40, 80), outline=(0, 150, 255))
+        draw.text((50 + stat_width // 2, stats_y + 15), "UPLOADS", fill=(100, 200, 255), font=stat_font, anchor="mm")
         draw.text((50 + stat_width // 2, stats_y + 40), str(uploads), fill=(255, 255, 255), font=stat_font, anchor="mm")
         
         # Wishes
         draw.rectangle([(50 + stat_width + spacing, stats_y), (50 + stat_width * 2 + spacing, stats_y + 60)], 
-                      fill=(40, 20, 80, 150), outline=(150, 0, 255))
-        draw.text((50 + stat_width + spacing + stat_width // 2, stats_y + 15), "✨ WISHES", fill=(200, 100, 255), font=stat_font, anchor="mm")
+                      fill=(40, 20, 80), outline=(150, 0, 255))
+        draw.text((50 + stat_width + spacing + stat_width // 2, stats_y + 15), "WISHES", fill=(200, 100, 255), font=stat_font, anchor="mm")
         draw.text((50 + stat_width + spacing + stat_width // 2, stats_y + 40), str(wishes), fill=(255, 255, 255), font=stat_font, anchor="mm")
         
         # Commands
         draw.rectangle([(50 + stat_width * 2 + spacing * 2, stats_y), (50 + stat_width * 3 + spacing * 2, stats_y + 60)], 
-                      fill=(20, 80, 40, 150), outline=(0, 255, 150))
-        draw.text((50 + stat_width * 2 + spacing * 2 + stat_width // 2, stats_y + 15), "🔧 COMMANDS", fill=(100, 255, 200), font=stat_font, anchor="mm")
+                      fill=(20, 80, 40), outline=(0, 255, 150))
+        draw.text((50 + stat_width * 2 + spacing * 2 + stat_width // 2, stats_y + 15), "COMMANDS", fill=(100, 255, 200), font=stat_font, anchor="mm")
         draw.text((50 + stat_width * 2 + spacing * 2 + stat_width // 2, stats_y + 40), str(commands), fill=(255, 255, 255), font=stat_font, anchor="mm")
         
         # Tempest Info Section
@@ -226,38 +227,43 @@ def create_profile_card(user_data):
         
         # Cult Rank
         if cult_rank and cult_rank != "none":
-            rank_text = f"👑 {cult_rank}"
-            sacrifice_text = f"⚔️ {sacrifices} Sacrifices"
+            rank_text = f"RANK: {cult_rank}"
+            sacrifice_text = f"SACRIFICES: {sacrifices}"
             draw.text((50, info_y), rank_text, fill=(255, 100, 100), font=stat_font)
             draw.text((50, info_y + 30), sacrifice_text, fill=(255, 200, 100), font=stat_font)
         else:
-            draw.text((50, info_y), "🌀 Not Initiated", fill=(150, 150, 150), font=stat_font)
-            draw.text((50, info_y + 30), "⚡ Use /tempest_join", fill=(200, 200, 100), font=small_font)
+            draw.text((50, info_y), "NOT INITIATED", fill=(150, 150, 150), font=stat_font)
+            draw.text((50, info_y + 30), "USE /TEMPEST_JOIN", fill=(200, 200, 100), font=small_font)
         
         # Curse Status
         if curse_type and curse_type != "none":
             curse_y = info_y
-            curse_text = f"⚡ CURSED: {curse_type}"
+            curse_text = f"CURSED: {curse_type}"
             draw.text((width - 250, curse_y), curse_text, fill=(255, 50, 50), font=stat_font)
             
             # Add cursed border
             draw.rectangle([(0, 0), (width-1, height-1)], outline=(255, 50, 50), width=5)
         
         # User ID and Date
-        id_text = f"🆔 {user_id}"
-        date_text = f"📅 {joined_date}"
+        id_text = f"ID: {user_id}"
+        date_text = f"JOINED: {joined_date}"
         draw.text((width - 250, info_y + 30), id_text, fill=(150, 200, 255), font=small_font)
         draw.text((width - 250, info_y + 55), date_text, fill=(150, 200, 255), font=small_font)
         
         # Bottom text
-        bottom_text = "🌀 The storm flows through your veins"
+        bottom_text = "The storm flows through your veins"
         draw.text((width // 2, height - 30), bottom_text, fill=(100, 150, 255), font=small_font, anchor="mm")
         
         # Save the image
         filename = f"profile_cards/profile_{user_id}_{int(time.time())}.png"
         base.save(filename, "PNG")
         
-        return filename
+        # Verify the image was created
+        if os.path.exists(filename) and os.path.getsize(filename) > 0:
+            return filename
+        else:
+            print(f"❌ Failed to save profile card for user {user_id}")
+            return None
         
     except Exception as e:
         print(f"❌ Error creating profile card: {e}")
@@ -289,7 +295,8 @@ def save_bot_state():
         conn.commit()
         conn.close()
         return True
-    except:
+    except Exception as e:
+        print(f"❌ Error saving bot state: {e}")
         return False
 
 def load_bot_state():
@@ -336,7 +343,7 @@ async def safe_answer_callback(callback: CallbackQuery, text: str = None, show_a
         await callback.answer(text, show_alert=show_alert)
     except TelegramBadRequest as e:
         if "query is too old" in str(e).lower():
-            pass  # Just ignore expired queries
+            pass
         else:
             raise e
 
@@ -744,21 +751,26 @@ async def profile_cmd(message: Message):
         caption += "\n\n🌀 <i>The storm flows through your veins...</i>"
         
         try:
+            # Send the photo
             await message.answer_photo(
                 FSInputFile(profile_card_path),
                 caption=caption,
                 parse_mode=ParseMode.HTML
             )
             
-            # Clean up the temporary image file after sending
-            try:
-                os.remove(profile_card_path)
-            except:
-                pass
+            # Schedule cleanup after 30 seconds
+            async def cleanup_later():
+                await asyncio.sleep(30)
+                try:
+                    os.remove(profile_card_path)
+                except:
+                    pass
+            
+            asyncio.create_task(cleanup_later())
             return
             
         except Exception as e:
-            print(f"Failed to send profile card: {e}")
+            print(f"❌ Failed to send profile card: {e}")
             # Fall back to text version
     
     # Fallback to text profile if image creation fails
@@ -1081,7 +1093,7 @@ async def broadcast_cmd(message: Message):
         return
     
     broadcast_state[user.id] = {"type": "users", "step": 1}
-    save_bot_state()  # Save state
+    save_bot_state()
     
     await message.answer(
         "📢 <b>BROADCAST TO ALL USERS</b>\n\n"
@@ -1103,7 +1115,7 @@ async def broadcast_gc_cmd(message: Message):
         return
     
     broadcast_state[user.id] = {"type": "groups", "step": 1}
-    save_bot_state()  # Save state
+    save_bot_state()
     
     await message.answer(
         "📢 <b>BROADCAST TO ALL GROUPS</b>\n\n"
@@ -1151,7 +1163,7 @@ async def refresh_cmd(message: Message):
     pending_invites.clear()
     story_states.clear()
     
-    save_bot_state()  # Save cleared state
+    save_bot_state()
     
     await message.answer("🔄 <b>Bot cache refreshed!</b>", parse_mode=ParseMode.HTML)
 
@@ -1177,7 +1189,7 @@ async def link_cmd(message: Message):
         return
     
     upload_waiting[user.id] = True
-    save_bot_state()  # Save state
+    save_bot_state()
     
     await message.answer(
         "📁 <b>Now send me any file:</b>\n"
@@ -1200,7 +1212,7 @@ async def handle_file(message: Message):
         return
     
     upload_waiting[user.id] = False
-    save_bot_state()  # Save state
+    save_bot_state()
     
     msg = await message.answer("⏳ <b>Processing...</b>", parse_mode=ParseMode.HTML)
     
@@ -1273,7 +1285,6 @@ async def handle_file(message: Message):
         size_mb = size_kb / 1024
         size_text = f"{size_mb:.1f} MB" if size_mb >= 1 else f"{size_kb:.1f} KB"
         
-        # Create keyboard with copy and share buttons
         keyboard = InlineKeyboardBuilder()
         keyboard.add(InlineKeyboardButton(text="📋 Copy Link", callback_data=f"copy_{result['url']}"))
         keyboard.add(InlineKeyboardButton(text="🔗 Share", url=f"https://t.me/share/url?url={result['url']}"))
@@ -1299,10 +1310,9 @@ async def handle_file(message: Message):
         await msg.edit_text("❌ Error uploading file")
         log_error(user.id, "upload", e)
 
-# Handle copy button callback
 @dp.callback_query(F.data.startswith("copy_"))
 async def handle_copy(callback: CallbackQuery):
-    url = callback.data[5:]  # Remove "copy_" prefix
+    url = callback.data[5:]
     await safe_answer_callback(callback, f"Link copied to clipboard!\n{url}", show_alert=True)
 
 @dp.message(Command("cancel"))
@@ -1311,12 +1321,12 @@ async def cancel_cmd(message: Message):
     
     if user.id in upload_waiting:
         upload_waiting[user.id] = False
-        save_bot_state()  # Save state
+        save_bot_state()
         await message.answer("❌ Upload cancelled")
     
     if user.id in broadcast_state:
         broadcast_state.pop(user.id, None)
-        save_bot_state()  # Save state
+        save_bot_state()
         await message.answer("❌ Broadcast cancelled")
     
     if user.id in story_states:
@@ -1335,18 +1345,16 @@ async def wish_cmd(message: Message):
     
     msg = await message.answer("✨ <b>Reading your destiny...</b>", parse_mode=ParseMode.HTML)
     
-    # Check if user is cursed
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
     c.execute("SELECT curse_type FROM users WHERE user_id = ?", (user.id,))
     curse_result = c.fetchone()
     curse_type = curse_result[0] if curse_result else "none"
     
-    # Apply curse penalty if cursed
     curse_penalty = 0
     curse_message = ""
     if curse_type != "none":
-        curse_penalty = random.randint(15, 30)  # -15 to -30% luck
+        curse_penalty = random.randint(15, 30)
         curse_message = f"\n⚡ <b>Curse penalty:</b> -{curse_penalty}%"
     
     for emoji in ["🌟", "⭐", "💫", "🌠", "✨"]:
@@ -1354,7 +1362,7 @@ async def wish_cmd(message: Message):
         await asyncio.sleep(0.2)
     
     base_luck = random.randint(1, 100)
-    luck = max(1, base_luck - curse_penalty)  # Apply curse penalty
+    luck = max(1, base_luck - curse_penalty)
     stars = "⭐" * (luck // 10)
     
     if luck >= 90:
@@ -1411,7 +1419,7 @@ async def flip_cmd(message: Message):
     await msg.edit_text(f"🪙 <b>{result}</b>", parse_mode=ParseMode.HTML)
 
 # ========== HIDDEN TEMPEST PROGRESS ==========
-@dp.message(Command("tempest_progress", ignore_case=True))  # FIXED: Case insensitive
+@dp.message(Command("tempest_progress", ignore_case=True))
 async def tempest_progress_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_progress")
     
@@ -1449,7 +1457,6 @@ async def tempest_progress_cmd(message: Message):
         
         progress_bar = "🩸" * (progress // 10) + "⚫" * (10 - progress // 10)
         
-        # Add curse info if cursed
         curse_text = ""
         if curse_type != "none":
             curse_text = f"\n⚡ <b>Curse:</b> {curse_type} (affects wish luck)"
@@ -1484,15 +1491,12 @@ async def tempest_progress_cmd(message: Message):
     conn.close()
     await message.answer(progress_text, parse_mode=ParseMode.HTML)
 
-# ========== CURSE COMMAND (HIDDEN TEMPEST COMMAND) ==========
+# ========== CURSE COMMAND ==========
 @dp.message(Command("curse", ignore_case=True))
 async def curse_cmd(message: Message):
-    """Curse a user with Ravijah's wrath"""
     user, chat = await handle_common(message, "curse")
     
-    # Check if user is admin or in Tempest
     if not await is_admin(user.id):
-        # Check if user is in Tempest cult
         conn = sqlite3.connect("data/bot.db")
         c = conn.cursor()
         c.execute("SELECT cult_status FROM users WHERE user_id = ?", (user.id,))
@@ -1503,24 +1507,20 @@ async def curse_cmd(message: Message):
             return
         conn.close()
     
-    # Check if replying to a message
     if not message.reply_to_message:
         await message.answer("🌀 <b>Reply to a user's message to curse them!</b>", parse_mode=ParseMode.HTML)
         return
     
     target_user = message.reply_to_message.from_user
     
-    # Can't curse yourself
     if target_user.id == user.id:
         await message.reply("🌀 You cannot curse yourself!")
         return
     
-    # Can't curse admins
     if await is_admin(target_user.id):
         await message.reply("🌀 You cannot curse an admin!")
         return
     
-    # Check if target is already cursed
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
     c.execute("SELECT curse_type FROM users WHERE user_id = ?", (target_user.id,))
@@ -1531,7 +1531,6 @@ async def curse_cmd(message: Message):
         conn.close()
         return
     
-    # Select random curse
     curses = [
         ("Misfortune", "May misfortune follow your every step!"),
         ("Bad Luck", "Bad luck shall be your constant companion!"),
@@ -1543,13 +1542,11 @@ async def curse_cmd(message: Message):
     
     curse_type, curse_quote = random.choice(curses)
     
-    # Update database
     c.execute("UPDATE users SET curse_type = ?, curse_time = ?, curse_by = ? WHERE user_id = ?",
              (curse_type, datetime.now().isoformat(), user.id, target_user.id))
     conn.commit()
     conn.close()
     
-    # Curse animation sequence
     msg = await message.reply(f"🌀 <b>INITIATING CURSE RITUAL...</b>")
     
     curse_steps = [
@@ -1586,27 +1583,23 @@ async def curse_cmd(message: Message):
     
     await msg.edit_text(final_message, parse_mode=ParseMode.HTML)
     
-    # Send log
     await send_log(f"⚡ <b>Curse Cast</b>\n\n👤 Target: {target_user.first_name}\n🆔 Target ID: {target_user.id}\n🌀 Curse: {curse_type}\n👑 Cursed by: {user.first_name}\n⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # ========== REMOVE CURSE COMMAND ==========
 @dp.message(Command("remove_curse", ignore_case=True))
 async def remove_curse_cmd(message: Message):
-    """Remove curse from a user"""
     user, chat = await handle_common(message, "remove_curse")
     
     if not await is_admin(user.id):
         await message.answer("🚫 Admin only")
         return
     
-    # Check if replying to a message
     if not message.reply_to_message:
         await message.answer("🌀 <b>Reply to a user's message to remove their curse!</b>", parse_mode=ParseMode.HTML)
         return
     
     target_user = message.reply_to_message.from_user
     
-    # Check if target is cursed
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
     c.execute("SELECT curse_type FROM users WHERE user_id = ?", (target_user.id,))
@@ -1617,7 +1610,6 @@ async def remove_curse_cmd(message: Message):
         conn.close()
         return
     
-    # Remove curse
     c.execute("UPDATE users SET curse_type = 'none', curse_time = NULL, curse_by = NULL WHERE user_id = ?",
              (target_user.id,))
     conn.commit()
@@ -1634,12 +1626,11 @@ async def remove_curse_cmd(message: Message):
 May you walk in the light once more...</i>
 """, parse_mode=ParseMode.HTML)
 
-# ========== TEMPEST JOIN WITH BLOODY CEREMONY ==========
-@dp.message(Command("tempest_join", ignore_case=True))  # FIXED: Case insensitive
+# ========== TEMPEST JOIN ==========
+@dp.message(Command("tempest_join", ignore_case=True))
 async def tempest_join_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_join")
     
-    # Check if already in cult
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
     c.execute("SELECT cult_status FROM users WHERE user_id = ?", (user.id,))
@@ -1652,7 +1643,6 @@ async def tempest_join_cmd(message: Message):
     
     conn.close()
     
-    # Start initiation with sacrifice selection
     pending_joins[user.id] = {
         "name": user.first_name,
         "step": 1,
@@ -1689,13 +1679,13 @@ async def handle_sacrifice(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     
     if user.id not in pending_joins:
-        await safe_answer_callback(callback, "❌ Initiation expired!", show_alert=True)  # FIXED
+        await safe_answer_callback(callback, "❌ Initiation expired!", show_alert=True)
         return
     
     if callback.data == "sacrifice_cancel":
         del pending_joins[user.id]
         await callback.message.edit_text("🌀 <b>Initiation cancelled. The storm is disappointed.</b>", parse_mode=ParseMode.HTML)
-        await safe_answer_callback(callback)  # FIXED
+        await safe_answer_callback(callback)
         return
     
     sacrifice_num = callback.data.split("_")[1]
@@ -1713,12 +1703,10 @@ async def handle_sacrifice(callback: CallbackQuery):
     
     sacrifice = sacrifices.get(sacrifice_num, "Mysterious offering")
     
-    # Start bloody ceremony animation
     msg = callback.message
     await msg.edit_text(f"🌀 <b>VERIFYING SACRIFICE...</b>\n\n⚡ {sacrifice}", parse_mode=ParseMode.HTML)
     await asyncio.sleep(1)
     
-    # Verify sacrifice
     is_real, status = await sacrifice_verification(sacrifice)
     
     if not is_real:
@@ -1731,14 +1719,12 @@ async def handle_sacrifice(callback: CallbackQuery):
         ])
         
         await msg.edit_text(rejection, parse_mode=ParseMode.HTML)
-        await safe_answer_callback(callback, "❌ Fake sacrifice detected!", show_alert=True)  # FIXED
+        await safe_answer_callback(callback, "❌ Fake sacrifice detected!", show_alert=True)
         return
     
-    # REAL SACRIFICE - Start bloody ceremony animation
     pending_joins[user.id]["sacrifice"] = sacrifice
     pending_joins[user.id]["verified"] = status
     
-    # Bloody ceremony animation
     ceremony_steps = [
         "🩸 <b>STEP 1: BLOOD OATH</b>\n\nA black obsidian blade materializes...\nYour palm is cut, blood flows into ancient bowl...",
         "🔥 <b>STEP 2: ETERNAL FLAMES</b>\n\nDark flames consume your offering...\nThe sacrifice burns with green fire...",
@@ -1753,7 +1739,6 @@ async def handle_sacrifice(callback: CallbackQuery):
         await msg.edit_text(step, parse_mode=ParseMode.HTML)
         await asyncio.sleep(2.5)
     
-    # Final initiation
     final_message = f"""⚡ <b>ETERNAL INITIATION COMPLETE!</b>
 
 🌀 <b>WELCOME TO THE TEMPEST, {pending_joins[user.id]['name'].upper()}!</b>
@@ -1771,7 +1756,6 @@ Your journey of darkness begins...</i>
     
     await msg.edit_text(final_message, parse_mode=ParseMode.HTML)
     
-    # Add to cult
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
     c.execute("UPDATE users SET cult_status = 'member', cult_rank = 'Blood Initiate', cult_join_date = ?, sacrifices = 3 WHERE user_id = ?",
@@ -1779,21 +1763,18 @@ Your journey of darkness begins...</i>
     conn.commit()
     conn.close()
     
-    # Send log
     await send_log(f"🌀 <b>New Tempest Member</b>\n\n👤 Name: {user.first_name}\n🆔 ID: {user.id}\n🩸 Sacrifice: {sacrifice}\n🌪️ Joined: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # Cleanup
     if user.id in pending_joins:
         del pending_joins[user.id]
     
-    await safe_answer_callback(callback, "✅ Sacrifice accepted! Welcome to the Tempest!", show_alert=True)  # FIXED
+    await safe_answer_callback(callback, "✅ Sacrifice accepted! Welcome to the Tempest!", show_alert=True)
 
-# ========== TEMPEST STORY WITH 8 CHAPTERS AND ANIMATIONS ==========
-@dp.message(Command("tempest_story", ignore_case=True))  # FIXED: Case insensitive
+# ========== TEMPEST STORY ==========
+@dp.message(Command("tempest_story", ignore_case=True))
 async def tempest_story_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_story")
     
-    # Check if in cult
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
     c.execute("SELECT cult_status FROM users WHERE user_id = ?", (user.id,))
@@ -1806,10 +1787,8 @@ async def tempest_story_cmd(message: Message):
     
     conn.close()
     
-    # Start story at chapter 1
     story_states[user.id] = {"chapter": 1}
     
-    # Chapter 1 with animation
     chapter1 = """📜 <b>CHAPTER 1: THE VOID BEFORE STORM</b>
 
 <i>Time before time, in the Age of Eternal Calm...</i>
@@ -1938,7 +1917,6 @@ We are the eternal storm."</code>
     }
     
     if chapter_num in chapters:
-        # Show animation before chapter
         await callback.message.edit_text(f"🌀 <b>Turning page {chapter_num}/8...</b>", parse_mode=ParseMode.HTML)
         await asyncio.sleep(2)
         
@@ -1950,32 +1928,29 @@ We are the eternal storm."</code>
             keyboard.add(InlineKeyboardButton(text="⚡ Story Complete", callback_data="story_end"))
         
         await callback.message.edit_text(chapters[chapter_num], parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup() if chapter_num < 8 else None)
-        await safe_answer_callback(callback)  # FIXED
+        await safe_answer_callback(callback)
     else:
-        await safe_answer_callback(callback, "Story complete!")  # FIXED
+        await safe_answer_callback(callback, "Story complete!")
 
 @dp.callback_query(F.data == "story_end")
 async def handle_story_end(callback: CallbackQuery):
     await callback.message.edit_text("📜 <b>THE TEMPEST SAGA</b>\n\n<i>Your understanding of the storm is complete. Your journey continues with each sacrifice. Make your mark in the eternal tempest.</i>", parse_mode=ParseMode.HTML)
-    await safe_answer_callback(callback)  # FIXED
+    await safe_answer_callback(callback)
     
-    # Auto-delete after 30 seconds
     await asyncio.sleep(30)
     try:
         await bot.delete_message(callback.message.chat.id, callback.message.message_id)
     except:
         pass
 
-# ========== FIXED REPLY INVITATION SYSTEM ==========
+# ========== REPLY INVITATION SYSTEM ==========
 @dp.message(F.reply_to_message)
 async def handle_reply_invite(message: Message):
-    """Handle when someone replies to a message with Tempest_join"""
     user, chat = await handle_common(message, "reply_invite")
     
     if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
         return
     
-    # Check if message contains Tempest_join (case insensitive)
     if "tempest_join" in message.text.lower() or "join tempest" in message.text.lower():
         replied_user = message.reply_to_message.from_user
         
@@ -2038,21 +2013,21 @@ async def handle_reply_invite(message: Message):
 async def handle_reply_invite_response(callback: CallbackQuery):
     data_parts = callback.data.split("_")
     if len(data_parts) < 5:
-        await safe_answer_callback(callback, "Invalid invite!")  # FIXED
+        await safe_answer_callback(callback, "Invalid invite!")
         return
     
     action = data_parts[3]
     invite_id = "_".join(data_parts[4:])
     
     if invite_id not in pending_invites:
-        await safe_answer_callback(callback, "Invite expired!")  # FIXED
+        await safe_answer_callback(callback, "Invite expired!")
         return
     
     invite_data = pending_invites[invite_id]
     user = callback.from_user
     
     if user.id != invite_data["target_id"]:
-        await safe_answer_callback(callback, "This invitation isn't for you!", show_alert=True)  # FIXED
+        await safe_answer_callback(callback, "This invitation isn't for you!", show_alert=True)
         return
     
     if action == "accept":
@@ -2062,7 +2037,7 @@ async def handle_reply_invite_response(callback: CallbackQuery):
         result = c.fetchone()
         
         if result and result[0] != "none":
-            await safe_answer_callback(callback, "You're already in the cult!", show_alert=True)  # FIXED
+            await safe_answer_callback(callback, "You're already in the cult!", show_alert=True)
             conn.close()
             return
         
@@ -2071,7 +2046,7 @@ async def handle_reply_invite_response(callback: CallbackQuery):
         conn.commit()
         conn.close()
         
-        await safe_answer_callback(callback, "✅ Blood pact accepted!", show_alert=True)  # FIXED
+        await safe_answer_callback(callback, "✅ Blood pact accepted!", show_alert=True)
         
         await callback.message.edit_text(
             f"🎉 <b>BLOOD PACT SEALED!</b>\n\n"
@@ -2083,11 +2058,10 @@ async def handle_reply_invite_response(callback: CallbackQuery):
             parse_mode=ParseMode.HTML
         )
         
-        # Send log
         await send_log(f"🌀 <b>Invitation Accepted</b>\n\n👤 Invited: {user.first_name}\n👑 Inviter: {invite_data['inviter_name']}\n🆔 User ID: {user.id}\n🌪️ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
     elif action == "decline":
-        await safe_answer_callback(callback, "❌ Invitation declined", show_alert=True)  # FIXED
+        await safe_answer_callback(callback, "❌ Invitation declined", show_alert=True)
         await callback.message.edit_text(
             f"🚫 <b>INVITATION REJECTED</b>\n\n"
             f"👤 <b>{user.first_name}</b> rejected the Tempest's call.\n"
@@ -2115,17 +2089,13 @@ async def handle_broadcast(message: Message):
     if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
         update_group(chat)
     
-    # Check if user is in broadcast state AND this is the content message
     if user.id in broadcast_state:
-        # Check if we're on step 1 (waiting for content)
         if broadcast_state[user.id].get("step") == 1:
-            # Process the broadcast
             broadcast_data = broadcast_state[user.id]
             broadcast_type = broadcast_data["type"]
             
-            # Move to step 2 immediately
             broadcast_state[user.id]["step"] = 2
-            save_bot_state()  # Save state
+            save_bot_state()
             
             if broadcast_type == "users":
                 conn = sqlite3.connect("data/bot.db")
@@ -2134,7 +2104,7 @@ async def handle_broadcast(message: Message):
                 targets = [row[0] for row in c.fetchall()]
                 conn.close()
                 target_type = "users"
-            else:  # groups
+            else:
                 conn = sqlite3.connect("data/bot.db")
                 c = conn.cursor()
                 c.execute("SELECT group_id FROM groups")
@@ -2146,7 +2116,7 @@ async def handle_broadcast(message: Message):
             if total == 0:
                 await message.answer(f"❌ No {target_type} found to broadcast!")
                 broadcast_state.pop(user.id, None)
-                save_bot_state()  # Save state
+                save_bot_state()
                 return
             
             status_msg = await message.answer(f"📤 Sending to {total} {target_type}...")
@@ -2154,7 +2124,6 @@ async def handle_broadcast(message: Message):
             success = 0
             failed = 0
             
-            # Handle all message types including media
             for target_id in targets:
                 try:
                     if message.text:
@@ -2180,18 +2149,16 @@ async def handle_broadcast(message: Message):
                         await bot.send_voice(target_id, message.voice.file_id)
                     
                     success += 1
-                    await asyncio.sleep(0.05)  # Rate limiting
+                    await asyncio.sleep(0.05)
                 except Exception as e:
                     failed += 1
                     continue
             
-            # Clear broadcast state after completion
             broadcast_state.pop(user.id, None)
-            save_bot_state()  # Save state
+            save_bot_state()
             
             await status_msg.edit_text(f"✅ Sent to {success}/{total} {target_type}\n❌ Failed: {failed}")
             
-            # Log the broadcast
             await send_log(f"📢 <b>Broadcast Sent</b>\n\nBy: {user.first_name}\nType: {target_type}\nSent: {success}/{total}\nFailed: {failed}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # ========== MAIN ==========
@@ -2210,7 +2177,6 @@ async def main():
     print("🖼️ Profile Cards: ENABLED (with Pillow)")
     print("=" * 50)
     
-    # Send startup log
     startup_log = f"🤖 <b>Bot Started - Complete Features</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: Complete Features\n⚡ Status: ALL SYSTEMS ACTIVE\n💾 State Restored: YES\n🖼️ Profile Cards: ENABLED"
     await send_log(startup_log)
     
@@ -2220,9 +2186,9 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        save_bot_state()  # Save state before exit
+        save_bot_state()
         print("\n🛑 Bot stopped gracefully (state saved)")
     except Exception as e:
-        save_bot_state()  # Save state on error
+        save_bot_state()
         print(f"❌ Fatal error: {e}")
         traceback.print_exc()
