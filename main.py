@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # Pillow for profile cards
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandStart
@@ -141,194 +141,99 @@ def init_db():
 
 init_db()
 
-# ========== PROFILE CARD GENERATOR - FIXED WITH USER PFP ==========
-def create_profile_card(user_data, profile_photo_path=None):
+# ========== PROFILE CARD GENERATOR - FIXED FONT ERROR ==========
+def create_profile_card(user_data):
     """
-    Create a profile card image with user's Telegram profile picture
+    Create a profile card image - FIXED Unicode issues
     """
     try:
         user_id, first_name, username, uploads, commands, wishes, cult_rank, sacrifices, curse_type, joined_date = user_data
         
-        # Create base image with dark theme
-        width, height = 900, 500
+        # Create base image
+        width, height = 800, 400
         base = Image.new('RGB', (width, height), color='#0a0a1a')
         draw = ImageDraw.Draw(base)
         
-        # Add gradient background
+        # Add gradient
         for i in range(height):
-            r = max(10, int(10 + i * 0.15))
-            g = max(10, int(10 + i * 0.08))
-            b = max(26, int(26 + i * 0.2))
+            r = max(10, int(10 + i * 0.1))
+            g = max(10, int(10 + i * 0.05))
+            b = max(26, int(26 + i * 0.15))
             draw.line([(0, i), (width, i)], fill=(r, g, b))
         
-        # Load fonts
+        # Simple fonts - FIXED: No size parameter for default font
         try:
-            # Try to load larger default font
-            title_font = ImageFont.truetype("arial.ttf", 32) if os.path.exists("arial.ttf") else ImageFont.load_default(32)
-            name_font = ImageFont.truetype("arial.ttf", 28) if os.path.exists("arial.ttf") else ImageFont.load_default(28)
-            stat_font = ImageFont.truetype("arial.ttf", 24) if os.path.exists("arial.ttf") else ImageFont.load_default(24)
-            small_font = ImageFont.truetype("arial.ttf", 18) if os.path.exists("arial.ttf") else ImageFont.load_default(18)
-        except:
-            # Fallback to default
+            # Try to load default font (NO SIZE PARAMETER)
             title_font = ImageFont.load_default()
             name_font = ImageFont.load_default()
             stat_font = ImageFont.load_default()
             small_font = ImageFont.load_default()
+        except:
+            # Ultimate fallback
+            title_font = None
+            name_font = None
+            stat_font = None
+            small_font = None
         
-        # Add user profile picture if available
-        if profile_photo_path and os.path.exists(profile_photo_path):
-            try:
-                profile_img = Image.open(profile_photo_path).convert("RGBA")
-                # Resize to 150x150
-                profile_img = profile_img.resize((150, 150))
-                
-                # Create circular mask
-                mask = Image.new('L', (150, 150), 0)
-                mask_draw = ImageDraw.Draw(mask)
-                mask_draw.ellipse((0, 0, 150, 150), fill=255)
-                
-                # Apply circular mask
-                profile_img.putalpha(mask)
-                
-                # Add glow effect
-                glow = profile_img.filter(ImageFilter.GaussianBlur(5))
-                base.paste(glow, (50, 50), glow)
-                base.paste(profile_img, (50, 50), profile_img)
-                
-                # Add ring around profile picture
-                ring_img = Image.new('RGBA', (160, 160), (0, 0, 0, 0))
-                ring_draw = ImageDraw.Draw(ring_img)
-                ring_draw.ellipse((0, 0, 160, 160), outline=(100, 200, 255), width=3)
-                base.paste(ring_img, (45, 45), ring_img)
-                
-            except Exception as e:
-                print(f"❌ Error processing profile picture: {e}")
-                # Draw placeholder if error
-                draw.ellipse((50, 50, 200, 200), outline=(100, 200, 255), width=3)
-                draw.text((125, 125), "👤", fill=(100, 200, 255), font=name_font, anchor="mm")
-        else:
-            # Draw placeholder circle
-            draw.ellipse((50, 50, 200, 200), outline=(100, 200, 255), width=3)
-            draw.text((125, 125), "👤", fill=(100, 200, 255), font=name_font, anchor="mm")
-        
-        # Clean name for display (safe ASCII)
+        # SAFE TEXT - NO EMOJIS, ASCII ONLY
+        # Clean username to ASCII only
         safe_name = ""
         for char in first_name:
             if ord(char) < 128:  # ASCII only
                 safe_name += char
-        safe_name = safe_name[:20] or "User"
+        safe_name = safe_name[:12] or "User"
         
-        # Draw title based on cult status
-        if cult_rank and cult_rank != "none":
-            title = "🌀 TEMPEST CREED"
-            title_color = (100, 200, 255)
-        else:
-            title = "✨ USER PROFILE"
-            title_color = (200, 200, 200)
-        
-        draw.text((width // 2, 30), title, fill=title_color, font=title_font, anchor="mm")
+        # Draw title
+        draw.text((width // 2, 30), "TEMPEST CREED", fill=(100, 200, 255), font=title_font, anchor="mm")
         
         # Draw user name
-        name_x = 250 if (profile_photo_path and os.path.exists(profile_photo_path)) else 100
-        draw.text((name_x, 80), safe_name, fill=(255, 255, 255), font=name_font)
+        draw.text((width // 2, 70), safe_name, fill=(255, 255, 255), font=name_font, anchor="mm")
         
-        # Draw user ID and username
-        username_text = f"@{username}" if username else "No username"
-        draw.text((name_x, 120), username_text, fill=(180, 180, 220), font=small_font)
-        draw.text((name_x, 150), f"ID: {user_id}", fill=(180, 180, 220), font=small_font)
+        # Draw user ID
+        draw.text((width // 2, 100), f"ID: {user_id}", fill=(180, 180, 220), font=small_font, anchor="mm")
         
         # Draw stats boxes
-        stats_y = 220
+        stats_y = 140
         stat_width = 180
         spacing = 20
         
-        # Uploads box
-        draw.rectangle([(50, stats_y), (50 + stat_width, stats_y + 60)], 
-                      fill=(20, 40, 80, 180), outline=(0, 150, 255))
-        draw.text((50 + stat_width // 2, stats_y + 15), "UPLOADS", 
-                 fill=(100, 200, 255), font=stat_font, anchor="mm")
-        draw.text((50 + stat_width // 2, stats_y + 40), str(uploads), 
-                 fill=(255, 255, 255), font=stat_font, anchor="mm")
+        # Uploads
+        draw.rectangle([(50, stats_y), (50 + stat_width, stats_y + 60)], fill=(20, 40, 80), outline=(0, 150, 255))
+        draw.text((50 + stat_width // 2, stats_y + 15), "UPLOADS", fill=(100, 200, 255), font=stat_font, anchor="mm")
+        draw.text((50 + stat_width // 2, stats_y + 40), str(uploads), fill=(255, 255, 255), font=stat_font, anchor="mm")
         
-        # Wishes box
-        draw.rectangle([(50 + stat_width + spacing, stats_y), 
-                       (50 + stat_width * 2 + spacing, stats_y + 60)], 
-                      fill=(40, 20, 80, 180), outline=(150, 0, 255))
-        draw.text((50 + stat_width + spacing + stat_width // 2, stats_y + 15), 
-                 "WISHES", fill=(200, 100, 255), font=stat_font, anchor="mm")
-        draw.text((50 + stat_width + spacing + stat_width // 2, stats_y + 40), 
-                 str(wishes), fill=(255, 255, 255), font=stat_font, anchor="mm")
+        # Wishes
+        draw.rectangle([(50 + stat_width + spacing, stats_y), (50 + stat_width * 2 + spacing, stats_y + 60)], 
+                      fill=(40, 20, 80), outline=(150, 0, 255))
+        draw.text((50 + stat_width + spacing + stat_width // 2, stats_y + 15), "WISHES", fill=(200, 100, 255), font=stat_font, anchor="mm")
+        draw.text((50 + stat_width + spacing + stat_width // 2, stats_y + 40), str(wishes), fill=(255, 255, 255), font=stat_font, anchor="mm")
         
-        # Commands box
-        draw.rectangle([(50 + stat_width * 2 + spacing * 2, stats_y), 
-                       (50 + stat_width * 3 + spacing * 2, stats_y + 60)], 
-                      fill=(20, 80, 40, 180), outline=(0, 255, 150))
-        draw.text((50 + stat_width * 2 + spacing * 2 + stat_width // 2, stats_y + 15), 
-                 "COMMANDS", fill=(100, 255, 200), font=stat_font, anchor="mm")
-        draw.text((50 + stat_width * 2 + spacing * 2 + stat_width // 2, stats_y + 40), 
-                 str(commands), fill=(255, 255, 255), font=stat_font, anchor="mm")
+        # Commands
+        draw.rectangle([(50 + stat_width * 2 + spacing * 2, stats_y), (50 + stat_width * 3 + spacing * 2, stats_y + 60)], 
+                      fill=(20, 80, 40), outline=(0, 255, 150))
+        draw.text((50 + stat_width * 2 + spacing * 2 + stat_width // 2, stats_y + 15), "CMDS", fill=(100, 255, 200), font=stat_font, anchor="mm")
+        draw.text((50 + stat_width * 2 + spacing * 2 + stat_width // 2, stats_y + 40), str(commands), fill=(255, 255, 255), font=stat_font, anchor="mm")
         
-        # Tempest/Cult Information Section
-        info_y = 300
+        # Tempest Info
+        info_y = 220
         
         if cult_rank and cult_rank != "none":
-            # Tempest member layout
-            draw.rectangle([(50, info_y), (width - 50, info_y + 120)], 
-                          fill=(20, 20, 40, 200), outline=(100, 200, 255))
-            
-            draw.text((width // 2, info_y + 20), "🌀 TEMPEST STATUS", 
-                     fill=(100, 200, 255), font=stat_font, anchor="mm")
-            
-            # Rank and sacrifices
-            draw.text((100, info_y + 50), f"RANK: {cult_rank}", 
-                     fill=(255, 100, 100), font=stat_font)
-            draw.text((100, info_y + 85), f"SACRIFICES: {sacrifices}", 
-                     fill=(255, 200, 100), font=stat_font)
-            
-            # Joined date
-            draw.text((width - 200, info_y + 50), f"INITIATED: {joined_date}", 
-                     fill=(150, 200, 255), font=small_font)
-            
-            # Curse status
-            if curse_type and curse_type != "none":
-                draw.text((width - 200, info_y + 85), f"CURSED: {curse_type}", 
-                         fill=(255, 50, 50), font=small_font)
-                # Add red border for cursed users
-                draw.rectangle([(0, 0), (width-1, height-1)], 
-                              outline=(255, 50, 50), width=3)
-            
-            # Bottom text for Tempest members
-            draw.text((width // 2, height - 30), 
-                     "🌀 The storm flows through your veins", 
-                     fill=(100, 150, 255), font=small_font, anchor="mm")
+            rank_text = f"RANK: {cult_rank}"
+            sacrifice_text = f"SACS: {sacrifices}"
+            draw.text((50, info_y), rank_text, fill=(255, 100, 100), font=stat_font)
+            draw.text((50, info_y + 30), sacrifice_text, fill=(255, 200, 100), font=stat_font)
         else:
-            # Normal user layout
-            draw.rectangle([(50, info_y), (width - 50, info_y + 80)], 
-                          fill=(30, 30, 50, 200), outline=(100, 100, 150))
-            
-            draw.text((width // 2, info_y + 20), "STATUS: UNINITIATED", 
-                     fill=(150, 150, 150), font=stat_font, anchor="mm")
-            
-            # Joined date for normal users
-            draw.text((100, info_y + 50), f"JOINED: {joined_date}", 
-                     fill=(150, 200, 255), font=small_font)
-            
-            # Invitation text
-            draw.text((width - 200, info_y + 50), "🌀 /tempest_join", 
-                     fill=(200, 200, 100), font=small_font)
-            
-            # Bottom text for normal users
-            draw.text((width // 2, height - 30), 
-                     "✨ Discover your true potential", 
-                     fill=(150, 150, 200), font=small_font, anchor="mm")
+            draw.text((50, info_y), "NOT INITIATED", fill=(150, 150, 150), font=stat_font)
+            draw.text((50, info_y + 30), "USE /TEMPEST_JOIN", fill=(200, 200, 100), font=small_font)
         
-        # Add decorative elements
-        # Top corners
-        draw.line([(0, 0), (50, 0), (0, 50)], fill=(100, 200, 255), width=2)
-        draw.line([(width, 0), (width-50, 0), (width, 50)], fill=(100, 200, 255), width=2)
-        # Bottom corners
-        draw.line([(0, height), (50, height), (0, height-50)], fill=(100, 200, 255), width=2)
-        draw.line([(width, height), (width-50, height), (width, height-50)], fill=(100, 200, 255), width=2)
+        # Curse Status
+        if curse_type and curse_type != "none":
+            draw.text((width - 250, info_y), f"CURSED: {curse_type}", fill=(255, 50, 50), font=stat_font)
+            draw.rectangle([(0, 0), (width-1, height-1)], outline=(255, 50, 50), width=3)
+        
+        # Date and bottom text
+        draw.text((width - 250, info_y + 30), f"JOINED: {joined_date}", fill=(150, 200, 255), font=small_font)
+        draw.text((width // 2, height - 30), "The storm flows through you", fill=(100, 150, 255), font=small_font, anchor="mm")
         
         # Save the image
         filename = f"profile_cards/profile_{user_id}_{int(time.time())}.png"
@@ -342,7 +247,6 @@ def create_profile_card(user_data, profile_photo_path=None):
         
     except Exception as e:
         print(f"❌ Profile card error: {e}")
-        traceback.print_exc()
         return None
 
 # ========== BOT STATE SAVING/RESTORING ==========
@@ -715,6 +619,7 @@ async def help_cmd(message: Message):
 🌀 <b>Tempest:</b>
 <code>/tempest_join</code> - Join the cult
 <code>/tempest_story</code> - Read the lore
+<code>/tempest_creed</code> - View all members & leaders
 <code>/curse</code> - Curse a user (Tempest only)
 <code>/remove_curse</code> - Remove curse (Admin)
 
@@ -796,42 +701,17 @@ async def profile_cmd(message: Message):
     
     conn.close()
     
-    # Try to get user's profile photo
-    profile_photo_path = None
-    try:
-        photos = await bot.get_user_profile_photos(user.id, limit=1)
-        if photos.total_count > 0:
-            photo = photos.photos[0][-1]
-            file = await bot.get_file(photo.file_id)
-            profile_photo_path = f"temp/profile_{user.id}_{int(time.time())}.jpg"
-            
-            # Download the photo
-            url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
-            async with httpx.AsyncClient() as client:
-                response = await client.get(url)
-            
-            if response.status_code == 200:
-                with open(profile_photo_path, 'wb') as f:
-                    f.write(response.content)
-    except Exception as e:
-        print(f"❌ Could not get profile photo: {e}")
-    
-    # Create profile card
+    # Try to create profile card
     user_data = (user.id, user.first_name, user.username, uploads, cmds, wishes, 
                 cult_rank, sacrifices, curse_type, join_date)
     
-    profile_card_path = create_profile_card(user_data, profile_photo_path)
-    
-    # Clean up profile photo temp file
-    if profile_photo_path and os.path.exists(profile_photo_path):
-        try:
-            os.remove(profile_photo_path)
-        except:
-            pass
+    profile_card_path = create_profile_card(user_data)
     
     if profile_card_path and os.path.exists(profile_card_path):
         # Send profile card image
         caption = f"""
+🌀 <b>TEMPEST CREED PROFILE</b>
+
 👤 <b>Name:</b> {user.first_name}
 📧 <b>Username:</b> @{user.username if user.username else 'None'}
 🆔 <b>ID:</b> <code>{user.id}</code>
@@ -849,10 +729,7 @@ async def profile_cmd(message: Message):
         if curse_type != "none":
             caption += f"\n⚡ <b>Curse:</b> {curse_type}"
         
-        if cult_rank != "none":
-            caption += "\n\n🌀 <i>The storm flows through your veins...</i>"
-        else:
-            caption += "\n\n✨ <i>Discover your true potential with /tempest_join</i>"
+        caption += "\n\n🌀 <i>The storm flows through your veins...</i>"
         
         try:
             await message.answer_photo(
@@ -876,7 +753,7 @@ async def profile_cmd(message: Message):
             print(f"❌ Failed to send profile card: {e}")
             # Fall back to text version
     
-    # Text-only profile (fallback)
+    # Text-only profile
     curse_text = ""
     if curse_type != "none":
         curse_text = f"\n🔮 <b>Curse Status:</b> ⚡ {curse_type}"
@@ -885,26 +762,21 @@ async def profile_cmd(message: Message):
     if cult_rank != "none":
         cult_text = f"\n🌀 <b>Tempest Rank:</b> {cult_rank}"
         cult_text += f"\n⚔️ <b>Sacrifices:</b> {sacrifices}"
-    else:
-        cult_text = f"\n🌀 <b>Tempest Status:</b> Not initiated\n💡 Use /tempest_join to begin"
     
     profile_text = f"""
-👤 <b>PROFILE</b>
+🌀 <b>TEMPEST CREED PROFILE</b>
 
-<b>Name:</b> {user.first_name}
-<b>Username:</b> @{user.username if user.username else 'None'}
-<b>ID:</b> <code>{user.id}</code>
+👤 <b>Name:</b> {user.first_name}
+📧 <b>Username:</b> @{user.username if user.username else 'None'}
+🆔 <b>ID:</b> <code>{user.id}</code>
 
-<b>Uploads:</b> {uploads}
-<b>Wishes:</b> {wishes}
-<b>Commands:</b> {cmds}
-<b>Joined:</b> {join_date}{cult_text}{curse_text}
+📁 <b>Uploads:</b> {uploads}
+✨ <b>Wishes:</b> {wishes}
+🔧 <b>Commands:</b> {cmds}
+📅 <b>Joined:</b> {join_date}{cult_text}{curse_text}
+
+🌀 <i>The storm flows through your veins...</i>
 """
-    
-    if cult_rank != "none":
-        profile_text += "\n🌀 <i>The storm flows through your veins...</i>"
-    else:
-        profile_text += "\n✨ <i>Discover your true potential...</i>"
     
     await message.answer(profile_text, parse_mode=ParseMode.HTML)
 
@@ -1140,6 +1012,93 @@ async def users_cmd(message: Message):
         os.remove(filename)
     except:
         pass
+
+# ========== NEW TEMPEST_CREED COMMAND ==========
+@dp.message(Command("tempest_creed"))
+async def tempest_creed_cmd(message: Message):
+    user, chat = await handle_common(message, "tempest_creed")
+    
+    conn = sqlite3.connect("data/bot.db")
+    c = conn.cursor()
+    
+    # Get founders (admins who are in Tempest)
+    c.execute("""
+        SELECT user_id, first_name, username, cult_rank, sacrifices 
+        FROM users 
+        WHERE is_admin = 1 AND cult_status != 'none' 
+        ORDER BY sacrifices DESC
+    """)
+    founders = c.fetchall()
+    
+    # Get all Tempest members
+    c.execute("""
+        SELECT user_id, first_name, username, cult_rank, sacrifices 
+        FROM users 
+        WHERE cult_status != 'none' 
+        ORDER BY 
+            CASE cult_rank
+                WHEN 'Storm Lord' THEN 1
+                WHEN 'Blood Master' THEN 2
+                WHEN 'Blood Adept' THEN 3
+                WHEN 'Blood Initiate' THEN 4
+                ELSE 5
+            END,
+            sacrifices DESC
+    """)
+    members = c.fetchall()
+    
+    conn.close()
+    
+    if not members:
+        await message.answer("🌀 <b>TEMPEST CREED</b>\n\nNo members have joined the Tempest yet.\n\nUse <code>/tempest_join</code> to become the first!")
+        return
+    
+    # Create the message
+    creed_text = "🌀 <b>TEMPEST CREED - BLOODLINE</b>\n\n"
+    
+    # Add founders section
+    if founders:
+        creed_text += "👑 <b>FOUNDERS & LEADERS</b>\n"
+        for user_id, name, uname, rank, sacrifices in founders:
+            username = f"@{uname}" if uname else "No username"
+            creed_text += f"• {name} ({username})\n"
+            creed_text += f"  👑 {rank} | ⚔️ {sacrifices} sacrifices\n"
+            creed_text += f"  🆔 <code>{user_id}</code>\n\n"
+    
+    # Add members count
+    total_members = len(members)
+    total_sacrifices = sum(m[4] for m in members)
+    
+    creed_text += f"📊 <b>STATISTICS</b>\n"
+    creed_text += f"• Total Members: {total_members}\n"
+    creed_text += f"• Total Sacrifices: {total_sacrifices}\n"
+    creed_text += f"• Active Today: Checking...\n\n"
+    
+    # Add member ranks breakdown
+    rank_counts = {}
+    for _, _, _, rank, _ in members:
+        rank_counts[rank] = rank_counts.get(rank, 0) + 1
+    
+    creed_text += "👥 <b>RANK DISTRIBUTION</b>\n"
+    for rank in ["Blood Initiate", "Blood Adept", "Blood Master", "Storm Lord"]:
+        if rank in rank_counts:
+            count = rank_counts[rank]
+            emoji = {"Blood Initiate": "🩸", "Blood Adept": "⚔️", "Blood Master": "👑", "Storm Lord": "🌀"}.get(rank, "•")
+            creed_text += f"{emoji} {rank}: {count}\n"
+    
+    creed_text += "\n📜 <b>BLOOD OATH</b>\n"
+    creed_text += "<i>We remember. We awaken. We are the eternal storm.</i>\n\n"
+    creed_text += "⚡ <b>Top Sacrificers</b> (Last 10):\n"
+    
+    # Show top 10 members by sacrifices
+    sorted_members = sorted(members, key=lambda x: x[4], reverse=True)[:10]
+    for i, (user_id, name, uname, rank, sacrifices) in enumerate(sorted_members, 1):
+        username = f"@{uname}" if uname else ""
+        creed_text += f"{i}. {name} {username} - ⚔️ {sacrifices}\n"
+    
+    creed_text += "\n🌀 <i>The storm grows stronger with each sacrifice...</i>"
+    
+    await message.answer(creed_text, parse_mode=ParseMode.HTML)
 
 # ========== PRO COMMAND ==========
 @dp.message(Command("pro"))
@@ -1526,6 +1485,79 @@ async def flip_cmd(message: Message):
     result = random.choice(["HEADS 🟡", "TAILS 🟤"])
     await msg.edit_text(f"🪙 <b>{result}</b>", parse_mode=ParseMode.HTML)
 
+# ========== HIDDEN TEMPEST PROGRESS ==========
+@dp.message(Command("tempest_progress", ignore_case=True))
+async def tempest_progress_cmd(message: Message):
+    user, chat = await handle_common(message, "tempest_progress")
+    
+    conn = sqlite3.connect("data/bot.db")
+    c = conn.cursor()
+    c.execute("SELECT cult_status, cult_rank, sacrifices, cult_join_date, curse_type FROM users WHERE user_id = ?", (user.id,))
+    result = c.fetchone()
+    
+    if result and result[0] != "none":
+        status, rank, sacrifices, join_date, curse_type = result
+        
+        try:
+            join_dt = datetime.fromisoformat(join_date)
+            days = (datetime.now() - join_dt).days
+            time_text = f"{days} days" if days > 0 else "Today"
+        except:
+            time_text = "Recently"
+        
+        if rank == "Blood Initiate":
+            next_rank = "Blood Adept"
+            needed = max(0, 15 - sacrifices)
+            progress = min(sacrifices * 6.67, 100)
+        elif rank == "Blood Adept":
+            next_rank = "Blood Master"
+            needed = max(0, 50 - sacrifices)
+            progress = min(sacrifices * 2, 100)
+        elif rank == "Blood Master":
+            next_rank = "Storm Lord"
+            needed = max(0, 150 - sacrifices)
+            progress = min(sacrifices * 0.67, 100)
+        else:
+            next_rank = "MAX RANK"
+            needed = 0
+            progress = 100
+        
+        progress_bar = "🩸" * (progress // 10) + "⚫" * (10 - progress // 10)
+        
+        curse_text = ""
+        if curse_type != "none":
+            curse_text = f"\n⚡ <b>Curse:</b> {curse_type} (affects wish luck)"
+        
+        progress_text = f"""
+🌀 <b>TEMPEST BLOOD PROGRESS</b>
+
+👤 <b>Storm-Born:</b> {user.first_name}
+👑 <b>Current Rank:</b> {rank}
+⚔️ <b>Blood Sacrifices:</b> {sacrifices}
+📅 <b>Blood Oath Since:</b> {time_text}{curse_text}
+
+<b>Blood Progress:</b> [{progress_bar}] {progress:.1f}%
+<b>Next Rank:</b> {next_rank}
+<b>Sacrifices Needed:</b> {needed}
+
+⚡ <i>Each upload = 1 sacrifice to the storm</i>
+🌪️ <i>Feed the tempest, grow in power...</i>
+        """
+    else:
+        progress_text = """
+🌀 <b>TEMPEST PROGRESS</b>
+
+👤 <b>Status:</b> Not initiated
+👁️ <b>Vision:</b> Blind to the storm
+
+⚡ Use /Tempest_join to begin your journey
+🌩️ The storm awaits worthy blood...
+💀 Warning: Fake offerings will be rejected!
+        """
+    
+    conn.close()
+    await message.answer(progress_text, parse_mode=ParseMode.HTML)
+
 # ========== CURSE COMMAND ==========
 @dp.message(Command("curse", ignore_case=True))
 async def curse_cmd(message: Message):
@@ -1612,7 +1644,7 @@ async def curse_cmd(message: Message):
 
 💀 <b>Effects:</b>
 • -15 to -30% wish luck penalty
-• Visible in /profile
+• Visible in /profile and /tempest_progress
 • Lasts until removed by admin
 """
     
@@ -1661,7 +1693,7 @@ async def remove_curse_cmd(message: Message):
 May you walk in the light once more...</i>
 """, parse_mode=ParseMode.HTML)
 
-# ========== TEMPEST JOIN - FIXED ==========
+# ========== TEMPEST JOIN ==========
 @dp.message(Command("tempest_join", ignore_case=True))
 async def tempest_join_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_join")
@@ -1672,7 +1704,7 @@ async def tempest_join_cmd(message: Message):
     result = c.fetchone()
     
     if result and result[0] != "none":
-        await message.answer("🌀 <b>Already part of the Tempest!</b>\nCheck your status in /profile", parse_mode=ParseMode.HTML)
+        await message.answer("🌀 <b>Already part of the Tempest!</b>\nUse /Tempest_progress to check your status.", parse_mode=ParseMode.HTML)
         conn.close()
         return
     
@@ -1787,7 +1819,7 @@ async def handle_sacrifice(callback: CallbackQuery):
 Each upload feeds the Tempest.
 Your journey of darkness begins...</i>
 
-🌀 Use /profile to track your bloody path"""
+🌀 Use /Tempest_progress to track your bloody path"""
     
     await msg.edit_text(final_message, parse_mode=ParseMode.HTML)
     
@@ -2201,18 +2233,19 @@ async def main():
     print("🚀 PRO BOT ULTIMATE FIX STARTING...")
     print(f"📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("✅ Database initialized")
-    print("🌀 Tempest: ALL COMMANDS WORKING")
+    print("🌀 Tempest: ALL CALLBACKS WORKING")
     print("📡 Scan: WORKING")
     print("📊 Log Channel: FIXED")
     print("📢 Broadcast: WORKING")
     print("🔗 Upload: WORKING")
     print("📜 Story: 8 CHAPTERS")
-    print("⚡ Curse System: WORKING")
+    print("⚡ Curse System: ADDED")
     print("💾 State Saving: ENABLED")
-    print("🖼️ Profile Cards: IMPROVED (with user PFP)")
+    print("🖼️ Profile Cards: FIXED (ASCII only)")
+    print("🌀 Tempest Creed: ADDED")
     print("=" * 50)
     
-    startup_log = f"🤖 <b>Bot Started - Ultimate Fix</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: Ultimate Fix\n⚡ Status: ALL SYSTEMS ACTIVE\n💾 State Restored: YES\n🖼️ Profile Cards: WITH PFP"
+    startup_log = f"🤖 <b>Bot Started - Ultimate Fix</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: Ultimate Fix\n⚡ Status: ALL SYSTEMS ACTIVE\n💾 State Restored: YES\n🖼️ Profile Cards: WORKING\n🌀 Tempest Creed: ADDED"
     await send_log(startup_log)
     
     await dp.start_polling(bot)
