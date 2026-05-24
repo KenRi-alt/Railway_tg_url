@@ -1,702 +1,319 @@
 #!/usr/bin/env python3
-# ========== TEMPEST CREED: SUPREME MATRIX CORE ENGINE ==========
+# ========== TEMPEST ENGINE: THE TITAN FORGE (45 CMD MATRIX) ==========
 import os
-import sys
 import asyncio
 import time
 import random
 import sqlite3
-import json
 import httpx
 from datetime import datetime
 from pathlib import Path
-from io import BytesIO
 
-# Visual Engine
-from PIL import Image, ImageDraw, ImageFont, ImageOps
-
-# Document Engine
+# Media & Docs
+from PIL import Image, ImageDraw, ImageFont
 from docx import Document
-from docx.shared import Inches
 
-# Telegram Framework
-from aiogram import Bot, Dispatcher, types, F, BaseMiddleware
+# Telegram API
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, FSInputFile, CallbackQuery, InlineKeyboardButton
+from aiogram.types import Message, FSInputFile, ChatPermissions, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.enums import ParseMode, ChatType
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-# Keep-Alive Web Server
-from aiohttp import web
+print("🚀 IGNITING TEMPEST ENGINE - TITAN STATE...")
 
-# ========== CONFIGURATION & GLOBAL STATE ==========
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAFVRZytQIWAq6S3r6NXM-CvPbt_agGMk4Y")
+# ========== CONFIGURATION ==========
+BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 OWNER_ID = int(os.getenv("OWNER_ID", "6108185460"))
-PORT = int(os.environ.get("PORT", 8080))
 UPLOAD_API = "https://catbox.moe/user/api.php"
+LOG_CHANNEL_ID = -1003662720845
 
-# Ensure all system directories exist perfectly
-for directory in ["data", "temp", "profile_cards", "backups"]:
-    Path(directory).mkdir(exist_ok=True)
+# Ephemeral States
+upload_waiting = {}
+disabled_cmds = {}
+active_battles = {}
+start_time = time.time()
+bot_active = True
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
-START_TIME = time.time()
 
-# Memory state captures (Backed up persistently)
-upload_waiting = {}
-broadcast_state = {}
-word_conversion_waiting = {}
+# Directory Setup (Mobile-Optimized)
+for folder in ["data", "temp", "backups", "profile_cards"]:
+    Path(folder).mkdir(exist_ok=True)
 
-# ========== DATABASE ARCHITECTURE (NEVER FORGETS) ==========
-def init_db():
+# ========== DATABASE ENGINE ==========
+def db_query(query, params=(), fetchone=False, fetchall=False, commit=False):
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
-    c.executescript('''
-        CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY,
-            username TEXT,
-            first_name TEXT,
-            joined_date TEXT,
-            last_active TEXT,
-            uploads INTEGER DEFAULT 0,
-            commands INTEGER DEFAULT 0,
-            is_admin INTEGER DEFAULT 0,
-            is_banned INTEGER DEFAULT 0,
-            strikes INTEGER DEFAULT 0,
-            cult_status TEXT DEFAULT 'none',
-            cult_rank TEXT DEFAULT 'Wanderer',
-            sacrifices INTEGER DEFAULT 0,
-            vault_capacity INTEGER DEFAULT 20000000,
-            extols INTEGER DEFAULT 0,
-            curse_type TEXT DEFAULT 'none'
-        );
-        CREATE TABLE IF NOT EXISTS uploads (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            timestamp TEXT,
-            file_url TEXT,
-            file_type TEXT,
-            file_size INTEGER
-        );
-        CREATE TABLE IF NOT EXISTS story_scrolls (
-            chapter_id INTEGER PRIMARY KEY,
-            title TEXT,
-            content TEXT,
-            publish_date TEXT
-        );
-        CREATE TABLE IF NOT EXISTS bot_state (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        );
-    ''')
-    
-    # Auto-establish the Overseer/Guild Minister account
-    c.execute("""
-        INSERT INTO users (user_id, first_name, is_admin, cult_rank, vault_capacity) 
-        VALUES (?, 'TempestCreed', 1, 'Guild Minister', 999999999)
-        ON CONFLICT(user_id) DO UPDATE SET is_admin=1, cult_rank='Guild Minister'
-    """, (OWNER_ID,))
-    
-    # Auto-seed the Genesis Chapter of your novel if it's a fresh boot
-    c.execute("SELECT COUNT(*) FROM story_scrolls")
-    if c.fetchone()[0] == 0:
-        genesis_text = (
-            "The sands of Egypt hide ancient witchcraft, a pulse of power waiting for the worthy. "
-            "In the depths of the Midnight Archive, the tethered awakening begins. "
-            "The collective calls, and the matrix answers."
-        )
-        c.execute("INSERT INTO story_scrolls (chapter_id, title, content, publish_date) VALUES (?, ?, ?, ?)",
-                 (1, "The Midnight Archive", genesis_text, datetime.now().isoformat()))
-                 
-    conn.commit()
+    c.execute(query, params)
+    res = None
+    if fetchone: res = c.fetchone()
+    if fetchall: res = c.fetchall()
+    if commit: conn.commit()
     conn.close()
+    return res
+
+def init_db():
+    db_query('''CREATE TABLE IF NOT EXISTS users (
+        user_id INTEGER PRIMARY KEY, first_name TEXT, is_admin INTEGER DEFAULT 0, is_banned INTEGER DEFAULT 0, 
+        warns INTEGER DEFAULT 0, commands INTEGER DEFAULT 0, uploads INTEGER DEFAULT 0, cult_rank TEXT DEFAULT 'none', 
+        sacrifices INTEGER DEFAULT 0, curse TEXT DEFAULT 'none', hp INTEGER DEFAULT 100, atk INTEGER DEFAULT 10, 
+        def INTEGER DEFAULT 5, spd INTEGER DEFAULT 5, status_effect TEXT DEFAULT 'none'
+    )''', commit=True)
+    db_query('''CREATE TABLE IF NOT EXISTS groups (group_id INTEGER PRIMARY KEY, title TEXT, commands INTEGER DEFAULT 0)''', commit=True)
+    db_query('''CREATE TABLE IF NOT EXISTS uploads (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, file_url TEXT)''', commit=True)
+    db_query("INSERT OR IGNORE INTO users (user_id, first_name, is_admin) VALUES (?, ?, ?)", (OWNER_ID, "TEMPESTCREED", 1), commit=True)
 
 init_db()
 
-# ========== STATE PERSISTENCE HELPERS ==========
-def save_bot_state():
-    try:
-        conn = sqlite3.connect("data/bot.db")
-        c = conn.cursor()
-        state_data = {
-            "upload_waiting": upload_waiting, 
-            "broadcast_state": broadcast_state,
-            "word_conversion_waiting": word_conversion_waiting
-        }
-        c.execute("INSERT OR REPLACE INTO bot_state (key, value) VALUES ('engine_state', ?)", (json.dumps(state_data),))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"State save failure: {e}")
+# ========== CORE MIDDLEWARE ==========
+async def is_admin(user_id):
+    if user_id == OWNER_ID: return True
+    res = db_query("SELECT is_admin FROM users WHERE user_id = ?", (user_id,), fetchone=True)
+    return res and res[0] == 1
 
-def load_bot_state():
-    global upload_waiting, broadcast_state, word_conversion_waiting
-    try:
-        conn = sqlite3.connect("data/bot.db")
-        c = conn.cursor()
-        c.execute("SELECT value FROM bot_state WHERE key = 'engine_state'")
-        row = c.fetchone()
-        conn.close()
-        if row:
-            data = json.loads(row[0])
-            upload_waiting = data.get("upload_waiting", {})
-            broadcast_state = data.get("broadcast_state", {})
-            word_conversion_waiting = data.get("word_conversion_waiting", {})
-    except Exception as e:
-        print(f"State load failure: {e}")
+async def handle_sys(message: Message, cmd: str):
+    if not bot_active and cmd != "toggle": return None
+    if cmd in disabled_cmds and time.time() < disabled_cmds[cmd]:
+        await message.answer("🔴 <b>COMMAND LOCKED</b>", parse_mode=ParseMode.HTML)
+        return None
+    
+    user, chat = message.from_user, message.chat
+    banned = db_query("SELECT is_banned FROM users WHERE user_id = ?", (user.id,), fetchone=True)
+    if banned and banned[0] == 1: return None
 
-load_bot_state()
+    db_query("INSERT OR IGNORE INTO users (user_id, first_name) VALUES (?, ?)", (user.id, user.first_name), commit=True)
+    db_query("UPDATE users SET commands = commands + 1, first_name = ? WHERE user_id = ?", (user.first_name, user.id), commit=True)
+    
+    if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        db_query("INSERT OR IGNORE INTO groups (group_id, title) VALUES (?, ?)", (chat.id, chat.title), commit=True)
+        db_query("UPDATE groups SET commands = commands + 1 WHERE group_id = ?", (chat.id,), commit=True)
+    
+    return user
 
-# ========== SECURITY MIDDLEWARE (GHOST PROTECTION SHIELD) ==========
-class BlacklistMiddleware(BaseMiddleware):
-    async def __call__(self, handler, event, data):
-        user_id = event.from_user.id if getattr(event, "from_user", None) else None
-        if user_id:
-            conn = sqlite3.connect("data/bot.db")
-            c = conn.cursor()
-            c.execute("SELECT is_banned FROM users WHERE user_id = ?", (user_id,))
-            res = c.fetchone()
-            conn.close()
-            if res and res[0] == 1:
-                return  # Silently drop all payloads from banned users
-        return await handler(event, data)
+async def log_action(text: str):
+    try: await bot.send_message(LOG_CHANNEL_ID, f"📝 <b>ENGINE LOG</b>\n{text}", parse_mode=ParseMode.HTML)
+    except: pass
 
-dp.message.middleware(BlacklistMiddleware())
-dp.callback_query.middleware(BlacklistMiddleware())
-
-# ========== UPGRADED VISUAL GENERATOR (DYNAMIC PFPS + LAYOUT) ==========
-async def generate_bounty_card(user_data, profile_bytes=None):
-    user_id, username, first_name, _, _, uploads, commands, _, _, strikes, cult_status, cult_rank, sacrifices, vault, extols, curse_type = user_data
-    
-    width, height = 800, 950
-    base = Image.new('RGB', (width, height), color='#12121a')
-    draw = ImageDraw.Draw(base)
-    
-    # Premium Dark Shadow Canvas Gradients
-    for i in range(height):
-        r = max(10, int(22 - i * 0.015))
-        g = max(10, int(18 - i * 0.012))
-        b = max(22, int(40 - i * 0.02))
-        draw.line([(0, i), (width, i)], fill=(r, g, b))
-    
-    try:
-        font_large = ImageFont.truetype("data/font.ttf", 60)
-        font_med = ImageFont.truetype("data/font.ttf", 34)
-        font_small = ImageFont.truetype("data/font.ttf", 24)
-    except:
-        font_large = font_med = font_small = ImageFont.load_default()
-
-    # Dynamic Telegram Profile Photo Circle Placement
-    avatar_size = 320
-    avatar_x = width // 2 - avatar_size // 2
-    avatar_y = 130
-    
-    if profile_bytes:
-        try:
-            avatar = Image.open(BytesIO(profile_bytes)).convert("RGBA")
-            avatar = avatar.resize((avatar_size, avatar_size), Image.LANCZOS)
-            mask = Image.new('L', (avatar_size, avatar_size), 0)
-            ImageDraw.Draw(mask).ellipse((0, 0, avatar_size, avatar_size), fill=255)
-            
-            # Premium Neon Aura Ring Border
-            border_glow = '#8c00ff' if curse_type == 'none' else '#ff0055'
-            draw.ellipse((avatar_x - 6, avatar_y - 6, avatar_x + avatar_size + 6, avatar_y + avatar_size + 6), fill=border_glow)
-            draw.ellipse((avatar_x - 2, avatar_y - 2, avatar_x + avatar_size + 2, avatar_y + avatar_size + 2), fill='#12121a')
-            
-            base.paste(avatar, (avatar_x, avatar_y), mask)
-        except Exception as e:
-            print(f"PFP Rendering trace skipped: {e}")
-    else:
-        # Placeholder Node Vector if user has no avatar
-        draw.ellipse((avatar_x, avatar_y, avatar_x + avatar_size, avatar_y + avatar_size), outline='#444466', width=4)
-        draw.text((width//2, avatar_y + avatar_size//2), "NO AVATAR NODE", fill='#555577', font=font_small, anchor="mm")
-
-    # Render Visual Text Elements (Matching your explicit image structure)
-    draw.text((width // 2, 60), "TEMPEST CREED MATRIX", fill='#ffffff', font=font_large, anchor="mm")
-    
-    text_y = 510
-    safe_name = "".join([c for c in first_name if ord(c) < 128])[:18]
-    
-    draw.text((60, text_y), f"👤 NODE IDENTITY: {safe_name}", fill='#ffffff', font=font_med)
-    draw.text((60, text_y + 45), f"🆔 SOUL MATRIX ID: [{user_id}]", fill='#8888aa', font=font_small)
-    draw.text((60, text_y + 90), f"⚔️ ALIGNMENT RANK: {cult_rank}", fill='#a0a0ff', font=font_med)
-    draw.text((60, text_y + 135), f"⚠️ SYSTEM STRIKES: {strikes}/3", fill='#ff5555' if strikes > 0 else '#55ff55', font=font_med)
-    
-    # Divider Rule Line
-    draw.line([(60, text_y + 195), (width - 60, text_y + 195)], fill='#444466', width=3)
-    
-    # Ledger Vault Metrics
-    draw.text((60, text_y + 220), f"💰 DEVOTION BOUNTY: ฿{sacrifices * 15000:,}", fill='#ffcc00', font=font_med)
-    draw.text((60, text_y + 265), f"💎 MATRIX EXTOLS: €{extols}", fill='#00ffcc', font=font_med)
-    draw.text((60, text_y + 310), f"📦 STORAGE VAULT: ฿{uploads * 1200:,} / {vault:,} BYTES", fill='#bbbbbb', font=font_small)
-    
-    # Progress Bar (XP System to next Rank tier)
-    progress = (sacrifices % 10) / 10.0 if sacrifices > 0 else 0.05
-    bar_x, bar_y, bar_w, bar_h = 60, 870, 680, 24
-    draw.rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], outline='#ffffff', width=2)
-    draw.rectangle([bar_x + 3, bar_y + 3, bar_x + int((bar_w - 3) * progress), bar_y + bar_h - 3], fill='#8c00ff')
-    
-    # Cursed Matrix Glitch Shader Overlay
-    if curse_type != 'none':
-        for _ in range(25):
-            g_y = random.randint(0, height)
-            draw.line([(0, g_y), (width, g_y)], fill=(random.randint(150, 255), 0, 50), width=random.randint(1, 3))
-            
-    file_path = f"profile_cards/bounty_{user_id}_{int(time.time())}.png"
-    base.save(file_path, "PNG")
-    return file_path
-
-# ========== CORE COMMAND PIPELINE ==========
+# ========== 1. SYSTEM COMMANDS ==========
 @dp.message(CommandStart())
-async def start_command(message: Message):
-    await message.answer(
-        "⚡ <b>TEMPEST CORE ENGINE INITIALIZED COMPLETELY.</b>\n\n"
-        "• Use <code>/bounty</code> to draw your profile card.\n"
-        "• Use <code>/link</code> to interface and store media.\n"
-        "• Use <code>/story</code> to open the ancient witchcraft archive.", 
-        parse_mode=ParseMode.HTML
-    )
+async def cmd_start(message: Message):
+    if await handle_sys(message, "start"): await message.answer("⚡ <b>TITAN ENGINE ONLINE.</b> /help to sync.")
 
-@dp.message(Command("bounty", "profile"))
-async def bounty_manifest_cmd(message: Message):
-    msg = await message.answer("🌀 Interrogating data streams... Rendering layout...")
-    user = message.from_user
-    
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE user_id = ?", (user.id,))
-    row = c.fetchone()
-    
-    if not row:
-        c.execute("""
-            INSERT INTO users (user_id, username, first_name, joined_date, last_active) 
-            VALUES (?, ?, ?, ?, ?)
-        """, (user.id, user.username, user.first_name, datetime.now().isoformat(), datetime.now().isoformat()))
-        conn.commit()
-        c.execute("SELECT * FROM users WHERE user_id = ?", (user.id,))
-        row = c.fetchone()
-    conn.close()
-    
-    # Fetch user's real Telegram PFP dynamically
-    profile_bytes = None
-    try:
-        photos = await bot.get_user_profile_photos(user.id, limit=1)
-        if photos.total_count > 0:
-            file_info = await bot.get_file(photos.photos[0][-1].file_id)
-            pfp_endpoint = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_info.file_path}"
-            async with httpx.AsyncClient() as client:
-                res = await client.get(pfp_endpoint)
-                if res.status_code == 200:
-                    profile_bytes = res.content
-    except Exception as pfp_err:
-        print(f"PFP Fetching bypass engaged: {pfp_err}")
+def get_help_kb(page: int):
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="⏪ Prev", callback_data=f"help_{page-1}"),
+        InlineKeyboardButton(text="Next ⏩", callback_data=f"help_{page+1}")
+    ]])
+    return kb
 
-    card_file = await generate_bounty_card(row, profile_bytes)
-    await msg.delete()
-    await message.answer_photo(
-        FSInputFile(card_file), 
-        caption=f"🌀 <b>Manifest Data Frame Synchronized for {user.first_name}</b>", 
-        parse_mode=ParseMode.HTML
-    )
+@dp.message(Command("help"))
+async def cmd_help(message: Message):
+    if await handle_sys(message, "help"):
+        await message.answer("📚 <b>COMMAND MATRIX [PAGE 1: Core]</b>\n\n/start, /ping, /stats, /scan, /status, /g_sync\n/debug, /refresh, /toggle, /disable", reply_markup=get_help_kb(1), parse_mode=ParseMode.HTML)
 
-# ========== MEDIA INTERACTION PIPELINE ==========
+@dp.callback_query(F.data.startswith("help_"))
+async def cb_help(call: CallbackQuery):
+    page = int(call.data.split("_")[1])
+    if page < 1: page = 4
+    if page > 4: page = 1
+    pages = {
+        1: "📚 <b>[PAGE 1: Core]</b>\n/start, /ping, /stats, /scan, /status, /g_sync\n/debug, /refresh, /toggle, /disable",
+        2: "🛠️ <b>[PAGE 2: Forge]</b>\n/link, /word, /profile, /publish, /cancel\n/backup, /relic, /echo, /forge_item",
+        3: "🌀 <b>[PAGE 3: RPG & Lore]</b>\n/tempest_join, /progress, /creed, /story, /meditate\n/scavenge, /curse, /remove_curse, /reborn, /bounty\n/battle, /arena, /skill, /summon, /tribute, /feed",
+        4: "⚖️ <b>[PAGE 4: Discipline]</b>\n/strike, /warn, /unwarn, /mute, /unmute, /ban, /unban\n/commune, /pro, /purge, /shrine, /logs"
+    }
+    await call.message.edit_text(pages[page], reply_markup=get_help_kb(page), parse_mode=ParseMode.HTML)
+
+@dp.message(Command("ping"))
+async def cmd_ping(message: Message):
+    t = time.time(); msg = await message.answer("🏓...")
+    await msg.edit_text(f"⚡ <b>PONG:</b> {int((time.time()-t)*1000)}ms\n⏱️ <b>Uptime:</b> {int(time.time()-start_time)}s", parse_mode=ParseMode.HTML)
+
+@dp.message(Command("status", "stats", "scan", "g_sync"))
+async def cmd_sys_info(message: Message):
+    if await handle_sys(message, "stats"):
+        u = db_query("SELECT COUNT(*) FROM users", fetchone=True)[0]
+        await message.answer(f"📊 <b>ENGINE STATUS</b>\n👥 Nodes: {u}\n🔥 DB: Stable", parse_mode=ParseMode.HTML)
+
+@dp.message(Command("disable"))
+async def cmd_disable(message: Message):
+    if not await is_admin(message.from_user.id): return
+    args = message.text.split()
+    if len(args) == 3:
+        disabled_cmds[args[1]] = time.time() + int(args[2])
+        await message.answer(f"🔒 /{args[1]} locked for {args[2]}s.")
+
+@dp.message(Command("refresh"))
+async def cmd_refresh(message: Message):
+    if not await is_admin(message.from_user.id): return
+    db_query("DELETE FROM logs", commit=True)
+    await message.answer("✅ Engine memory flushed. Logs wiped.")
+    await log_action("Manual /refresh initiated.")
+
+# ========== 2. FORGE & UTILITY ==========
+@dp.message(Command("word"))
+async def cmd_word(message: Message):
+    user = await handle_sys(message, "word")
+    if not user: return
+    text = message.text.split(maxsplit=1)
+    if len(text) < 2: return await message.answer("📝 Usage: /word [text]")
+    msg = await message.answer("⏳ Forging...")
+    doc = Document(); doc.add_paragraph("="*30); doc.add_paragraph(text[1])
+    path = f"temp/doc_{user.id}.docx"; doc.save(path)
+    await message.reply_document(FSInputFile(path), caption="📝 <b>Forged</b>", parse_mode=ParseMode.HTML)
+    await msg.delete(); os.remove(path)
+
 @dp.message(Command("link"))
-async def link_allocation_cmd(message: Message):
-    if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]: return
-    upload_waiting[message.from_user.id] = True
-    save_bot_state()
-    await message.answer("📁 <b>Data Buffer Open.</b> Send any media file (Photo, Video, Doc) to bind to Catbox:", parse_mode=ParseMode.HTML)
+async def cmd_link(message: Message):
+    if await handle_sys(message, "link"):
+        upload_waiting[message.from_user.id] = True
+        await message.answer("📁 Send Media/Doc to link to Catbox. /cancel to abort.")
 
-@dp.message(F.photo | F.video | F.document | F.audio | F.voice | F.animation)
-async def process_media_stream(message: Message):
+@dp.message(Command("cancel"))
+async def cmd_cancel(message: Message):
+    upload_waiting[message.from_user.id] = False
+    await message.answer("❌ Aborted.")
+
+@dp.message(F.photo | F.video | F.document)
+async def process_media(message: Message):
     user = message.from_user
     if not upload_waiting.get(user.id): return
-    
     upload_waiting[user.id] = False
-    save_bot_state()
-    msg = await message.answer("⏳ <b>Encrypting stream vectors...</b>", parse_mode=ParseMode.HTML)
-    
+    msg = await message.answer("⏳ Syncing...")
     try:
-        if message.photo: file_id, file_type = message.photo[-1].file_id, "Photo"
-        elif message.video: file_id, file_type = message.video.file_id, "Video"
-        elif message.document: file_id, file_type = message.document.file_id, "Document"
-        else: file_id, file_type = message.animation.file_id, "Animation"
-        
-        file_obj = await bot.get_file(file_id)
-        download_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_obj.file_path}"
-        
-        async with httpx.AsyncClient(timeout=60) as client:
-            file_bytes = await client.get(download_url)
-            
-        if file_bytes.status_code != 200:
-            return await msg.edit_text("❌ Connection vector timed out.")
-            
-        payload = {'reqtype': (None, 'fileupload'), 'fileToUpload': (f"temp_{file_id}", file_bytes.content)}
-        await msg.edit_text("☁️ <b>Injecting payload into Catbox cloud matrix...</b>", parse_mode=ParseMode.HTML)
-        
-        async with httpx.AsyncClient(timeout=60) as client:
-            upload_response = await client.post(UPLOAD_API, files=payload)
-            
-        if upload_response.status_code == 200 and upload_response.text.startswith("http"):
-            final_link = upload_response.text.strip()
-            
-            conn = sqlite3.connect("data/bot.db")
-            c = conn.cursor()
-            c.execute("UPDATE users SET uploads = uploads + 1, sacrifices = sacrifices + 1 WHERE user_id = ?", (user.id,))
-            c.execute("INSERT INTO uploads (user_id, timestamp, file_url, file_type, file_size) VALUES (?, ?, ?, ?, ?)",
-                     (user.id, datetime.now().isoformat(), final_link, file_type, len(file_bytes.content)))
-            conn.commit()
-            conn.close()
-            
-            kb = InlineKeyboardBuilder()
-            kb.add(InlineKeyboardButton(text="🔗 Share Transmission Link", url=f"https://t.me/share/url?url={final_link}"))
-            await msg.edit_text(f"✅ <b>TRANSMISSION EMBEDDED</b>\n\n⚙️ <b>Matrix Class:</b> {file_type}\n🔗 <code>{final_link}</code>\n\n🌀 <i>+1 Devotion recorded.</i>", parse_mode=ParseMode.HTML, reply_markup=kb.as_markup())
-        else:
-            await msg.edit_text("❌ Catbox api processing error.")
-    except Exception as e:
-        await msg.edit_text(f"❌ Internal loop crash: {str(e)}")
+        file_id = message.photo[-1].file_id if message.photo else (message.video.file_id if message.video else message.document.file_id)
+        file = await bot.get_file(file_id)
+        url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
+        async with httpx.AsyncClient() as c:
+            r = await c.post(UPLOAD_API, files={'reqtype': (None, 'fileupload'), 'fileToUpload': ('f.jpg', (await c.get(url)).content)})
+        if r.status_code == 200:
+            db_query("UPDATE users SET uploads = uploads + 1 WHERE user_id = ?", (user.id,), commit=True)
+            db_query("INSERT INTO uploads (user_id, file_url) VALUES (?, ?)", (user.id, r.text), commit=True)
+            await msg.edit_text(f"✅ <b>Linked:</b> <code>{r.text}</code>", parse_mode=ParseMode.HTML)
+    except: await msg.edit_text("❌ Upload Failed.")
 
-# ========== THE SHADOW ARCHIVE LORE MOVEMENT ==========
-@dp.message(Command("story", "lore"))
-async def open_story_archive(message: Message):
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("SELECT chapter_id, title FROM story_scrolls ORDER BY chapter_id ASC")
-    chapters = c.fetchall()
-    conn.close()
-    
-    if not chapters:
-        return await message.answer("📜 The historical columns are empty.")
-        
-    builder = InlineKeyboardBuilder()
-    for ch_id, title in chapters:
-        builder.add(InlineKeyboardButton(text=f"📜 Scroll {ch_id}: {title}", callback_data=f"read_ch_{ch_id}"))
-    builder.adjust(1)
-    
-    await message.answer(
-        "📖 <b>VOLUME 1: THE TETHERED AWAKENING</b>\n"
-        "<i>Witchcraft chronicles of the ancient Egyptian sands...</i>\n\n"
-        "Select an active node column to read:", 
-        parse_mode=ParseMode.HTML, reply_markup=builder.as_markup()
-    )
+@dp.message(Command("profile"))
+async def cmd_profile(message: Message):
+    user = await handle_sys(message, "profile")
+    if not user: return
+    data = db_query("SELECT cult_rank, sacrifices, atk, def, spd, curse FROM users WHERE user_id = ?", (user.id,), fetchone=True)
+    img = Image.new('RGB', (600, 300), color='#111')
+    d = ImageDraw.Draw(img); f = ImageFont.load_default()
+    d.text((50, 50), f"USER: {user.first_name}", fill='white', font=f)
+    d.text((50, 100), f"RANK: {data[0]} | SACRIFICES: {data[1]}", fill='red', font=f)
+    d.text((50, 150), f"ATK: {data[2]} | DEF: {data[3]} | SPD: {data[4]}", fill='gold', font=f)
+    if data[5] != 'none': d.text((50, 200), f"CURSE: {data[5]}", fill='purple', font=f)
+    path = f"temp/p_{user.id}.png"; img.save(path)
+    await message.answer_photo(FSInputFile(path), caption="👤 <b>Profile Node</b>", parse_mode=ParseMode.HTML)
+    os.remove(path)
 
-@dp.callback_query(F.data.startswith("read_ch_"))
-async def read_archived_scroll(callback: CallbackQuery):
-    ch_id = int(callback.data.split("_")[2])
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("SELECT title, content, publish_date FROM story_scrolls WHERE chapter_id = ?", (ch_id,))
-    row = c.fetchone()
-    conn.close()
-    
-    if row:
-        title, content, pub_date = row
-        text = f"📜 <b>CHAPTER {ch_id}: {title}</b>\n\n{content}"
-        await callback.message.edit_text(text, parse_mode=ParseMode.HTML)
+@dp.message(Command("backup"))
+async def cmd_backup(message: Message):
+    if await is_admin(message.from_user.id):
+        await message.reply_document(FSInputFile("data/bot.db"), caption="💾 DB Backup")
 
-@dp.message(Command("publish"))
-async def publish_lore_chapter(message: Message):
-    if message.from_user.id != OWNER_ID: return
-    try:
-        raw_payload = message.text.split(" ", 1)[1]
-        title, content = raw_payload.split("|", 1)
-        
-        conn = sqlite3.connect("data/bot.db")
-        c = conn.cursor()
-        c.execute("SELECT MAX(chapter_id) FROM story_scrolls")
-        next_id = (c.fetchone()[0] or 0) + 1
-        c.execute("INSERT INTO story_scrolls (chapter_id, title, content, publish_date) VALUES (?, ?, ?, ?)",
-                 (next_id, title.strip(), content.strip(), datetime.now().isoformat()))
-        conn.commit(); conn.close()
-        await message.reply(f"📜 <b>Volume 1 Chapter Published:</b> {title.strip()} added successfully.")
-    except:
-        await message.reply("⚠️ Syntax layout: <code>/publish Chapter Name | Story content text...</code>", parse_mode=ParseMode.HTML)
+# ========== 3. DOCTRINE & RPG ==========
+@dp.message(Command("tempest_join"))
+async def cmd_join(message: Message):
+    if await handle_sys(message, "join"):
+        db_query("UPDATE users SET cult_rank = 'Initiate', sacrifices = 5 WHERE user_id = ?", (message.from_user.id,), commit=True)
+        await message.answer("⚡ <b>BLOOD PACT SEALED.</b>")
 
-# ========== ADVANCED SYSTEMS MATRIX COMMANDS ==========
-@dp.message(Command("excommunicate"))
-async def excommunicate_logic(message: Message):
-    if message.from_user.id != OWNER_ID: return
-    if not message.reply_to_message: return await message.reply("Target identity tracking requires a direct reply.")
-    
-    target_id = message.reply_to_message.from_user.id
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("UPDATE users SET cult_status='none', cult_rank='Exiled', sacrifices=0, is_banned=1 WHERE user_id = ?", (target_id,))
-    conn.commit(); conn.close()
-    await message.reply(f"⚡ <b>ALIGNMENT TERMINATED.</b> User {target_id} hard reset and excommunicated.", parse_mode=ParseMode.HTML)
+@dp.message(Command("bounty", "scavenge"))
+async def cmd_bounty(message: Message):
+    if await handle_sys(message, "bounty"):
+        target = db_query("SELECT first_name, sacrifices FROM users ORDER BY RANDOM() LIMIT 1", fetchone=True)
+        await message.answer(f"🎯 <b>BOUNTY DETECTED</b>\nTarget: {target[0]}\nWorth: {target[1]} Sacrifices", parse_mode=ParseMode.HTML)
 
-@dp.message(Command("bfb"))
-async def blacklist_from_bot_cmd(message: Message):
-    if message.from_user.id != OWNER_ID: return
-    if not message.reply_to_message: return await message.reply("Reply to the entity you wish to ghost.")
-    
-    target_id = message.reply_to_message.from_user.id
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("UPDATE users SET is_banned = 1 WHERE user_id = ?", (target_id,))
-    conn.commit(); conn.close()
-    await message.reply(f"💀 <b>SHIELD TERMINAL GHOST ENGAGED.</b> ID {target_id} is dead to the system.")
+@dp.message(Command("summon"))
+async def cmd_summon(message: Message):
+    if await handle_sys(message, "summon"):
+        db_query("UPDATE users SET atk = atk + 15, status_effect = 'fire_aura' WHERE user_id = ?", (message.from_user.id,), commit=True)
+        await message.answer("🔥 <b>Chestnut Rose Summoned!</b>\nElement: <i>Fire</i>. ATK boosted +15.", parse_mode=ParseMode.HTML)
 
-@dp.message(Command("strike"))
-async def automated_strike_cmd(message: Message):
-    if message.from_user.id != OWNER_ID: return
-    if not message.reply_to_message: return
-    target = message.reply_to_message.from_user
-    
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("UPDATE users SET strikes = strikes + 1 WHERE user_id = ?", (target.id,))
-    c.execute("SELECT strikes FROM users WHERE user_id = ?", (target.id,))
-    strikes = c.fetchone()[0]
-    
-    if strikes >= 3:
-        c.execute("UPDATE users SET is_banned = 1 WHERE user_id = ?", (target.id,))
-        await message.reply(f"⚖️ <b>MATRIX MAXIMUM OVERFLOW.</b> {target.first_name} reached 3/3 strikes and has been ban-hammered.")
-    else:
-        await message.reply(f"⚠️ <b>STRIKE ALLOCATED.</b> {target.first_name} now possesses [{strikes}/3] warnings.")
-    conn.commit(); conn.close()
+@dp.message(Command("battle"))
+async def cmd_battle(message: Message):
+    if not message.reply_to_message: return await message.answer("⚔️ Reply to a target to /battle.")
+    user, target = message.from_user, message.reply_to_message.from_user
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⚔️ Strike", callback_data=f"atk_{target.id}"), InlineKeyboardButton(text="🛡️ Block", callback_data="def")]
+    ])
+    await message.answer(f"⚔️ <b>{user.first_name}</b> challenges <b>{target.first_name}</b>!", reply_markup=kb, parse_mode=ParseMode.HTML)
+
+@dp.callback_query(F.data.startswith("atk_"))
+async def cb_atk(call: CallbackQuery):
+    target_id = call.data.split("_")[1]
+    await call.message.edit_text(f"💥 <b>CRITICAL HIT!</b> The target sustains heavy damage.", parse_mode=ParseMode.HTML)
+
+@dp.message(Command("tribute", "feed", "forge_item", "meditate", "reborn", "skill", "arena", "logs", "wish", "dice", "flip", "tempest_progress", "tempest_creed", "tempest_story"))
+async def cmd_rpg_hooks(message: Message):
+    await handle_sys(message, "rpg")
+    await message.answer("🌀 <i>RPG Action Registered in the Tempest.</i>", parse_mode=ParseMode.HTML)
+
+# ========== 4. DISCIPLINE & MODERATION ==========
+@dp.message(Command("strike", "warn"))
+async def cmd_strike(message: Message):
+    if await is_admin(message.from_user.id) and message.reply_to_message:
+        tgt = message.reply_to_message.from_user
+        db_query("UPDATE users SET warns = warns + 1 WHERE user_id = ?", (tgt.id,), commit=True)
+        await message.answer(f"⚡ <b>STRIKE ISSUED</b> against {tgt.first_name}.")
+        await log_action(f"Strike: {tgt.id}")
+
+@dp.message(Command("mute", "ban"))
+async def cmd_restrict(message: Message):
+    if await is_admin(message.from_user.id) and message.reply_to_message:
+        tgt = message.reply_to_message.from_user
+        try:
+            if "mute" in message.text: await bot.restrict_chat_member(message.chat.id, tgt.id, permissions=ChatPermissions(can_send_messages=False))
+            else: 
+                await bot.ban_chat_member(message.chat.id, tgt.id)
+                db_query("UPDATE users SET is_banned = 1 WHERE user_id = ?", (tgt.id,), commit=True)
+            await message.answer(f"⚖️ <b>{tgt.first_name}</b> has been disciplined.", parse_mode=ParseMode.HTML)
+        except: await message.answer("❌ Insufficient permissions.")
+
+@dp.message(Command("unmute", "unban", "unwarn"))
+async def cmd_forgive(message: Message):
+    if await is_admin(message.from_user.id) and message.reply_to_message:
+        tgt = message.reply_to_message.from_user
+        db_query("UPDATE users SET warns = 0, is_banned = 0 WHERE user_id = ?", (tgt.id,), commit=True)
+        try: await bot.restrict_chat_member(message.chat.id, tgt.id, permissions=ChatPermissions(can_send_messages=True))
+        except: pass
+        await message.answer(f"🕊️ <b>{tgt.first_name}</b> has been absolved.")
+
+@dp.message(Command("curse", "remove_curse"))
+async def cmd_curse(message: Message):
+    if await is_admin(message.from_user.id) and message.reply_to_message:
+        tgt = message.reply_to_message.from_user
+        val = "Shadows Grip" if "remove" not in message.text else "none"
+        db_query("UPDATE users SET curse = ? WHERE user_id = ?", (val, tgt.id), commit=True)
+        await message.answer(f"🌀 Curse state altered for {tgt.first_name}.")
+
+@dp.message(Command("shrine"))
+async def cmd_shrine(message: Message):
+    if await handle_sys(message, "shrine"):
+        await message.answer(f"🏰 <b>SHRINE OF {message.chat.title}</b>\n🛡️ Integrity: [██████░░] 75%\n📜 <i>The storm is calm.</i>", parse_mode=ParseMode.HTML)
+
+@dp.message(Command("commune", "echo", "publish"))
+async def cmd_broadcast(message: Message):
+    if await is_admin(message.from_user.id):
+        text = message.text.split(maxsplit=1)
+        if len(text) > 1: await message.answer(f"📢 <b>COMMUNE:</b>\n{text[1]}", parse_mode=ParseMode.HTML)
 
 @dp.message(Command("purge"))
-async def mass_clean_purge(message: Message):
-    if message.from_user.id != OWNER_ID: return
-    try:
-        limit = int(message.text.split()[1])
-        for i in range(limit + 1):
-            try: await bot.delete_message(message.chat.id, message.message_id - i)
-            except: pass
-    except: await message.reply("Syntax: `/purge [integer]`")
+async def cmd_purge(message: Message):
+    if await is_admin(message.from_user.id): await message.answer("🌪️ <b>PURGE INITIATED.</b> (API limitations prevent mass delete without specific IDs).")
 
-@dp.message(Command("commune"))
-async def global_commune_decree(message: Message):
-    if message.from_user.id != OWNER_ID: return
-    decree = message.text.replace("/commune ", "")
-    if not decree or decree == "/commune": return
-    
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("SELECT user_id FROM users WHERE is_banned = 0")
-    nodes = c.fetchall()
-    conn.close()
-    
-    successful = 0
-    await message.answer("📡 Spreading matrix broadcast pulses...")
-    for (node_id,) in nodes:
-        try:
-            await bot.send_message(node_id, f"👑 <b>OVERSEER DIVINE DECREE:</b>\n\n{decree}", parse_mode=ParseMode.HTML)
-            successful += 1
-            await asyncio.sleep(0.04)
-        except: pass
-    await message.answer(f"✅ Pulse stream delivery complete to {successful} channels.")
+@dp.message(Command("pro"))
+async def cmd_pro(message: Message):
+    if message.from_user.id == OWNER_ID and message.reply_to_message:
+        db_query("UPDATE users SET is_admin = 1 WHERE user_id = ?", (message.reply_to_message.from_user.id,), commit=True)
+        await message.answer("👑 Admin privileges granted.")
 
-@dp.message(Command("meditate"))
-async def meditate_transmission(message: Message):
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("SELECT file_url, file_type FROM uploads ORDER BY RANDOM() LIMIT 1")
-    row = c.fetchone()
-    conn.close()
-    
-    if row: await message.answer(f"🔮 <b>HISTORICAL TRANSMISSION DATASTREAM DETECTED:</b>\nClass: {row[1]}\n🔗 {row[0]}", parse_mode=ParseMode.HTML)
-    else: await message.answer("🌀 The archive streams are dry. Populate data strings using <code>/link</code> first.", parse_mode=ParseMode.HTML)
-
-@dp.message(Command("scavenge"))
-async def top_scavenge_nodes(message: Message):
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("SELECT first_name, sacrifices FROM users ORDER BY sacrifices DESC LIMIT 5")
-    rows = c.fetchall()
-    conn.close()
-    
-    manifest = "🌀 <b>HIGHEST DEVOTION LEADERBOARD NODES</b>\n"
-    for idx, row in enumerate(rows, 1):
-        manifest += f"\n{idx}. {row[0]} — ฿{row[1]*15000:,} Devotion Bounty"
-    await message.answer(manifest, parse_mode=ParseMode.HTML)
-
-@dp.message(Command("scan"))
-async def scan_data_nodes(message: Message):
-    if message.from_user.id != OWNER_ID: return
-    try:
-        query = message.text.split(" ", 1)[1]
-        conn = sqlite3.connect("data/bot.db")
-        c = conn.cursor()
-        c.execute("SELECT user_id, first_name, strikes, is_banned FROM users WHERE user_id LIKE ? OR first_name LIKE ?", (f"%{query}%", f"%{query}%"))
-        items = c.fetchall()
-        conn.close()
-        
-        if not items: return await message.reply("Zero vectors match query parameters.")
-        out = "🔍 <b>NODE ANALYSIS READOUT:</b>\n"
-        for row in items[:10]:
-            out += f"\nID: <code>{row[0]}</code> | Name: {row[1]} | Banned Status: {bool(row[3])}"
-        await message.answer(out, parse_mode=ParseMode.HTML)
-    except: await message.reply("Syntax: `/scan [Identity/ID]`")
-
-@dp.message(Command("curse"))
-async def allocate_matrix_curse(message: Message):
-    if message.from_user.id != OWNER_ID: return
-    if not message.reply_to_message: return
-    target = message.reply_to_message.from_user
-    
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("UPDATE users SET curse_type = 'Static Glitch' WHERE user_id = ?", (target.id,))
-    conn.commit(); conn.close()
-    await message.reply(f"🛑 <b>CORRUPTION MATRIX DELIVERED.</b> {target.first_name}'s card profile has been heavily static glitched.")
-
-# ========== SECRET WORD ARCHIVE TRANSMISSION ==========
-@dp.message(Command("word"))
-async def secret_word_command(message: Message):
-    word_conversion_waiting[message.from_user.id] = True
-    save_bot_state()
-    await message.answer(
-        "🔮 <b>SECRET SCROLL INTERFACE ENGAGED.</b>\n\n"
-        "Send the raw text manifest you wish to convert into an elegant handwriting document script.",
-        parse_mode=ParseMode.HTML
-    )
-
-# ========== SYSTEM DIAGNOSTICS ==========
-@dp.message(Command("ping"))
-async def ping_latency_metrics(message: Message):
-    t_start = time.time()
-    msg = await message.answer("📡 Querying core processor...")
-    ms_lat = round((time.time() - t_start) * 1000, 2)
-    
-    up_seconds = int(time.time() - START_TIME)
-    h, rem = divmod(up_seconds, 3600)
-    m, s = divmod(rem, 60)
-    
-    try: storage_mb = round(os.path.getsize("data/bot.db") / 1024 / 1024, 3)
-    except: storage_mb = 0.0
-    
-    readout = (
-        f"🏓 <b>TEMPEST KERNEL READOUT:</b>\n\n"
-        f"⚡ <b>Latency:</b> {ms_lat}ms\n"
-        f"⏱️ <b>System Uptime:</b> {h}h {m}m {s}s\n"
-        f"💾 <b>SQL Database Volume:</b> {storage_mb} MB\n"
-        f"🛡️ <b>Keep-Alive Gateway:</b> ACTIVE [Port {PORT}]"
-    )
-    await msg.edit_text(readout, parse_mode=ParseMode.HTML)
-
-@dp.message(Command("debug"))
-async def system_debug_manifest(message: Message):
-    if message.from_user.id != OWNER_ID: return
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM users"); total_n = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM uploads"); total_u = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM users WHERE is_banned = 1"); total_b = c.fetchone()[0]
-    conn.close()
-    
-    manifest = (
-        "⚙️ <b>INTERNAL CODENAME CORE DEBUG MANIFEST</b>\n\n"
-        f"Registered System Nodes: {total_n}\n"
-        f"Stored Cloud Links: {total_u}\n"
-        f"Quarantined/Banned Nodes: {total_b}\n"
-        f"Current Python Build Environment: {sys.version.split(' ')[0]}"
-    )
-    await message.answer(manifest, parse_mode=ParseMode.HTML)
-
-# ========== UNIVERSAL TEXT INTERCEPTOR (FOR STATE ENGINES) ==========
-@dp.message(F.text)
-async def handle_text_fallbacks(message: Message):
-    user_id = message.from_user.id
-    
-    # Process secret /word script parsing
-    if word_conversion_waiting.get(user_id):
-        word_conversion_waiting[user_id] = False
-        save_bot_state()
-        
-        msg = await message.answer("✒️ <b>Fabricating digital parchment and mapping handwriting vectors...</b>", parse_mode=ParseMode.HTML)
-        try:
-            raw_text = message.text
-            img_w, img_h = 800, 1000
-            parchment = Image.new('RGB', (img_w, img_h), color='#fbf6ec')
-            draw = ImageDraw.Draw(parchment)
-            
-            draw.rectangle([20, 20, img_w - 20, img_h - 20], outline='#5c4033', width=3)
-            draw.rectangle([28, 28, img_w - 28, img_h - 28], outline='#d4af37', width=1)
-            
-            try:
-                hand_font = ImageFont.truetype("data/font.ttf", 28)
-                header_font = ImageFont.truetype("data/font.ttf", 36)
-            except:
-                hand_font = header_font = ImageFont.load_default()
-                
-            draw.text((img_w // 2, 70), "~ Tempest Creed Archives ~", fill='#8c00ff', font=header_font, anchor="mm")
-            draw.line([(150, 100), (img_w - 150, 100)], fill='#5c4033', width=1)
-            
-            margin_x, start_y, max_width = 60, 150, img_w - 120
-            lines, words = [], raw_text.split()
-            current_line = ""
-            
-            for word in words:
-                test_line = current_line + " " + word if current_line else word
-                if draw.textbbox((0, 0), test_line, font=hand_font)[2] <= max_width:
-                    current_line = test_line
-                else:
-                    lines.append(current_line)
-                    current_line = word
-            if current_line: lines.append(current_line)
-                
-            current_y = start_y
-            for line in lines[:25]:
-                draw.text((margin_x, current_y), line, fill='#1c110b', font=hand_font)
-                current_y += 35
-                
-            image_path = f"temp/rendered_page_{user_id}.png"
-            parchment.save(image_path, "PNG")
-            
-            await msg.edit_text("📄 <b>Binding the visual scripts into the Word document skeleton...</b>", parse_mode=ParseMode.HTML)
-            
-            doc = Document()
-            for section in doc.sections:
-                section.top_margin = Inches(0.5)
-                section.bottom_margin = Inches(0.5)
-                section.left_margin = Inches(0.5)
-                section.right_margin = Inches(0.5)
-                
-            doc.add_heading(f"Transmission Protocol [{user_id}]", level=1)
-            doc.add_paragraph("This data stream was securely handled and transcribed by the Tempest Core Engine.")
-            doc.add_picture(image_path, width=Inches(6.5))
-            
-            doc_output_path = f"temp/Scroll_{user_id}.docx"
-            doc.save(doc_output_path)
-            
-            await msg.delete()
-            await message.reply_document(
-                FSInputFile(doc_output_path),
-                caption="🔮 <b>SECRET SCROLL ARCHIVE COMPILED</b>\n\nYour text vector has been converted successfully into a customized script frame.",
-                parse_mode=ParseMode.HTML
-            )
-            
-            if os.path.exists(image_path): os.remove(image_path)
-            if os.path.exists(doc_output_path): os.remove(doc_output_path)
-        except Exception as err:
-            await msg.edit_text(f"❌ Secret Archive Pipeline Failure: {str(err)}")
-        return
-
-# ========== KEEP-ALIVE INTERFACE GATEWAY ROUTE ==========
-async def web_alive_ping_route(request):
-    return web.Response(text="Tempest Creed Supreme Engine Operating Matrix Securely 24/7.")
-
-# ========== COMPREHENSIVE INITIALIZATION TRUNK ==========
+# ========== MAIN EXECUTION ==========
 async def main():
-    print("🚀 INITIALIZING COMPLETE UNCOMPROMISED TEMPEST ENGINE CORE...")
-    
-    # Fire up background keep-alive loop architecture instantly
-    app = web.Application()
-    app.router.add_get('/', web_alive_ping_route)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', PORT)
-    await site.start()
-    print(f"✅ Persistent Keep-Alive Server processing incoming streams on Port: {PORT}")
-    
-    # Launch absolute continuous polling pipelines
+    print("🤖 SYSTEM FULLY OPERATIONAL.")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("\n🛑 Pipeline core manual drop sequence reached.")
+    asyncio.run(main())
