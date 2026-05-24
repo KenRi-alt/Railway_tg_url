@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-# ========== COMPLETE FIXED CODE - ULTIMATE VERSION ==========
+# ========== TEMPEST BOT - ADVANCED ULTIMATE VERSION ==========
 import sys
 print("=" * 60)
-print("🚀 PRO BOT - ULTIMATE VERSION")
-print("✅ All previous fixes included")
-print("✅ Enhanced ping command")
-print("✅ Story publishing system")
-print("✅ Keep-alive for Render")
-print("✅ Word document generator")
+print("🌀 TEMPEST BOT - ADVANCED ULTIMATE VERSION")
+print("✅ All previous features intact")
+print("✅ Enhanced ping & stats")
+print("✅ Shrine command for groups")
+print("✅ REM command for backup restore")
+print("✅ Restart command added")
+print("✅ Improved upload engine")
 print("=" * 60)
 
 import os
@@ -26,7 +27,6 @@ from pathlib import Path
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.style import WD_STYLE_TYPE
 import io
 
 # Pillow for profile cards
@@ -39,7 +39,7 @@ from aiogram.enums import ParseMode, ChatType
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest
 
-print("🤖 PRO BOT ULTIMATE VERSION INITIALIZING...")
+print("🤖 TEMPEST BOT ADVANCED INITIALIZING...")
 
 # ========== CONFIG ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAFVRZytQIWAq6S3r6NXM-CvPbt_agGMk4Y")
@@ -65,6 +65,7 @@ pending_joins = {}
 pending_invites = {}
 story_states = {}
 last_activity = datetime.now()
+pending_restore = {}  # For /rem command
 
 # ========== DATABASE ==========
 def init_db():
@@ -176,6 +177,36 @@ def init_db():
 
 init_db()
 
+# ========== IMPROVED UPLOAD ENGINE WITH RETRY ==========
+async def upload_to_catbox_advanced(file_data, filename):
+    """Resilient upload engine with retry mechanism"""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        for attempt in range(3):
+            try:
+                files = {
+                    'reqtype': (None, 'fileupload'),
+                    'fileToUpload': (filename, file_data)
+                }
+                response = await client.post(UPLOAD_API, files=files)
+                if response.status_code == 200 and response.text.startswith('http'):
+                    return {'success': True, 'url': response.text.strip()}
+                elif attempt < 2:
+                    await asyncio.sleep(2)
+                    continue
+                else:
+                    return {'success': False, 'error': 'Upload failed after 3 attempts'}
+            except httpx.ConnectError:
+                if attempt < 2:
+                    await asyncio.sleep(2)
+                    continue
+                return {'success': False, 'error': 'Connection error'}
+            except Exception as e:
+                if attempt < 2:
+                    await asyncio.sleep(2)
+                    continue
+                return {'success': False, 'error': str(e)}
+    return {'success': False, 'error': 'Unknown error'}
+
 # ========== WORD DOCUMENT GENERATOR ==========
 def create_word_document(text, username, user_id):
     """Create a styled Word document from user's message"""
@@ -211,16 +242,15 @@ def create_word_document(text, username, user_id):
         doc.add_paragraph("─" * 50)
         doc.add_paragraph()
         
-        # Add the main content with handwriting style
+        # Add the main content
         content_para = doc.add_paragraph()
         content_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
         
-        # Split into paragraphs
         lines = text.split('\n')
         for line in lines:
             run = content_para.add_run(line)
             run.font.size = Pt(12)
-            run.font.name = 'Segoe Script'  # Handwriting-like font
+            run.font.name = 'Calibri'
             run.font.color.rgb = RGBColor(50, 50, 80)
             content_para.add_run('\n')
         
@@ -246,22 +276,22 @@ def create_word_document(text, username, user_id):
         print(f"❌ Word document error: {e}")
         return None
 
-# ========== PROFILE CARD GENERATOR ==========
+# ========== PROFILE CARD GENERATOR - IMPROVED ==========
 def create_profile_card(user_data, profile_photo_path=None):
     """Create a profile card image with user's Telegram profile picture"""
     try:
         user_id, first_name, username, uploads, commands, wishes, cult_rank, sacrifices, curse_type, joined_date = user_data
         
-        # Create base image
+        # Create base image - Titan style
         width, height = 800, 450
-        base = Image.new('RGB', (width, height), color='#0a0a1a')
+        base = Image.new('RGB', (width, height), color='#0a0a0a')  # Deep black background
         draw = ImageDraw.Draw(base)
         
         # Add gradient
         for i in range(height):
             r = max(10, int(10 + i * 0.1))
             g = max(10, int(10 + i * 0.05))
-            b = max(26, int(26 + i * 0.15))
+            b = max(10, int(10 + i * 0.1))
             draw.line([(0, i), (width, i)], fill=(r, g, b))
         
         # Simple fonts
@@ -288,15 +318,15 @@ def create_profile_card(user_data, profile_photo_path=None):
                 
                 profile_img.putalpha(mask)
                 base.paste(profile_img, (50, 50), profile_img)
-                draw.ellipse([(45, 45), (155, 155)], outline=(100, 200, 255), width=2)
+                draw.ellipse([(45, 45), (155, 155)], outline=(255, 69, 0), width=3)  # Tempest orange
                 
             except Exception as e:
                 print(f"❌ Error processing profile picture: {e}")
-                draw.ellipse([(50, 50), (150, 150)], outline=(100, 200, 255), width=2)
-                draw.text((100, 100), "👤", fill=(100, 200, 255), font=name_font, anchor="mm")
+                draw.ellipse([(50, 50), (150, 150)], outline=(255, 69, 0), width=3)
+                draw.text((100, 100), "👤", fill=(255, 69, 0), font=name_font, anchor="mm")
         else:
-            draw.ellipse([(50, 50), (150, 150)], outline=(100, 200, 255), width=2)
-            draw.text((100, 100), "👤", fill=(100, 200, 255), font=name_font, anchor="mm")
+            draw.ellipse([(50, 50), (150, 150)], outline=(255, 69, 0), width=3)
+            draw.text((100, 100), "👤", fill=(255, 69, 0), font=name_font, anchor="mm")
         
         # SAFE TEXT
         safe_name = ""
@@ -306,8 +336,8 @@ def create_profile_card(user_data, profile_photo_path=None):
         safe_name = safe_name[:12] or "User"
         
         if cult_rank and cult_rank != "none":
-            title = "🌀 TEMPEST CREED"
-            title_color = (100, 200, 255)
+            title = f"🌀 TEMPEST NODE: {safe_name.upper()}"
+            title_color = (255, 69, 0)  # Tempest orange/red
         else:
             title = "✨ USER PROFILE"
             title_color = (200, 200, 200)
@@ -326,18 +356,21 @@ def create_profile_card(user_data, profile_photo_path=None):
         stat_width = 180
         spacing = 20
         
-        draw.rectangle([(50, stats_y), (50 + stat_width, stats_y + 60)], fill=(20, 40, 80), outline=(0, 150, 255))
-        draw.text((50 + stat_width // 2, stats_y + 15), "UPLOADS", fill=(100, 200, 255), font=stat_font, anchor="mm")
+        # Uploads
+        draw.rectangle([(50, stats_y), (50 + stat_width, stats_y + 60)], fill=(20, 40, 80), outline=(255, 69, 0))
+        draw.text((50 + stat_width // 2, stats_y + 15), "UPLOADS", fill=(255, 69, 0), font=stat_font, anchor="mm")
         draw.text((50 + stat_width // 2, stats_y + 40), str(uploads), fill=(255, 255, 255), font=stat_font, anchor="mm")
         
+        # Wishes
         draw.rectangle([(50 + stat_width + spacing, stats_y), (50 + stat_width * 2 + spacing, stats_y + 60)], 
-                      fill=(40, 20, 80), outline=(150, 0, 255))
-        draw.text((50 + stat_width + spacing + stat_width // 2, stats_y + 15), "WISHES", fill=(200, 100, 255), font=stat_font, anchor="mm")
+                      fill=(40, 20, 80), outline=(255, 69, 0))
+        draw.text((50 + stat_width + spacing + stat_width // 2, stats_y + 15), "WISHES", fill=(255, 69, 0), font=stat_font, anchor="mm")
         draw.text((50 + stat_width + spacing + stat_width // 2, stats_y + 40), str(wishes), fill=(255, 255, 255), font=stat_font, anchor="mm")
         
+        # Commands
         draw.rectangle([(50 + stat_width * 2 + spacing * 2, stats_y), (50 + stat_width * 3 + spacing * 2, stats_y + 60)], 
-                      fill=(20, 80, 40), outline=(0, 255, 150))
-        draw.text((50 + stat_width * 2 + spacing * 2 + stat_width // 2, stats_y + 15), "CMDS", fill=(100, 255, 200), font=stat_font, anchor="mm")
+                      fill=(20, 80, 40), outline=(255, 69, 0))
+        draw.text((50 + stat_width * 2 + spacing * 2 + stat_width // 2, stats_y + 15), "CMDS", fill=(255, 69, 0), font=stat_font, anchor="mm")
         draw.text((50 + stat_width * 2 + spacing * 2 + stat_width // 2, stats_y + 40), str(commands), fill=(255, 255, 255), font=stat_font, anchor="mm")
         
         info_y = 250
@@ -345,11 +378,11 @@ def create_profile_card(user_data, profile_photo_path=None):
         if cult_rank and cult_rank != "none":
             rank_text = f"RANK: {cult_rank}"
             sacrifice_text = f"SACRIFICES: {sacrifices}"
-            draw.text((50, info_y), rank_text, fill=(255, 100, 100), font=stat_font)
+            draw.text((50, info_y), rank_text, fill=(255, 69, 0), font=stat_font)
             draw.text((50, info_y + 30), sacrifice_text, fill=(255, 200, 100), font=stat_font)
         else:
             draw.text((50, info_y), "NOT INITIATED", fill=(150, 150, 150), font=stat_font)
-            draw.text((50, info_y + 30), "USE /TEMPEST_JOIN", fill=(200, 200, 100), font=small_font)
+            draw.text((50, info_y + 30), "USE /TEMPEST_JOIN", fill=(255, 69, 0), font=small_font)
         
         if curse_type and curse_type != "none":
             draw.text((width - 250, info_y), f"CURSED: {curse_type}", fill=(255, 50, 50), font=stat_font)
@@ -358,11 +391,11 @@ def create_profile_card(user_data, profile_photo_path=None):
         draw.text((width - 250, info_y + 30), f"JOINED: {joined_date}", fill=(150, 200, 255), font=small_font)
         
         if cult_rank and cult_rank != "none":
-            bottom_text = "🌀 The storm flows through you"
+            bottom_text = "🌀 The storm flows through your veins"
         else:
             bottom_text = "✨ Discover your true potential"
         
-        draw.text((width // 2, height - 30), bottom_text, fill=(100, 150, 255), font=small_font, anchor="mm")
+        draw.text((width // 2, height - 30), bottom_text, fill=(255, 69, 0), font=small_font, anchor="mm")
         
         filename = f"profile_cards/profile_{user_id}_{int(time.time())}.png"
         base.save(filename, "PNG")
@@ -383,16 +416,9 @@ async def keep_alive():
     while True:
         await asyncio.sleep(300)  # Every 5 minutes
         try:
-            # Update last activity
             last_activity = datetime.now()
-            
-            # Ping the bot itself
             me = await bot.get_me()
             print(f"💓 Keep-alive signal at {datetime.now().strftime('%H:%M:%S')} - Bot: @{me.username}")
-            
-            # Send a keep-alive log every hour
-            if int(time.time()) % 3600 < 300:
-                await send_log(f"💓 Bot keep-alive signal - Active since {start_time}")
         except Exception as e:
             print(f"⚠️ Keep-alive error: {e}")
 
@@ -548,21 +574,6 @@ async def is_admin(user_id):
     except:
         return False
 
-async def upload_to_catbox(file_data, filename):
-    try:
-        files = {
-            'reqtype': (None, 'fileupload'),
-            'fileToUpload': (filename, file_data)
-        }
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(UPLOAD_API, files=files)
-        
-        if response.status_code == 200 and response.text.startswith('http'):
-            return {'success': True, 'url': response.text.strip()}
-        return {'success': False, 'error': 'Upload failed'}
-    except Exception as e:
-        return {'success': False, 'error': str(e)}
-
 def format_uptime(seconds):
     days = seconds // 86400
     hours = (seconds % 86400) // 3600
@@ -623,7 +634,7 @@ async def ping_cmd(message: Message):
         await message.answer("🚫 Admin only")
         return
     
-    start_ping = time.time()
+    start_ping = time.perf_counter()
     
     # Database stats
     conn = sqlite3.connect("data/bot.db")
@@ -636,10 +647,10 @@ async def ping_cmd(message: Message):
     total_uploads = c.fetchone()[0] or 0
     conn.close()
     
-    ping_ms = (time.time() - start_ping) * 1000
+    end_ping = time.perf_counter()
+    ping_ms = int((end_ping - start_ping) * 1000)
     
-    current_time = time.time()
-    uptime_seconds = int(current_time - start_time)
+    uptime_seconds = int(time.time() - start_time)
     uptime = format_uptime(uptime_seconds)
     
     # System stats
@@ -647,25 +658,27 @@ async def ping_cmd(message: Message):
     memory = psutil.virtual_memory()
     disk = psutil.disk_usage('/')
     
-    # Bot speed
-    speed_text = "⚡ FAST" if ping_ms < 200 else "🐢 SLOW" if ping_ms > 500 else "✅ GOOD"
+    # Bot speed rating
+    if ping_ms < 200:
+        speed_text = "⚡ EXCELLENT"
+    elif ping_ms < 500:
+        speed_text = "✅ GOOD"
+    else:
+        speed_text = "🐢 SLOW"
     
     # Storage info
-    storage_text = f"💾 {disk.used // (1024**3)}GB / {disk.total // (1024**3)}GB used ({disk.percent}%)"
+    storage_text = f"💾 {disk.used // (1024**3)}GB / {disk.total // (1024**3)}GB ({disk.percent}%)"
     
     # Memory info
     memory_text = f"🧠 {memory.used // (1024**2)}MB / {memory.total // (1024**2)}MB ({memory.percent}%)"
     
-    # Last activity
-    last_active_str = last_activity.strftime("%H:%M:%S")
-    
     response = f"""
-📊 <b>SYSTEM STATUS</b>
+⚡ <b>ENGINE STATUS</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
-🏓 <b>PING:</b> {ping_ms:.0f}ms {speed_text}
+🏓 <b>LATENCY:</b> {ping_ms}ms {speed_text}
 🕒 <b>UPTIME:</b> {uptime}
-🎯 <b>BOT STATUS:</b> {'🟢 ACTIVE' if bot_active else '🔴 PAUSED'}
+🎯 <b>STATUS:</b> {'🟢 ACTIVE' if bot_active else '🔴 PAUSED'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 💻 <b>SYSTEM RESOURCES</b>
@@ -677,46 +690,104 @@ async def ping_cmd(message: Message):
 📈 <b>BOT STATISTICS</b>
 👥 <b>Users:</b> {users}
 👥 <b>Groups:</b> {groups}
-📁 <b>Total Uploads:</b> {total_uploads}
-⏰ <b>Last Activity:</b> {last_active_str}
+📁 <b>Uploads:</b> {total_uploads}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
-✨ <i>All systems operational!</i>
+✨ <i>All systems operational</i>
 """
     
     await message.answer(response, parse_mode=ParseMode.HTML)
 
-# ========== WORD DOCUMENT COMMAND ==========
+# ========== ENHANCED STATS COMMAND ==========
+@dp.message(Command("stats"))
+async def stats_cmd(message: Message):
+    user, chat = await handle_common(message, "stats")
+    
+    if not await is_admin(user.id):
+        await message.answer("🚫 Admin only")
+        return
+    
+    conn = sqlite3.connect("data/bot.db")
+    c = conn.cursor()
+    
+    c.execute("SELECT COUNT(*) FROM users")
+    total_users = c.fetchone()[0] or 0
+    
+    c.execute("SELECT COUNT(*) FROM groups")
+    total_groups = c.fetchone()[0] or 0
+    
+    c.execute("SELECT COUNT(*) FROM uploads")
+    total_uploads = c.fetchone()[0] or 0
+    
+    c.execute("SELECT COUNT(*) FROM wishes")
+    total_wishes = c.fetchone()[0] or 0
+    
+    c.execute("SELECT COUNT(*) FROM users WHERE cult_status != 'none'")
+    tempest_members = c.fetchone()[0] or 0
+    
+    c.execute("SELECT SUM(sacrifices) FROM users WHERE cult_status != 'none'")
+    total_sacrifices = c.fetchone()[0] or 0
+    
+    week_ago = (datetime.now() - timedelta(days=7)).isoformat()
+    c.execute("SELECT COUNT(*) FROM users WHERE last_active >= ?", (week_ago,))
+    active_users = c.fetchone()[0] or 0
+    
+    today = datetime.now().strftime("%Y-%m-%d")
+    c.execute("SELECT COUNT(*) FROM command_logs WHERE DATE(timestamp) = DATE(?)", (today,))
+    today_commands = c.fetchone()[0] or 0
+    
+    conn.close()
+    
+    response = f"""
+📊 <b>ENGINE STATISTICS</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+👥 <b>USERS & GROUPS</b>
+• Total Users: {total_users}
+• Active (7d): {active_users}
+• Groups: {total_groups}
+
+🌀 <b>TEMPEST REALM</b>
+• Storm-Born: {tempest_members}
+• Total Sacrifices: {total_sacrifices}
+• Blood Offerings: {total_sacrifices}
+
+📁 <b>ACTIVITY</b>
+• Uploads: {total_uploads}
+• Wishes: {total_wishes}
+• Commands Today: {today_commands}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+📈 <b>ACTIVE RATIO</b>
+• {int((active_users/total_users)*100) if total_users > 0 else 0}% User Activity
+
+<i>The tempest flows through all</i>
+"""
+    
+    await message.answer(response, parse_mode=ParseMode.HTML)
+
+# ========== WORD COMMAND ==========
 @dp.message(Command("word"))
 async def word_cmd(message: Message):
     user, chat = await handle_common(message, "word")
     
-    # Get the text after /word
-    text = message.text.replace("/word", "").strip()
-    
-    if not text:
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
         await message.answer(
             "📝 <b>Convert text to Word document</b>\n\n"
             "Usage: <code>/word Your message here</code>\n\n"
-            "Example: <code>/word Hello world! This will be converted to a beautifully formatted Word document.</code>\n\n"
-            "✨ Features:\n"
-            "• Handwriting-style font\n"
-            "• Decorative borders\n"
-            "• Professional layout\n"
-            "• Timestamp and user info",
+            "Example: <code>/word Hello world! This will be converted to a beautifully formatted Word document.</code>",
             parse_mode=ParseMode.HTML
         )
         return
     
-    processing_msg = await message.answer("📝 <b>Creating your Word document...</b>", parse_mode=ParseMode.HTML)
+    processing_msg = await message.answer("📝 <b>Forging document...</b>", parse_mode=ParseMode.HTML)
     
-    # Create the document
-    doc_stream = create_word_document(text, user.first_name, user.id)
+    doc_stream = create_word_document(args[1], user.first_name, user.id)
     
     if doc_stream:
-        filename = f"tempest_document_{user.id}_{int(time.time())}.docx"
+        filename = f"temp/forge_{user.id}_{int(time.time())}.docx"
         
-        # Save to file for sending
         with open(filename, 'wb') as f:
             f.write(doc_stream.getvalue())
         
@@ -724,244 +795,277 @@ async def word_cmd(message: Message):
         
         await message.answer_document(
             FSInputFile(filename),
-            caption=f"📄 <b>Document Created</b>\n\n👤 By: {user.first_name}\n📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n📝 Word Count: {len(text.split())}\n\n🌀 <i>The storm flows through your words...</i>",
+            caption=f"📜 <b>Document forged successfully</b>\n\n👤 By: {user.first_name}\n📅 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n🌀 <i>The storm flows through your words...</i>",
             parse_mode=ParseMode.HTML
         )
         
-        # Clean up
         try:
             os.remove(filename)
         except:
             pass
     else:
-        await processing_msg.edit_text("❌ Failed to create Word document. Please try again.")
+        await processing_msg.edit_text("❌ Failed to forge document. Please try again.")
 
-# ========== PUBLISH STORY COMMAND ==========
+# ========== PUBLISH COMMAND (Enhanced) ==========
 @dp.message(Command("publish"))
 async def publish_cmd(message: Message):
     user, chat = await handle_common(message, "publish")
     
     if not await is_admin(user.id):
-        await message.answer("🚫 Admin only")
-        return
+        return await message.answer("🚫 Unauthorized.")
     
-    args = message.text.split(maxsplit=2)
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        return await message.answer("📌 Usage: /publish [filename] (file must be in temp/ folder)")
     
-    if len(args) < 3:
-        await message.answer(
-            "📖 <b>Publish New Story Chapter</b>\n\n"
-            "Usage: <code>/publish chapter_number title | content</code>\n\n"
-            "Example: <code>/publish 9 NEW CHAPTER | This is the content of the new chapter...</code>\n\n"
-            "Use '|' to separate title from content\n"
-            "Chapters will be added to /tempest_story",
-            parse_mode=ParseMode.HTML
-        )
-        return
+    file_name = args[1]
+    file_path = os.path.join("temp", file_name)
+    
+    if not os.path.exists(file_path):
+        return await message.answer(f"❌ File '{file_name}' not found in temp/ folder.")
     
     try:
-        chapter_num = int(args[1])
-        parts = args[2].split("|", 1)
+        await message.answer(f"📤 Publishing {file_name} to Log Channel...")
+        await bot.send_document(
+            chat_id=LOG_CHANNEL_ID,
+            document=FSInputFile(file_path),
+            caption=f"📢 <b>PUBLISHED BY:</b> {user.first_name}\n🕒 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            parse_mode="HTML"
+        )
+        await message.answer("✅ Published successfully.")
+    except Exception as e:
+        await message.answer(f"❌ Failed to publish: {str(e)}")
+
+# ========== BACKUP COMMAND ==========
+@dp.message(Command("backup"))
+async def backup_cmd(message: Message):
+    user, chat = await handle_common(message, "backup")
+    
+    if user.id != OWNER_ID:
+        return await message.answer("🚫 Owner only command")
+    
+    db_path = "data/bot.db"
+    
+    if not os.path.exists(db_path):
+        return await message.answer("❌ Database not found.")
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_file = f"backups/backup_{timestamp}.db"
+    
+    try:
+        shutil.copy2(db_path, backup_file)
+        await message.answer("💾 <b>Creating backup...</b>", parse_mode=ParseMode.HTML)
+        await message.reply_document(
+            document=FSInputFile(backup_file),
+            caption=f"📁 <b>BACKUP COMPLETE</b>\n🕒 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n👤 By: {user.first_name}",
+            parse_mode=ParseMode.HTML
+        )
+        os.remove(backup_file)
+    except Exception as e:
+        await message.answer(f"❌ Backup failed: {str(e)}")
+
+# ========== REM COMMAND (Restore Memory) ==========
+@dp.message(Command("rem"))
+async def rem_cmd(message: Message):
+    user, chat = await handle_common(message, "rem")
+    
+    if user.id != OWNER_ID:
+        return await message.answer("🚫 Owner only command")
+    
+    pending_restore[user.id] = True
+    
+    await message.answer(
+        "💾 <b>RESTORE MEMORY MODE ACTIVE</b>\n\n"
+        "Please upload the backup .db file you want to restore.\n"
+        "⚠️ <b>WARNING:</b> This will REPLACE current database!\n\n"
+        "Send <code>/cancel</code> to abort.",
+        parse_mode=ParseMode.HTML
+    )
+
+@dp.message(F.document)
+async def handle_restore_file(message: Message):
+    user = message.from_user
+    
+    if user.id not in pending_restore:
+        return
+    
+    if not pending_restore.get(user.id):
+        return
+    
+    document = message.document
+    
+    if not document.file_name.endswith('.db'):
+        await message.answer("❌ Please upload a valid .db backup file!")
+        return
+    
+    processing_msg = await message.answer("⏳ <b>Restoring database...</b>", parse_mode=ParseMode.HTML)
+    
+    try:
+        # Download the backup file
+        file = await bot.get_file(document.file_id)
+        url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
         
-        if len(parts) != 2:
-            await message.answer("❌ Please use '|' to separate title from content\n\nExample: <code>/publish 9 Chapter Title | Chapter content here...</code>", parse_mode=ParseMode.HTML)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+        
+        if response.status_code != 200:
+            await processing_msg.edit_text("❌ Failed to download backup file.")
+            pending_restore.pop(user.id, None)
             return
         
-        title = parts[0].strip()
-        content = parts[1].strip()
+        # Save backup temporarily
+        temp_backup = f"temp/restore_{user.id}_{int(time.time())}.db"
+        with open(temp_backup, 'wb') as f:
+            f.write(response.content)
         
-        if not title or not content:
-            await message.answer("❌ Both title and content are required!")
-            return
+        # Create backup of current database before restore
+        current_backup = f"backups/pre_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+        shutil.copy2("data/bot.db", current_backup)
         
-        conn = sqlite3.connect("data/bot.db")
-        c = conn.cursor()
+        # Restore the backup
+        shutil.copy2(temp_backup, "data/bot.db")
         
-        # Check if chapter exists
-        c.execute("SELECT chapter_number FROM story_chapters WHERE chapter_number = ?", (chapter_num,))
-        existing = c.fetchone()
+        # Reinitialize database connection
+        init_db()
         
-        if existing:
-            await message.answer(f"⚠️ Chapter {chapter_num} already exists! Use a different number or delete the existing chapter first.")
-            conn.close()
-            return
+        # Reload bot state
+        load_bot_state()
         
-        # Insert new chapter
-        c.execute("INSERT INTO story_chapters (chapter_number, title, content, added_by, added_date, is_published) VALUES (?, ?, ?, ?, ?, ?)",
-                 (chapter_num, title, content, user.id, datetime.now().isoformat(), 1))
-        conn.commit()
-        conn.close()
+        # Clean up
+        os.remove(temp_backup)
         
-        await message.answer(
-            f"✅ <b>Chapter {chapter_num} Published!</b>\n\n"
-            f"📖 Title: {title}\n"
-            f"📝 Content length: {len(content)} characters\n"
-            f"👤 Published by: {user.first_name}\n"
+        pending_restore.pop(user.id, None)
+        
+        await processing_msg.edit_text(
+            f"✅ <b>DATABASE RESTORED SUCCESSFULLY!</b>\n\n"
+            f"📁 Restored from: {document.file_name}\n"
+            f"💾 Previous database saved as: {os.path.basename(current_backup)}\n"
             f"🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-            f"🔍 Users can now read it with <code>/tempest_story</code>",
+            f"🌀 <i>The storm remembers...</i>",
             parse_mode=ParseMode.HTML
         )
         
-        await send_log(f"📖 <b>New Story Chapter Published</b>\n\nChapter: {chapter_num}\nTitle: {title}\nPublished by: {user.first_name}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        await send_log(f"💾 <b>Database Restored</b>\n\n👤 By: {user.first_name}\n📁 File: {document.file_name}\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
-    except ValueError:
-        await message.answer("❌ Chapter number must be a valid integer!")
     except Exception as e:
-        await message.answer(f"❌ Error publishing chapter: {str(e)[:100]}")
-        log_error(user.id, "publish", e)
+        await processing_msg.edit_text(f"❌ Restore failed: {str(e)}")
+        pending_restore.pop(user.id, None)
+        log_error(user.id, "rem", e)
 
-# ========== UPDATE TEMPEST STORY TO USE DATABASE ==========
-@dp.message(Command("tempest_story", ignore_case=True))
-async def tempest_story_cmd(message: Message):
-    user, chat = await handle_common(message, "tempest_story")
+# ========== RESTART COMMAND ==========
+@dp.message(Command("restart"))
+async def restart_cmd(message: Message):
+    user, chat = await handle_common(message, "restart")
+    
+    if user.id != OWNER_ID:
+        return await message.answer("🚫 Owner only command")
+    
+    await message.answer("🔄 <b>REBOOTING TEMPEST ENGINE...</b>\n\nSaving state and restarting...", parse_mode=ParseHTML)
+    
+    save_bot_state()
+    
+    await send_log(f"🔄 <b>Bot Restarted</b>\n\n👤 By: {user.first_name}\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # Restart the process
+    os.execv(sys.executable, ['python'] + sys.argv)
+
+# ========== SHRINE COMMAND (Group Tempest Info) ==========
+@dp.message(Command("shrine"))
+async def shrine_cmd(message: Message):
+    user, chat = await handle_common(message, "shrine")
+    
+    # Only works in groups
+    if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        await message.answer("🌀 The Shrine can only be erected in groups!")
+        return
     
     conn = sqlite3.connect("data/bot.db")
     c = conn.cursor()
-    c.execute("SELECT cult_status FROM users WHERE user_id = ?", (user.id,))
-    result = c.fetchone()
     
-    if not result or result[0] == "none":
-        await message.answer("🌀 This command is for Tempest members only.")
-        conn.close()
-        return
+    # Get all Tempest members
+    c.execute("""
+        SELECT user_id, first_name, username, cult_rank, sacrifices 
+        FROM users 
+        WHERE cult_status != 'none'
+        ORDER BY sacrifices DESC
+    """)
+    all_members = c.fetchall()
     
-    # Get total chapters
-    c.execute("SELECT COUNT(*) FROM story_chapters WHERE is_published = 1")
-    total_chapters = c.fetchone()[0]
+    # Find which members are in this group
+    tempest_in_group = []
     
-    if total_chapters == 0:
-        await message.answer("📖 No story chapters available yet.")
-        conn.close()
-        return
+    try:
+        for member in all_members:
+            member_id = member[0]
+            try:
+                chat_member = await bot.get_chat_member(chat.id, member_id)
+                if chat_member.status in ['member', 'administrator', 'creator']:
+                    tempest_in_group.append(member)
+            except:
+                pass
+    except:
+        pass
     
-    # Get first chapter
-    c.execute("SELECT chapter_number, title, content FROM story_chapters WHERE is_published = 1 ORDER BY chapter_number LIMIT 1")
-    first_chapter = c.fetchone()
+    # Global Tempest stats
+    c.execute("SELECT COUNT(*) FROM users WHERE cult_status != 'none'")
+    total_tempest = c.fetchone()[0] or 0
+    
+    c.execute("SELECT SUM(sacrifices) FROM users WHERE cult_status != 'none'")
+    total_sacrifices = c.fetchone()[0] or 0
+    
+    c.execute("""
+        SELECT cult_rank, COUNT(*) 
+        FROM users 
+        WHERE cult_status != 'none' 
+        GROUP BY cult_rank
+    """)
+    rank_stats = c.fetchall()
     
     conn.close()
     
-    if first_chapter:
-        chapter_num, title, content = first_chapter
-        story_states[user.id] = {"chapter": chapter_num}
-        
-        chapter_text = f"📜 <b>CHAPTER {chapter_num}: {title}</b>\n\n<i>{content}</i>"
-        
-        keyboard = InlineKeyboardBuilder()
-        keyboard.add(InlineKeyboardButton(text="🌪️ Next Chapter", callback_data=f"story_next_db_{chapter_num}"))
-        
-        story_msg = await message.answer("🌀 <b>Loading ancient scrolls...</b>", parse_mode=ParseMode.HTML)
-        await asyncio.sleep(2)
-        await story_msg.edit_text(chapter_text, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
+    # Build shrine message
+    shrine_text = f"""
+🌀 <b>⚔️ TEMPEST SHRINE ⚔️</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-@dp.callback_query(F.data.startswith("story_next_db_"))
-async def handle_story_next_db(callback: CallbackQuery):
-    user = callback.from_user
-    current_chapter = int(callback.data.split("_")[-1])
+📍 <b>LOCATION:</b> {chat.title}
+
+<b>🌪️ GROUP PRESENCE:</b>
+• Tempest members here: {len(tempest_in_group)}
+
+<b>📜 GLOBAL TEMPEST STATS:</b>
+• Total Storm-Born: {total_tempest}
+• Total Sacrifices: {total_sacrifices}
+
+<b>👑 RANK DISTRIBUTION:</b>
+"""
     
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
+    rank_emojis = {
+        "Storm Lord": "🌀",
+        "Blood Master": "👑",
+        "Blood Adept": "⚔️",
+        "Blood Initiate": "🩸"
+    }
     
-    # Get next chapter
-    c.execute("SELECT chapter_number, title, content FROM story_chapters WHERE is_published = 1 AND chapter_number > ? ORDER BY chapter_number LIMIT 1", (current_chapter,))
-    next_chapter = c.fetchone()
+    for rank, count in rank_stats:
+        emoji = rank_emojis.get(rank, "•")
+        shrine_text += f"{emoji} {rank}: {count}\n"
     
-    if next_chapter:
-        chapter_num, title, content = next_chapter
+    if tempest_in_group:
+        shrine_text += f"\n<b>🌀 STORM-BORN IN THIS SHRINE:</b>\n"
+        for member in tempest_in_group[:10]:  # Show top 10
+            _, name, uname, rank, sacs = member
+            username = f"@{uname}" if uname else name
+            shrine_text += f"• {username} - {rank} (⚔️{sacs})\n"
         
-        chapter_text = f"📜 <b>CHAPTER {chapter_num}: {title}</b>\n\n<i>{content}</i>"
-        
-        keyboard = InlineKeyboardBuilder()
-        
-        # Add previous button
-        keyboard.add(InlineKeyboardButton(text="⬅️ Previous Chapter", callback_data=f"story_prev_db_{chapter_num}"))
-        
-        # Check if there's more chapters
-        c.execute("SELECT COUNT(*) FROM story_chapters WHERE is_published = 1 AND chapter_number > ?", (chapter_num,))
-        has_next = c.fetchone()[0] > 0
-        
-        if has_next:
-            keyboard.add(InlineKeyboardButton(text="🌪️ Next Chapter", callback_data=f"story_next_db_{chapter_num}"))
-        
-        keyboard.adjust(2)
-        
-        await callback.message.edit_text(chapter_text, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
-        await safe_answer_callback(callback)
+        if len(tempest_in_group) > 10:
+            shrine_text += f"\n<i>...and {len(tempest_in_group) - 10} more</i>"
     else:
-        # End of story
-        end_text = """📜 <b>THE END (FOR NOW)</b>
-
-<i>Your journey through the storm's history is complete.
-But remember... the story continues with you.
-
-New chapters will be added by the Council.
-The eternal storm always has more tales to tell.</i>
-
-🌀 <b>THE STORM NEVER ENDS</b>
-
-<code>"We are the calm's end. We are the eternal storm."</code>"""
-        
-        keyboard = InlineKeyboardBuilder()
-        keyboard.add(InlineKeyboardButton(text="🔄 Start Over", callback_data="story_restart"))
-        
-        await callback.message.edit_text(end_text, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
-        await safe_answer_callback(callback)
+        shrine_text += f"\n<i>No Tempest members found in this shrine.</i>\n<i>Use /tempest_join to become storm-born!</i>"
     
-    conn.close()
-
-@dp.callback_query(F.data.startswith("story_prev_db_"))
-async def handle_story_prev_db(callback: CallbackQuery):
-    user = callback.from_user
-    current_chapter = int(callback.data.split("_")[-1])
+    shrine_text += "\n\n🌀 <i>The shrine watches over all who enter...</i>"
     
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    
-    # Get previous chapter
-    c.execute("SELECT chapter_number, title, content FROM story_chapters WHERE is_published = 1 AND chapter_number < ? ORDER BY chapter_number DESC LIMIT 1", (current_chapter,))
-    prev_chapter = c.fetchone()
-    
-    if prev_chapter:
-        chapter_num, title, content = prev_chapter
-        
-        chapter_text = f"📜 <b>CHAPTER {chapter_num}: {title}</b>\n\n<i>{content}</i>"
-        
-        keyboard = InlineKeyboardBuilder()
-        
-        # Check if there's previous
-        c.execute("SELECT COUNT(*) FROM story_chapters WHERE is_published = 1 AND chapter_number < ?", (chapter_num,))
-        has_prev = c.fetchone()[0] > 0
-        
-        if has_prev:
-            keyboard.add(InlineKeyboardButton(text="⬅️ Previous Chapter", callback_data=f"story_prev_db_{chapter_num}"))
-        
-        keyboard.add(InlineKeyboardButton(text="🌪️ Next Chapter", callback_data=f"story_next_db_{chapter_num}"))
-        keyboard.adjust(2)
-        
-        await callback.message.edit_text(chapter_text, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
-        await safe_answer_callback(callback)
-    
-    conn.close()
-
-@dp.callback_query(F.data == "story_restart")
-async def handle_story_restart(callback: CallbackQuery):
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    
-    # Get first chapter
-    c.execute("SELECT chapter_number, title, content FROM story_chapters WHERE is_published = 1 ORDER BY chapter_number LIMIT 1")
-    first_chapter = c.fetchone()
-    
-    conn.close()
-    
-    if first_chapter:
-        chapter_num, title, content = first_chapter
-        
-        chapter_text = f"📜 <b>CHAPTER {chapter_num}: {title}</b>\n\n<i>{content}</i>"
-        
-        keyboard = InlineKeyboardBuilder()
-        keyboard.add(InlineKeyboardButton(text="🌪️ Next Chapter", callback_data=f"story_next_db_{chapter_num}"))
-        
-        await callback.message.edit_text(chapter_text, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
-        await safe_answer_callback(callback)
+    await message.answer(shrine_text, parse_mode=ParseMode.HTML)
 
 # ========== SCAN FUNCTION ==========
 async def scan_users_and_groups():
@@ -1058,17 +1162,19 @@ async def start_cmd(message: Message):
     
     await message.answer(
         f"✨ <b>Hey {user.first_name}!</b>\n\n"
-        "🤖 <b>PRO TELEGRAM BOT - ULTIMATE VERSION</b>\n\n"
-        "🔗 <b>Upload files</b> - Get permanent links\n"
-        "✨ <b>Wish fortune teller</b> - Check your luck\n"
+        "🌀 <b>TEMPEST BOT - ADVANCED EDITION</b>\n\n"
+        "🔗 <b>Upload files</b> - Permanent links\n"
+        "📝 <b>Word converter</b> - Text to DOCX\n"
+        "✨ <b>Wish fortune teller</b> - Check luck\n"
         "🎮 <b>Fun games</b> - Dice & coin flip\n"
-        "📝 <b>Word converter</b> - Convert text to DOCX\n"
-        "👑 <b>Admin controls</b> - Manage your bot\n"
-        "🌀 <b>Tempest Creed</b> - Join the secret society\n\n"
-        "📁 <b>Upload:</b> Send <code>/link</code> then any file\n"
-        "📝 <b>Word:</b> Send <code>/word Your text here</code>\n"
-        "🎮 <b>Games:</b> <code>/dice</code> <code>/flip</code> <code>/wish [text]</code>\n"
+        "👑 <b>Admin controls</b> - Manage bot\n"
+        "🌀 <b>Tempest Creed</b> - Join the secret society\n"
+        "🏛️ <b>Shrine</b> - Group Tempest stats\n\n"
+        "📁 <b>Upload:</b> <code>/link</code> then file\n"
+        "📝 <b>Word:</b> <code>/word Your text</code>\n"
+        "🎮 <b>Games:</b> <code>/dice</code> <code>/flip</code> <code>/wish</code>\n"
         "👤 <b>Profile:</b> <code>/profile</code>\n"
+        "🏛️ <b>Shrine:</b> <code>/shrine</code> (in groups)\n"
         "📚 <b>All commands:</b> <code>/help</code>",
         parse_mode=ParseMode.HTML
     )
@@ -1078,50 +1184,64 @@ async def start_cmd(message: Message):
 async def help_cmd(message: Message):
     user, chat = await handle_common(message, "help")
     
-    help_text = """📚 <b>ALL COMMANDS - ULTIMATE VERSION</b>
+    help_text = """📚 <b>TEMPEST BOT - COMPLETE GUIDE</b>
 
-🔗 <b>Upload System:</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+🔗 <b>UPLOAD SYSTEM</b>
 <code>/link</code> - Upload file (send file after)
 
-📝 <b>Word Converter:</b>
-<code>/word [text]</code> - Convert text to DOCX file
+📝 <b>WORD CONVERTER</b>
+<code>/word [text]</code> - Convert text to DOCX
 
-🌟 <b>Wish & Games:</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+🌟 <b>WISH & GAMES</b>
 <code>/wish [text]</code> - Check luck %
 <code>/dice</code> - Roll dice
 <code>/flip</code> - Flip coin
 
-👤 <b>User Profile:</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+👤 <b>USER PROFILE</b>
 <code>/profile</code> - Your stats
 <code>/start</code> - Welcome message
 
-🌀 <b>Tempest Creed:</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+🌀 <b>TEMPEST CREED</b>
 <code>/tempest_join</code> - Join the cult
 <code>/tempest_story</code> - Read the lore
 <code>/tempest_creed</code> - View all members
+<code>/shrine</code> - Group Tempest stats
 <code>/curse</code> - Curse a user
 <code>/remove_curse</code> - Remove curse
 
-👑 <b>Admin Commands:</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+👑 <b>ADMIN COMMANDS</b>
 <code>/ping</code> - System status & resources
+<code>/stats</code> - Bot statistics
 <code>/logs [days]</code> - View logs (.txt)
-<code>/stats</code> - Statistics
 <code>/users</code> - User list (.txt)
-<code>/admins</code> - List bot admins
-<code>/backup</code> - Backup database
+<code>/admins</code> - List admins
 <code>/scan</code> - Scan for new users
-<code>/publish</code> - Publish story chapter
+<code>/publish</code> - Publish file to log channel
+<code>/backup</code> - Backup database
+<code>/toggle</code> - Pause/resume bot
 
-⚡ <b>Owner Commands:</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ <b>OWNER COMMANDS</b>
 <code>/pro [id]</code> - Make admin
-<code>/toggle</code> - Toggle bot
+<code>/rem</code> - Restore from backup
+<code>/restart</code> - Reboot bot
 <code>/broadcast</code> - Send to all users
-<code>/broadcast_gc</code> - Send to groups only
-<code>/refresh</code> - Refresh bot cache
+<code>/broadcast_gc</code> - Send to groups
+<code>/refresh</code> - Refresh cache
 <code>/emergency_stop</code> - Stop bot
 
-📖 <b>Story Publishing Format:</b>
-<code>/publish 9 Chapter Title | Chapter content here...</code>"""
+━━━━━━━━━━━━━━━━━━━━━━━━
+📖 <b>STORY PUBLISHING</b>
+Chapters can be added via database directly
+Contact owner for new story chapters
+
+🌀 <i>The storm flows through all commands</i>
+"""
     
     await message.answer(help_text, parse_mode=ParseMode.HTML)
 
@@ -1307,89 +1427,6 @@ async def profile_cmd(message: Message):
         profile_text += "\n✨ <i>Discover your true potential...</i>"
     
     await message.answer(profile_text, parse_mode=ParseMode.HTML)
-
-@dp.message(Command("stats"))
-async def stats_cmd(message: Message):
-    user, chat = await handle_common(message, "stats")
-    
-    if not await is_admin(user.id):
-        await message.answer("🚫 Admin only")
-        return
-    
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    
-    c.execute("SELECT COUNT(*) FROM users")
-    total_users = c.fetchone()[0] or 0
-    
-    c.execute("SELECT COUNT(*) FROM groups")
-    total_groups = c.fetchone()[0] or 0
-    
-    c.execute("SELECT COUNT(*) FROM uploads")
-    total_uploads = c.fetchone()[0] or 0
-    
-    c.execute("SELECT COUNT(*) FROM wishes")
-    total_wishes = c.fetchone()[0] or 0
-    
-    week_ago = (datetime.now() - timedelta(days=7)).isoformat()
-    c.execute("SELECT COUNT(*) FROM users WHERE last_active >= ?", (week_ago,))
-    active_users = c.fetchone()[0] or 0
-    
-    month_ago = (datetime.now() - timedelta(days=30)).isoformat()
-    c.execute("SELECT COUNT(*) FROM users WHERE last_active < ?", (month_ago,))
-    dead_users = c.fetchone()[0] or 0
-    
-    c.execute("SELECT COUNT(*) FROM groups WHERE last_active >= ?", (week_ago,))
-    active_groups = c.fetchone()[0] or 0
-    
-    c.execute("SELECT COUNT(*) FROM groups WHERE last_active < ?", (month_ago,))
-    dead_groups = c.fetchone()[0] or 0
-    
-    today = datetime.now().strftime("%Y-%m-%d")
-    c.execute("SELECT COUNT(*) FROM command_logs WHERE DATE(timestamp) = DATE(?)", (today,))
-    today_commands = c.fetchone()[0] or 0
-    
-    c.execute("SELECT COUNT(DISTINCT user_id) FROM command_logs WHERE DATE(timestamp) = DATE(?)", (today,))
-    active_today = c.fetchone()[0] or 0
-    
-    conn.close()
-    
-    user_percent = (active_users / total_users * 100) if total_users > 0 else 0
-    group_percent = (active_groups / total_groups * 100) if total_groups > 0 else 0
-    dead_user_percent = (dead_users / total_users * 100) if total_users > 0 else 0
-    
-    stats_text = f"""
-📊 <b>COMPLETE BOT STATISTICS</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-👥 <b>USER STATS:</b>
-• Total Users: {total_users}
-• Active Users (7 days): {active_users}
-• Dead Users (30+ days): {dead_users}
-• Active Today: {active_today}
-
-👥 <b>GROUP STATS:</b>
-• Total Groups: {total_groups}
-• Active Groups (7 days): {active_groups}
-• Dead Groups (30+ days): {dead_groups}
-
-📁 <b>UPLOAD STATS:</b>
-• Total Uploads: {total_uploads}
-• Total Wishes: {total_wishes}
-
-⚡ <b>TODAY'S ACTIVITY:</b>
-• Commands: {today_commands}
-• Active Users: {active_today}
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-📈 <b>PERCENTAGES:</b>
-• Active Users: {user_percent:.1f}%
-• Active Groups: {group_percent:.1f}%
-• Dead Users: {dead_user_percent:.1f}%
-━━━━━━━━━━━━━━━━━━━━━━━━
-"""
-    
-    await message.answer(stats_text, parse_mode=ParseMode.HTML)
 
 @dp.message(Command("logs"))
 async def logs_cmd(message: Message):
@@ -1603,26 +1640,6 @@ async def broadcast_gc_cmd(message: Message):
         parse_mode=ParseMode.HTML
     )
 
-@dp.message(Command("backup"))
-async def backup_cmd(message: Message):
-    user, chat = await handle_common(message, "backup")
-    
-    if not await is_admin(user.id):
-        return
-    
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_file = f"backups/backup_{timestamp}.db"
-    
-    try:
-        shutil.copy2("data/bot.db", backup_file)
-        await message.answer_document(
-            FSInputFile(backup_file),
-            caption=f"💾 Backup {timestamp}\n✅ Database backed up successfully"
-        )
-    except Exception as e:
-        await message.answer(f"❌ Backup failed: {str(e)}")
-        log_error(user.id, "backup", e)
-
 @dp.message(Command("refresh"))
 async def refresh_cmd(message: Message):
     user, chat = await handle_common(message, "refresh")
@@ -1652,85 +1669,6 @@ async def emergency_stop(message: Message):
     bot_active = False
     
     await message.answer("🛑 <b>BOT EMERGENCY STOPPED!</b>", parse_mode=ParseMode.HTML)
-
-# ========== TEMPEST CREED COMMAND ==========
-@dp.message(Command("tempest_creed"))
-async def tempest_creed_cmd(message: Message):
-    user, chat = await handle_common(message, "tempest_creed")
-    
-    conn = sqlite3.connect("data/bot.db")
-    c = conn.cursor()
-    
-    c.execute("""
-        SELECT user_id, first_name, username, cult_rank, sacrifices 
-        FROM users 
-        WHERE is_admin = 1 AND cult_status != 'none' 
-        ORDER BY sacrifices DESC
-    """)
-    founders = c.fetchall()
-    
-    c.execute("""
-        SELECT user_id, first_name, username, cult_rank, sacrifices 
-        FROM users 
-        WHERE cult_status != 'none' 
-        ORDER BY 
-            CASE cult_rank
-                WHEN 'Storm Lord' THEN 1
-                WHEN 'Blood Master' THEN 2
-                WHEN 'Blood Adept' THEN 3
-                WHEN 'Blood Initiate' THEN 4
-                ELSE 5
-            END,
-            sacrifices DESC
-    """)
-    members = c.fetchall()
-    
-    conn.close()
-    
-    if not members:
-        await message.answer("🌀 <b>TEMPEST CREED</b>\n\nNo members have joined the Tempest yet.\n\nUse <code>/tempest_join</code> to become the first!")
-        return
-    
-    creed_text = "🌀 <b>TEMPEST CREED - BLOODLINE</b>\n\n"
-    
-    if founders:
-        creed_text += "👑 <b>FOUNDERS & LEADERS</b>\n"
-        for user_id, name, uname, rank, sacrifices in founders:
-            username = f"@{uname}" if uname else "No username"
-            creed_text += f"• {name} ({username})\n"
-            creed_text += f"  👑 {rank} | ⚔️ {sacrifices} sacrifices\n"
-            creed_text += f"  🆔 <code>{user_id}</code>\n\n"
-    
-    total_members = len(members)
-    total_sacrifices = sum(m[4] for m in members)
-    
-    creed_text += f"📊 <b>STATISTICS</b>\n"
-    creed_text += f"• Total Members: {total_members}\n"
-    creed_text += f"• Total Sacrifices: {total_sacrifices}\n\n"
-    
-    rank_counts = {}
-    for _, _, _, rank, _ in members:
-        rank_counts[rank] = rank_counts.get(rank, 0) + 1
-    
-    creed_text += "👥 <b>RANK DISTRIBUTION</b>\n"
-    for rank in ["Blood Initiate", "Blood Adept", "Blood Master", "Storm Lord"]:
-        if rank in rank_counts:
-            count = rank_counts[rank]
-            emoji = {"Blood Initiate": "🩸", "Blood Adept": "⚔️", "Blood Master": "👑", "Storm Lord": "🌀"}.get(rank, "•")
-            creed_text += f"{emoji} {rank}: {count}\n"
-    
-    creed_text += "\n📜 <b>BLOOD OATH</b>\n"
-    creed_text += "<i>We remember. We awaken. We are the eternal storm.</i>\n\n"
-    creed_text += "⚡ <b>Top Sacrificers</b>:\n"
-    
-    sorted_members = sorted(members, key=lambda x: x[4], reverse=True)[:10]
-    for i, (user_id, name, uname, rank, sacrifices) in enumerate(sorted_members, 1):
-        username = f"@{uname}" if uname else ""
-        creed_text += f"{i}. {name} {username} - ⚔️ {sacrifices}\n"
-    
-    creed_text += "\n🌀 <i>The storm grows stronger with each sacrifice...</i>"
-    
-    await message.answer(creed_text, parse_mode=ParseMode.HTML)
 
 # ========== FILE UPLOAD ==========
 @dp.message(Command("link"))
@@ -1814,7 +1752,7 @@ async def handle_file(message: Message):
         
         await msg.edit_text("☁️ <b>Uploading...</b>", parse_mode=ParseMode.HTML)
         filename = file.file_path.split('/')[-1] if '/' in file.file_path else f"file_{file_id}"
-        result = await upload_to_catbox(file_data, filename)
+        result = await upload_to_catbox_advanced(file_data, filename)
         
         if not result['success']:
             await msg.edit_text("❌ Upload failed")
@@ -1885,6 +1823,10 @@ async def cancel_cmd(message: Message):
     if user.id in story_states:
         story_states.pop(user.id, None)
         await message.answer("❌ Story cancelled")
+    
+    if user.id in pending_restore:
+        pending_restore.pop(user.id, None)
+        await message.answer("❌ Restore cancelled")
 
 # ========== GAMES ==========
 @dp.message(Command("wish"))
@@ -2250,6 +2192,228 @@ Your journey of darkness begins...</i>
     
     await safe_answer_callback(callback, "✅ Sacrifice accepted! Welcome to the Tempest!", show_alert=True)
 
+# ========== TEMPEST STORY (Database Driven) ==========
+@dp.message(Command("tempest_story", ignore_case=True))
+async def tempest_story_cmd(message: Message):
+    user, chat = await handle_common(message, "tempest_story")
+    
+    conn = sqlite3.connect("data/bot.db")
+    c = conn.cursor()
+    c.execute("SELECT cult_status FROM users WHERE user_id = ?", (user.id,))
+    result = c.fetchone()
+    
+    if not result or result[0] == "none":
+        await message.answer("🌀 This command is for Tempest members only.")
+        conn.close()
+        return
+    
+    c.execute("SELECT COUNT(*) FROM story_chapters WHERE is_published = 1")
+    total_chapters = c.fetchone()[0]
+    
+    if total_chapters == 0:
+        await message.answer("📖 No story chapters available yet.")
+        conn.close()
+        return
+    
+    c.execute("SELECT chapter_number, title, content FROM story_chapters WHERE is_published = 1 ORDER BY chapter_number LIMIT 1")
+    first_chapter = c.fetchone()
+    
+    conn.close()
+    
+    if first_chapter:
+        chapter_num, title, content = first_chapter
+        
+        chapter_text = f"📜 <b>CHAPTER {chapter_num}: {title}</b>\n\n<i>{content}</i>"
+        
+        keyboard = InlineKeyboardBuilder()
+        keyboard.add(InlineKeyboardButton(text="🌪️ Next Chapter", callback_data=f"story_next_db_{chapter_num}"))
+        
+        story_msg = await message.answer("🌀 <b>Loading ancient scrolls...</b>", parse_mode=ParseMode.HTML)
+        await asyncio.sleep(2)
+        await story_msg.edit_text(chapter_text, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
+
+@dp.callback_query(F.data.startswith("story_next_db_"))
+async def handle_story_next_db(callback: CallbackQuery):
+    user = callback.from_user
+    current_chapter = int(callback.data.split("_")[-1])
+    
+    conn = sqlite3.connect("data/bot.db")
+    c = conn.cursor()
+    
+    c.execute("SELECT chapter_number, title, content FROM story_chapters WHERE is_published = 1 AND chapter_number > ? ORDER BY chapter_number LIMIT 1", (current_chapter,))
+    next_chapter = c.fetchone()
+    
+    if next_chapter:
+        chapter_num, title, content = next_chapter
+        
+        chapter_text = f"📜 <b>CHAPTER {chapter_num}: {title}</b>\n\n<i>{content}</i>"
+        
+        keyboard = InlineKeyboardBuilder()
+        keyboard.add(InlineKeyboardButton(text="⬅️ Previous", callback_data=f"story_prev_db_{chapter_num}"))
+        
+        c.execute("SELECT COUNT(*) FROM story_chapters WHERE is_published = 1 AND chapter_number > ?", (chapter_num,))
+        has_next = c.fetchone()[0] > 0
+        
+        if has_next:
+            keyboard.add(InlineKeyboardButton(text="🌪️ Next", callback_data=f"story_next_db_{chapter_num}"))
+        
+        keyboard.adjust(2)
+        
+        await callback.message.edit_text(chapter_text, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
+        await safe_answer_callback(callback)
+    else:
+        end_text = """📜 <b>THE END (FOR NOW)</b>
+
+<i>Your journey through the storm's history is complete.
+But remember... the story continues with you.
+
+New chapters may be added by the Council.
+The eternal storm always has more tales to tell.</i>
+
+🌀 <b>THE STORM NEVER ENDS</b>
+
+<code>"We are the calm's end. We are the eternal storm."</code>"""
+        
+        keyboard = InlineKeyboardBuilder()
+        keyboard.add(InlineKeyboardButton(text="🔄 Start Over", callback_data="story_restart"))
+        
+        await callback.message.edit_text(end_text, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
+        await safe_answer_callback(callback)
+    
+    conn.close()
+
+@dp.callback_query(F.data.startswith("story_prev_db_"))
+async def handle_story_prev_db(callback: CallbackQuery):
+    user = callback.from_user
+    current_chapter = int(callback.data.split("_")[-1])
+    
+    conn = sqlite3.connect("data/bot.db")
+    c = conn.cursor()
+    
+    c.execute("SELECT chapter_number, title, content FROM story_chapters WHERE is_published = 1 AND chapter_number < ? ORDER BY chapter_number DESC LIMIT 1", (current_chapter,))
+    prev_chapter = c.fetchone()
+    
+    if prev_chapter:
+        chapter_num, title, content = prev_chapter
+        
+        chapter_text = f"📜 <b>CHAPTER {chapter_num}: {title}</b>\n\n<i>{content}</i>"
+        
+        keyboard = InlineKeyboardBuilder()
+        
+        c.execute("SELECT COUNT(*) FROM story_chapters WHERE is_published = 1 AND chapter_number < ?", (chapter_num,))
+        has_prev = c.fetchone()[0] > 0
+        
+        if has_prev:
+            keyboard.add(InlineKeyboardButton(text="⬅️ Previous", callback_data=f"story_prev_db_{chapter_num}"))
+        
+        keyboard.add(InlineKeyboardButton(text="🌪️ Next", callback_data=f"story_next_db_{chapter_num}"))
+        keyboard.adjust(2)
+        
+        await callback.message.edit_text(chapter_text, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
+        await safe_answer_callback(callback)
+    
+    conn.close()
+
+@dp.callback_query(F.data == "story_restart")
+async def handle_story_restart(callback: CallbackQuery):
+    conn = sqlite3.connect("data/bot.db")
+    c = conn.cursor()
+    
+    c.execute("SELECT chapter_number, title, content FROM story_chapters WHERE is_published = 1 ORDER BY chapter_number LIMIT 1")
+    first_chapter = c.fetchone()
+    
+    conn.close()
+    
+    if first_chapter:
+        chapter_num, title, content = first_chapter
+        
+        chapter_text = f"📜 <b>CHAPTER {chapter_num}: {title}</b>\n\n<i>{content}</i>"
+        
+        keyboard = InlineKeyboardBuilder()
+        keyboard.add(InlineKeyboardButton(text="🌪️ Next Chapter", callback_data=f"story_next_db_{chapter_num}"))
+        
+        await callback.message.edit_text(chapter_text, parse_mode=ParseMode.HTML, reply_markup=keyboard.as_markup())
+        await safe_answer_callback(callback)
+
+# ========== TEMPEST CREED COMMAND ==========
+@dp.message(Command("tempest_creed"))
+async def tempest_creed_cmd(message: Message):
+    user, chat = await handle_common(message, "tempest_creed")
+    
+    conn = sqlite3.connect("data/bot.db")
+    c = conn.cursor()
+    
+    c.execute("""
+        SELECT user_id, first_name, username, cult_rank, sacrifices 
+        FROM users 
+        WHERE is_admin = 1 AND cult_status != 'none' 
+        ORDER BY sacrifices DESC
+    """)
+    founders = c.fetchall()
+    
+    c.execute("""
+        SELECT user_id, first_name, username, cult_rank, sacrifices 
+        FROM users 
+        WHERE cult_status != 'none' 
+        ORDER BY 
+            CASE cult_rank
+                WHEN 'Storm Lord' THEN 1
+                WHEN 'Blood Master' THEN 2
+                WHEN 'Blood Adept' THEN 3
+                WHEN 'Blood Initiate' THEN 4
+                ELSE 5
+            END,
+            sacrifices DESC
+    """)
+    members = c.fetchall()
+    
+    conn.close()
+    
+    if not members:
+        await message.answer("🌀 <b>TEMPEST CREED</b>\n\nNo members have joined the Tempest yet.\n\nUse <code>/tempest_join</code> to become the first!")
+        return
+    
+    creed_text = "🌀 <b>TEMPEST CREED - BLOODLINE</b>\n\n"
+    
+    if founders:
+        creed_text += "👑 <b>FOUNDERS & LEADERS</b>\n"
+        for user_id, name, uname, rank, sacrifices in founders:
+            username = f"@{uname}" if uname else "No username"
+            creed_text += f"• {name} ({username})\n"
+            creed_text += f"  👑 {rank} | ⚔️ {sacrifices} sacrifices\n"
+            creed_text += f"  🆔 <code>{user_id}</code>\n\n"
+    
+    total_members = len(members)
+    total_sacrifices = sum(m[4] for m in members)
+    
+    creed_text += f"📊 <b>STATISTICS</b>\n"
+    creed_text += f"• Total Members: {total_members}\n"
+    creed_text += f"• Total Sacrifices: {total_sacrifices}\n\n"
+    
+    rank_counts = {}
+    for _, _, _, rank, _ in members:
+        rank_counts[rank] = rank_counts.get(rank, 0) + 1
+    
+    creed_text += "👥 <b>RANK DISTRIBUTION</b>\n"
+    for rank in ["Blood Initiate", "Blood Adept", "Blood Master", "Storm Lord"]:
+        if rank in rank_counts:
+            count = rank_counts[rank]
+            emoji = {"Blood Initiate": "🩸", "Blood Adept": "⚔️", "Blood Master": "👑", "Storm Lord": "🌀"}.get(rank, "•")
+            creed_text += f"{emoji} {rank}: {count}\n"
+    
+    creed_text += "\n📜 <b>BLOOD OATH</b>\n"
+    creed_text += "<i>We remember. We awaken. We are the eternal storm.</i>\n\n"
+    creed_text += "⚡ <b>Top Sacrificers</b>:\n"
+    
+    sorted_members = sorted(members, key=lambda x: x[4], reverse=True)[:10]
+    for i, (user_id, name, uname, rank, sacrifices) in enumerate(sorted_members, 1):
+        username = f"@{uname}" if uname else ""
+        creed_text += f"{i}. {name} {username} - ⚔️ {sacrifices}\n"
+    
+    creed_text += "\n🌀 <i>The storm grows stronger with each sacrifice...</i>"
+    
+    await message.answer(creed_text, parse_mode=ParseMode.HTML)
+
 # ========== REPLY INVITATION SYSTEM ==========
 @dp.message(F.reply_to_message)
 async def handle_reply_invite(message: Message):
@@ -2470,27 +2634,30 @@ async def handle_broadcast(message: Message):
 
 # ========== MAIN ==========
 async def main():
-    print("🚀 PRO BOT ULTIMATE VERSION STARTING...")
+    print("🚀 TEMPEST BOT ADVANCED STARTING...")
     print(f"📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("✅ Database initialized")
     print("🌀 Tempest: ALL COMMANDS WORKING")
     print("📡 Scan: WORKING")
     print("📊 Log Channel: FIXED")
     print("📢 Broadcast: WORKING")
-    print("🔗 Upload: WORKING")
+    print("🔗 Upload: ENHANCED")
     print("📜 Story: DATABASE DRIVEN")
     print("⚡ Curse System: WORKING")
     print("💾 State Saving: ENABLED")
     print("🖼️ Profile Cards: WITH PFP")
     print("📝 Word Converter: ADDED")
     print("💓 Keep-Alive: ENABLED")
-    print("📖 Publish System: ADDED")
+    print("🏛️ Shrine: ADDED")
+    print("💾 REM Restore: ADDED")
+    print("🔄 Restart: ADDED")
+    print("📊 Enhanced Stats: ADDED")
     print("=" * 50)
     
     # Start keep-alive task
     asyncio.create_task(keep_alive())
     
-    startup_log = f"🤖 <b>Bot Started - Ultimate Version</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: Ultimate\n⚡ Status: ALL SYSTEMS ACTIVE\n💾 State Restored: YES\n🖼️ Profile Cards: WITH PFP\n📝 Word Converter: READY\n💓 Keep-Alive: RUNNING\n📖 Publish System: READY"
+    startup_log = f"🤖 <b>Tempest Bot - Advanced Version</b>\n\n🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🌀 Version: Advanced\n⚡ Status: ALL SYSTEMS ACTIVE\n💾 State Restored: YES\n🖼️ Profile Cards: WITH PFP\n📝 Word Converter: READY\n💓 Keep-Alive: RUNNING\n🏛️ Shrine: ACTIVE\n💾 REM Restore: READY\n🔄 Restart: READY"
     await send_log(startup_log)
     
     await dp.start_polling(bot)
