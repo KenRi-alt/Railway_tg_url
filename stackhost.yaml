@@ -1,0 +1,6 @@
+version: 1
+build:
+  language: python
+  command: pip install -r requirements.txt
+run:
+  command: python main.py
