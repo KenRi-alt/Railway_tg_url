@@ -1,6 +1,16 @@
-version: 1
-build:
-  language: python
-  command: pip install -r requirements.txt
-run:
-  command: python main.py
+user:
+  name: "ishikki"
+  github: "ishikki-akabane"
+
+runtime:
+  image: "python:3.11-slim"
+
+commands:
+  package: ""
+  build:
+    - "pip install -r requirements.txt"
+  start: "python api.py"
+
+repository:
+  branch: "main"
+  auto_deploy: true
