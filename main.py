@@ -43,8 +43,8 @@ from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
 print("🤖 BOT INITIALIZING...")
 
 # ========== CONFIG ==========
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TOKEN_HERE")
-OWNER_ID = int(os.getenv("OWNER_ID", "YOUR_OWNER_ID"))
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAFVRZytQIWAq6S3r6NXM-CvPbt_agGMk4Y")
+OWNER_ID = int(os.getenv("OWNER_ID", "6108185460"))
 UPLOAD_API = "https://catbox.moe/user/api.php"
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "-1003662720845"))
 
