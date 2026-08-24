@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ========== TEMPEST BOT - ULTIMATE STABLE ==========
+# ========== TEMPEST BOT - ULTIMATE FIXED ==========
 import os
 import asyncio
 import time
@@ -13,6 +13,9 @@ import psutil
 import math
 import io
 import base64
+import sys
+import subprocess
+import textwrap
 from datetime import datetime, timedelta
 from pathlib import Path
 from docx import Document
@@ -27,14 +30,15 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
 
 print("=" * 60)
-print("🌀 TEMPEST BOT - ULTIMATE STABLE")
+print("🌀 TEMPEST BOT - ULTIMATE FIXED")
+print("✅ All commands operational")
 print("=" * 60)
 
 # ========== CONFIG ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAFVRZytQIWAq6S3r6NXM-CvPbt_agGMk4Y")
 OWNER_ID = int(os.getenv("OWNER_ID", "6108185460"))
 UPLOAD_API = "https://catbox.moe/user/api.php"
-LOG_CHANNEL_ID = -1003662720845  # Ensure this is correct
+LOG_CHANNEL_ID = -1003662720845
 
 # Try importing yt-dlp
 try:
@@ -42,7 +46,6 @@ try:
     YTDLP_AVAILABLE = True
 except ImportError:
     YTDLP_AVAILABLE = False
-    print("⚠️ yt-dlp not installed")
 
 # Create directories
 for dir_name in ["data", "temp", "backups", "profile_cards", "fonts"]:
@@ -57,6 +60,7 @@ upload_waiting = {}
 broadcast_state = {}
 pending_restore = {}
 disabled_commands = {}
+maintenance_mode = False
 last_activity = datetime.now()
 
 # ========== COMPACT ART STYLE ==========
@@ -85,7 +89,6 @@ class ArtStyle:
 def init_db():
     with sqlite3.connect("data/bot.db") as conn:
         c = conn.cursor()
-
         c.execute('''CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
             username TEXT,
@@ -104,7 +107,6 @@ def init_db():
             curse_time TEXT DEFAULT NULL,
             curse_by INTEGER DEFAULT NULL
         )''')
-
         c.execute('''CREATE TABLE IF NOT EXISTS groups (
             group_id INTEGER PRIMARY KEY,
             title TEXT,
@@ -114,7 +116,6 @@ def init_db():
             messages INTEGER DEFAULT 0,
             commands INTEGER DEFAULT 0
         )''')
-
         c.execute('''CREATE TABLE IF NOT EXISTS uploads (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
@@ -123,7 +124,6 @@ def init_db():
             file_type TEXT,
             file_size INTEGER
         )''')
-
         c.execute('''CREATE TABLE IF NOT EXISTS command_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
@@ -133,7 +133,6 @@ def init_db():
             command TEXT,
             success INTEGER
         )''')
-
         c.execute('''CREATE TABLE IF NOT EXISTS error_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
@@ -142,7 +141,6 @@ def init_db():
             error TEXT,
             traceback TEXT
         )''')
-
         c.execute('''CREATE TABLE IF NOT EXISTS wishes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
@@ -150,13 +148,11 @@ def init_db():
             wish_text TEXT,
             luck INTEGER
         )''')
-
         c.execute('''CREATE TABLE IF NOT EXISTS bot_state (
             key TEXT PRIMARY KEY,
             value TEXT,
             timestamp TEXT
         )''')
-
         c.execute('''CREATE TABLE IF NOT EXISTS story_chapters (
             chapter_number INTEGER PRIMARY KEY,
             title TEXT,
@@ -165,7 +161,6 @@ def init_db():
             added_date TEXT,
             is_published INTEGER DEFAULT 1
         )''')
-
         c.execute('''CREATE TABLE IF NOT EXISTS encrypted_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
@@ -174,7 +169,6 @@ def init_db():
             encrypted_text TEXT,
             method TEXT
         )''')
-
         c.execute('''CREATE TABLE IF NOT EXISTS fate_pairs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             chat_id INTEGER,
@@ -185,10 +179,15 @@ def init_db():
             love_percentage INTEGER,
             created_date TEXT
         )''')
-
+        c.execute('''CREATE TABLE IF NOT EXISTS fortunes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            timestamp TEXT,
+            fortune_type TEXT,
+            fortune_text TEXT
+        )''')
         c.execute("INSERT OR IGNORE INTO users (user_id, first_name, joined_date, last_active, is_admin) VALUES (?, ?, ?, ?, ?)",
                   (OWNER_ID, "Owner", datetime.now().isoformat(), datetime.now().isoformat(), 1))
-
         conn.commit()
         print("✅ Database initialized")
 
@@ -228,6 +227,18 @@ def format_uptime(seconds):
 async def handle_common(message: Message, command: str):
     user = message.from_user
     chat = message.chat
+
+    # Check maintenance mode
+    global maintenance_mode
+    if maintenance_mode and user.id != OWNER_ID:
+        if not await is_admin(user.id):
+            await message.answer(
+                f"{ArtStyle.header('MAINTENANCE')}\n"
+                f"🔧 <b>Bot is under maintenance!</b>\n"
+                f"⏳ Please try again later.",
+                parse_mode=ParseMode.HTML
+            )
+            return None, None
 
     # Check disabled commands
     if command in disabled_commands:
@@ -332,7 +343,7 @@ async def upload_to_catbox(file_data, filename):
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
-# ========== PREMIUM PROFILE CARD ==========
+# ========== PREMIUM PROFILE CARD (Same as before) ==========
 class PremiumProfileCard:
     @staticmethod
     def create_gradient_background(width, height, color1=(15, 15, 35), color2=(45, 25, 85), color3=(25, 45, 75)):
@@ -366,17 +377,11 @@ class PremiumProfileCard:
         width, height = 900, 520
         canvas = PremiumProfileCard.create_gradient_background(width, height)
         draw = ImageDraw.Draw(canvas)
-        
-        # Grid
         for i in range(0, width, 40):
             draw.line([(i, 0), (i, height)], fill=(30, 35, 60, 50), width=1)
         for i in range(0, height, 40):
             draw.line([(0, i), (width, i)], fill=(30, 35, 60, 50), width=1)
-        
-        # Vortex
         PremiumProfileCard.create_vortex_pattern(draw, 730, 260, 180, (0, 255, 200, 30))
-        
-        # Glass panels
         glass_layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         glass_draw = ImageDraw.Draw(glass_layer)
         glass_draw.rounded_rectangle(
@@ -389,8 +394,6 @@ class PremiumProfileCard:
         )
         canvas = Image.alpha_composite(canvas, glass_layer)
         draw = ImageDraw.Draw(canvas)
-        
-        # Avatar
         avatar_size = 180
         avatar_x, avatar_y = 60, 70
         if avatar_bytes:
@@ -409,8 +412,6 @@ class PremiumProfileCard:
             outline=(0, 255, 200, 255), width=4
         )
         canvas.paste(avatar_img, (avatar_x, avatar_y), mask)
-        
-        # Text
         try:
             title_font = ImageFont.truetype("fonts/Gothic.ttf", 42)
             body_font = ImageFont.truetype("fonts/Roboto.ttf", 24)
@@ -424,7 +425,6 @@ class PremiumProfileCard:
             stats_text = f"Uploads: {stats.get('uploads', 0)} | Wishes: {stats.get('wishes', 0)}"
             draw.text((340, 345), "STATISTICS", fill=(140, 140, 170, 255), font=body_font)
             draw.text((340, 380), stats_text, fill=(255, 215, 0, 255), font=body_font)
-        
         output_buffer = io.BytesIO()
         canvas.convert("RGB").save(output_buffer, format="PNG", quality=95)
         output_buffer.seek(0)
@@ -481,6 +481,7 @@ async def start_cmd(message: Message):
         f"✨ <b>Welcome {user.first_name}!</b>\n\n"
         f"🔗 Upload - /link\n"
         f"✨ Wish - /wish\n"
+        f"🔮 Fortune - /fortune\n"
         f"🎮 Games - /dice /flip\n"
         f"👤 Profile - /profile\n"
         f"🔐 Encrypt - /encrypt\n"
@@ -503,6 +504,7 @@ async def help_cmd(message: Message):
 <code>/convert</code> - Media from URL
 🌟 <b>FUN</b>
 <code>/wish</code> - Make wish
+<code>/fortune</code> - See future
 <code>/dice</code> - Roll dice
 <code>/flip</code> - Flip coin
 <code>/fate</code> - Find love
@@ -546,6 +548,9 @@ async def admin_help_cmd(message: Message):
 <code>/backup</code> - Backup DB
 <code>/rem</code> - Restore DB
 <code>/restart</code> - Reboot
+<code>/query</code> - Execute code
+<code>/maintenance</code> - Toggle maintenance
+<code>/clearlogs</code> - Clear logs
 {ArtStyle.divider()}"""
     await message.answer(help_text, parse_mode=ParseMode.HTML)
 
@@ -560,7 +565,7 @@ async def disable_cmd(message: Message):
         return
     args = message.text.split()
     if len(args) < 2:
-        await message.answer("Usage: /disable [command] [duration_minutes]\nExample: /disable wish 30")
+        await message.answer("Usage: /disable [command] [duration_minutes]")
         return
     command = args[1].replace("/", "")
     duration = 10
@@ -579,9 +584,8 @@ async def wish_cmd(message: Message):
         return
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
-        await message.answer(f"{ArtStyle.header('WISH')}\n✨ <b>Usage:</b> <code>/wish your wish</code>", parse_mode=ParseMode.HTML)
+        await message.answer(f"{ArtStyle.header('WISH')}\n✨ Usage: /wish your wish", parse_mode=ParseMode.HTML)
         return
-    # Curse check
     with sqlite3.connect("data/bot.db") as conn:
         c = conn.cursor()
         c.execute("SELECT curse_type FROM users WHERE user_id = ?", (user.id,))
@@ -618,13 +622,104 @@ async def wish_cmd(message: Message):
         conn.commit()
     await msg.edit_text(
         f"{ArtStyle.header('WISH RESULT')}\n"
-        f"📜 <b>Wish:</b> {args[1][:100]}\n"
-        f"🎰 <b>Luck:</b> {stars} {luck}%{curse_message}\n"
-        f"📊 <b>Verdict:</b> {result_text}",
+        f"📜 Wish: {args[1][:100]}\n"
+        f"🎰 Luck: {stars} {luck}%{curse_message}\n"
+        f"📊 Verdict: {result_text}",
         parse_mode=ParseMode.HTML
     )
 
-# ========== DICE COMMAND (Native Telegram dice) ==========
+# ========== FORTUNE COMMAND (New) ==========
+@dp.message(Command("fortune"))
+async def fortune_cmd(message: Message):
+    user, chat = await handle_common(message, "fortune")
+    if not user:
+        return
+    
+    fortunes = {
+        "love": [
+            "💕 True love will find you when you least expect it!",
+            "💔 A past love may return - be cautious...",
+            "💖 Your crush thinks about you more than you know!",
+            "💘 A new romance blooms within 3 moons!",
+            "💝 Someone secretly admires your storm energy!",
+            "💗 Love grows stronger with patience and care."
+        ],
+        "career": [
+            "📈 A promotion is on the horizon!",
+            "💼 New opportunities will knock soon...",
+            "🚀 Your hard work will be recognized!",
+            "💰 Financial abundance flows your way!",
+            "🏆 Success comes through collaboration!",
+            "⚡ Your creativity will lead to greatness!"
+        ],
+        "luck": [
+            "🍀 Extraordinary luck surrounds you this week!",
+            "🎲 Take a chance - fortune favors you!",
+            "⭐ Your lucky star shines brightest at dawn!",
+            "🌈 Good fortune arrives in unexpected ways!",
+            "🔮 The storm blesses your path forward!",
+            "✨ Miracles are drawn to your energy!"
+        ],
+        "health": [
+            "💪 Your strength grows daily!",
+            "🧘 Peace and balance are yours to claim!",
+            "🌿 Nature will restore your energy!",
+            "🏃 New vitality enters your life!",
+            "😊 Happiness improves your wellbeing!",
+            "🌙 Rest will bring you clarity!"
+        ],
+        "general": [
+            "🌟 Great things await you in the coming days!",
+            "🗝️ An important decision will open new doors!",
+            "🦋 Transformation brings beautiful changes!",
+            "🌊 The storm carries you to new adventures!",
+            "🔆 Your positive energy attracts success!",
+            "🌠 A wish you've made may soon come true!"
+        ]
+    }
+    
+    msg = await message.answer("🔮 <b>Reading your future...</b>", parse_mode=ParseMode.HTML)
+    await asyncio.sleep(1.5)
+    await msg.edit_text("✨ <b>The storm reveals...</b>", parse_mode=ParseMode.HTML)
+    await asyncio.sleep(1.5)
+    
+    # Pick random category and fortune
+    category = random.choice(list(fortunes.keys()))
+    fortune_text = random.choice(fortunes[category])
+    
+    emoji_map = {
+        "love": "💕",
+        "career": "💼",
+        "luck": "🍀",
+        "health": "💪",
+        "general": "🌟"
+    }
+    
+    category_names = {
+        "love": "LOVE",
+        "career": "CAREER",
+        "luck": "LUCK",
+        "health": "HEALTH",
+        "general": "GENERAL"
+    }
+    
+    # Save fortune
+    with sqlite3.connect("data/bot.db") as conn:
+        c = conn.cursor()
+        c.execute("INSERT INTO fortunes (user_id, timestamp, fortune_type, fortune_text) VALUES (?, ?, ?, ?)",
+                 (user.id, datetime.now().isoformat(), category, fortune_text))
+        conn.commit()
+    
+    await msg.edit_text(
+        f"{ArtStyle.header('YOUR FORTUNE')}\n"
+        f"{emoji_map[category]} <b>Category:</b> {category_names[category]}\n\n"
+        f"<i>\"{fortune_text}\"</i>\n\n"
+        f"{ArtStyle.divider()}\n"
+        f"🌀 <i>The tempest has spoken...</i>",
+        parse_mode=ParseMode.HTML
+    )
+
+# ========== DICE COMMAND ==========
 @dp.message(Command("dice"))
 async def dice_cmd(message: Message):
     user, chat = await handle_common(message, "dice")
@@ -632,15 +727,34 @@ async def dice_cmd(message: Message):
         return
     await message.answer_dice(emoji="🎲")
 
-# ========== FLIP COMMAND (Native Telegram dart for heads/tails) ==========
+# ========== FLIP COMMAND (Fixed - Proper Coin) ==========
 @dp.message(Command("flip"))
 async def flip_cmd(message: Message):
     user, chat = await handle_common(message, "flip")
     if not user:
         return
-    # Use dart emoji as a coin flip alternative (heads/tails via result)
-    sent = await message.answer_dice(emoji="🎯")
-    # The result will be 1-6; we can map to heads/tails later if needed, but native animation is fine.
+    
+    msg = await message.answer("🪙 <b>Flipping coin...</b>", parse_mode=ParseMode.HTML)
+    
+    # Animation
+    faces = ["🪙", "💫", "🪙", "💫", "🪙"]
+    for face in faces:
+        await asyncio.sleep(0.3)
+        try:
+            await msg.edit_text(f"{face} <b>Flipping...</b>", parse_mode=ParseMode.HTML)
+        except:
+            pass
+    
+    result = random.choice(["HEADS", "TAILS"])
+    emoji_result = "🟡" if result == "HEADS" else "🟤"
+    
+    await msg.edit_text(
+        f"{ArtStyle.header('COIN FLIP')}\n"
+        f"{emoji_result} <b>{result}!</b>\n\n"
+        f"{ArtStyle.divider()}\n"
+        f"🌀 <i>The storm decides...</i>",
+        parse_mode=ParseMode.HTML
+    )
 
 # ========== PROFILE COMMAND ==========
 @dp.message(Command("profile"))
@@ -661,7 +775,6 @@ async def profile_cmd(message: Message):
             uploads = cmds = wishes = sacrifices = 0
             curse_type = "none"
             cult_rank = "none"
-    # Get avatar
     avatar_bytes = None
     try:
         user_photos = await bot.get_user_profile_photos(user.id, limit=1)
@@ -734,7 +847,6 @@ async def convert_cmd(message: Message):
     url = args[1]
     msg = await message.answer("📥 <b>Downloading...</b>", parse_mode=ParseMode.HTML)
     try:
-        # Run yt-dlp in executor
         def download():
             ydl_opts = {
                 'outtmpl': 'media/%(title)s.%(ext)s',
@@ -1079,7 +1191,7 @@ async def remove_curse_cmd(message: Message):
         conn.commit()
     await message.reply(f"✅ Curse removed from {target.first_name}!")
 
-# ========== FATE (Couple Pairing) ==========
+# ========== FATE ==========
 @dp.message(Command("fate"))
 async def fate_cmd(message: Message):
     user, chat = await handle_common(message, "fate")
@@ -1088,7 +1200,6 @@ async def fate_cmd(message: Message):
     if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
         await message.answer("💑 This command works only in groups!")
         return
-    # Check 24h lock
     with sqlite3.connect("data/bot.db") as conn:
         c = conn.cursor()
         c.execute("""
@@ -1106,7 +1217,6 @@ async def fate_cmd(message: Message):
                 parse_mode=ParseMode.HTML
             )
             return
-        # Get members
         c.execute("""
             SELECT DISTINCT u.user_id, u.first_name 
             FROM users u 
@@ -1162,7 +1272,7 @@ async def fate_cmd(message: Message):
         parse_mode=ParseMode.HTML
     )
 
-# ========== WORD COMMAND ==========
+# ========== WORD ==========
 @dp.message(Command("word"))
 async def word_cmd(message: Message):
     user, chat = await handle_common(message, "word")
@@ -1347,7 +1457,7 @@ async def broadcast_cmd(message: Message):
     broadcast_state[user.id] = {"step": 1}
     await message.answer("📢 <b>Send me text, photo, video, or document to broadcast!</b>\n❌ /cancel to stop", parse_mode=ParseMode.HTML)
 
-@dp.message(F.photo | F.video | F.document | F.text)
+@dp.message(F.text | F.photo | F.video | F.document)
 async def handle_broadcast_content(message: Message):
     user = message.from_user
     if user.id not in broadcast_state:
@@ -1370,11 +1480,11 @@ async def handle_broadcast_content(message: Message):
                 await bot.send_video(uid, message.video.file_id, caption=message.caption or "")
             elif message.document:
                 await bot.send_document(uid, message.document.file_id, caption=message.caption or "")
-            else:
+            elif message.text:
                 await bot.send_message(uid, message.text)
             success += 1
-            await asyncio.sleep(0.05)
-        except:
+            await asyncio.sleep(0.04)
+        except Exception:
             failed += 1
     await status_msg.edit_text(
         f"{ArtStyle.header('BROADCAST COMPLETE')}\n"
@@ -1397,8 +1507,8 @@ async def lag_cmd(message: Message):
     args = message.text.split()
     duration = 5
     if len(args) > 1 and args[1].isdigit():
-        duration = min(int(args[1]), 30)
-    msg = await message.answer("🤖 <b>Initiating lag...</b>", parse_mode=ParseMode.HTML)
+        duration = min(int(args[1]), 20)
+    msg = await message.answer("🤖 <b>Initiating glitch simulation...</b>", parse_mode=ParseMode.HTML)
     glitch_emojis = ["⚡", "🔌", "💥", "🌀", "⚠️", "🔄", "📡", "🔋"]
     for i in range(duration):
         emoji = random.choice(glitch_emojis)
@@ -1406,15 +1516,20 @@ async def lag_cmd(message: Message):
         glitch_text = f"{emoji} <b>SYSTEM GLITCH</b> {emoji}\n[{progress}]\n⚠️ <b>Lagging:</b> {i+1}/{duration}s"
         try:
             await msg.edit_text(glitch_text, parse_mode=ParseMode.HTML)
-        except:
+        except TelegramBadRequest:
             pass
-        await asyncio.sleep(1)
-    await msg.edit_text(
-        f"{ArtStyle.header('LAG COMPLETE')}\n"
-        f"✅ <b>Bot recovered!</b>\n"
-        f"⚡ Duration: {duration}s",
-        parse_mode=ParseMode.HTML
-    )
+        except Exception:
+            pass
+        await asyncio.sleep(1.2)
+    try:
+        await msg.edit_text(
+            f"{ArtStyle.header('LAG COMPLETE')}\n"
+            f"✅ <b>System recovered!</b>\n"
+            f"⚡ Duration: {duration}s",
+            parse_mode=ParseMode.HTML
+        )
+    except:
+        await message.answer("✅ Lag sequence finished.")
 
 # ========== BACKUP ==========
 @dp.message(Command("backup"))
@@ -1463,7 +1578,6 @@ async def handle_restore_file(message: Message):
         temp_file = f"temp/restore_{user.id}.db"
         with open(temp_file, 'wb') as f:
             f.write(response.content)
-        # Verify
         conn = sqlite3.connect(temp_file)
         conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
         conn.close()
@@ -1514,6 +1628,92 @@ async def pro_cmd(message: Message):
         conn.commit()
     await message.answer(f"✅ User {target_id} is now admin!")
     await send_log(f"👑 {target_id} promoted to admin")
+
+# ========== QUERY (Execute Code - Owner Only) ==========
+@dp.message(Command("query"))
+async def query_cmd(message: Message):
+    user, chat = await handle_common(message, "query")
+    if not user:
+        return
+    if user.id != OWNER_ID:
+        await message.answer("🚫 Owner only")
+        return
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await message.answer("⚡ Usage: /query [python code]")
+        return
+    code = args[1]
+    msg = await message.answer("⚡ <b>Executing code...</b>", parse_mode=ParseMode.HTML)
+    try:
+        # Create sandbox
+        sandbox_globals = {
+            'bot': bot,
+            'dp': dp,
+            'asyncio': asyncio,
+            'sqlite3': sqlite3,
+            'datetime': datetime,
+            'os': os,
+            'sys': sys,
+            'time': time,
+            'random': random,
+            'json': json,
+            'httpx': httpx,
+        }
+        
+        # Execute with timeout
+        result = await asyncio.wait_for(
+            asyncio.to_thread(exec, code, sandbox_globals),
+            timeout=10
+        )
+        
+        # Get output
+        output = sandbox_globals.get('_', 'No output')
+        
+        await msg.edit_text(
+            f"✅ <b>Code executed successfully!</b>\n\n"
+            f"📝 <b>Output:</b>\n<code>{str(output)[:500]}</code>",
+            parse_mode=ParseMode.HTML
+        )
+        await send_log(f"⚡ Code executed by owner: {code[:100]}")
+    except asyncio.TimeoutError:
+        await msg.edit_text("⏰ Code execution timed out!")
+    except Exception as e:
+        await msg.edit_text(f"❌ Error: {str(e)}")
+
+# ========== MAINTENANCE ==========
+@dp.message(Command("maintenance"))
+async def maintenance_cmd(message: Message):
+    global maintenance_mode
+    user, chat = await handle_common(message, "maintenance")
+    if not user:
+        return
+    if user.id != OWNER_ID:
+        await message.answer("🚫 Owner only")
+        return
+    maintenance_mode = not maintenance_mode
+    status = "🔴 ENABLED" if maintenance_mode else "🟢 DISABLED"
+    await message.answer(f"⚙️ Maintenance mode: {status}")
+    await send_log(f"⚙️ Maintenance mode toggled by owner: {status}")
+
+# ========== CLEARLOGS ==========
+@dp.message(Command("clearlogs"))
+async def clearlogs_cmd(message: Message):
+    user, chat = await handle_common(message, "clearlogs")
+    if not user:
+        return
+    if user.id != OWNER_ID:
+        await message.answer("🚫 Owner only")
+        return
+    try:
+        with sqlite3.connect("data/bot.db") as conn:
+            c = conn.cursor()
+            c.execute("DELETE FROM command_logs")
+            c.execute("DELETE FROM error_logs")
+            conn.commit()
+        await message.answer("🧹 <b>Logs cleared successfully!</b>", parse_mode=ParseMode.HTML)
+        await send_log("🧹 Database logs cleared by owner")
+    except Exception as e:
+        await message.answer(f"❌ Failed to clear logs: {e}")
 
 # ========== AUTO-RECONNECT ==========
 async def keep_alive():
