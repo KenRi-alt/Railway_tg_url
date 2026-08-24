@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ========== TEMPEST BOT - ULTIMATE FIXED ==========
+# ========== TEMPEST BOT - FINAL COMPLETE ==========
 import os
 import asyncio
 import time
@@ -14,14 +14,13 @@ import math
 import io
 import base64
 import sys
-import subprocess
-import textwrap
+import contextlib
 from datetime import datetime, timedelta
 from pathlib import Path
 from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageEnhance, ImageFilter
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, FSInputFile, CallbackQuery, BufferedInputFile
@@ -29,18 +28,24 @@ from aiogram.enums import ParseMode, ChatType
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
 
+# Timezone support
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
+
 print("=" * 60)
-print("🌀 TEMPEST BOT - ULTIMATE FIXED")
-print("✅ All commands operational")
+print("🌀 TEMPEST BOT - FINAL COMPLETE")
+print("✅ All systems operational")
 print("=" * 60)
 
 # ========== CONFIG ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAFVRZytQIWAq6S3r6NXM-CvPbt_agGMk4Y")
-OWNER_ID = int(os.getenv("OWNER_ID", "6108185460"))
+OWNER_ID = 6108185460  # YOUR ID
 UPLOAD_API = "https://catbox.moe/user/api.php"
 LOG_CHANNEL_ID = -1003662720845
 
-# Try importing yt-dlp
+# Try yt-dlp
 try:
     import yt_dlp
     YTDLP_AVAILABLE = True
@@ -61,22 +66,9 @@ broadcast_state = {}
 pending_restore = {}
 disabled_commands = {}
 maintenance_mode = False
-last_activity = datetime.now()
 
-# ========== COMPACT ART STYLE ==========
+# ========== ART STYLE ==========
 class ArtStyle:
-    @staticmethod
-    def fancy_text(text):
-        fancy_map = {
-            'a': '𝔞', 'b': '𝔟', 'c': '𝔠', 'd': '𝔡', 'e': '𝔢',
-            'f': '𝔣', 'g': '𝔤', 'h': '𝔥', 'i': '𝔦', 'j': '𝔧',
-            'k': '𝔨', 'l': '𝔩', 'm': '𝔪', 'n': '𝔫', 'o': '𝔬',
-            'p': '𝔭', 'q': '𝔮', 'r': '𝔯', 's': '𝔰', 't': '𝔱',
-            'u': '𝔲', 'v': '𝔳', 'w': '𝔴', 'x': '𝔵', 'y': '𝔶',
-            'z': '𝔷'
-        }
-        return ''.join(fancy_map.get(c.lower(), c) for c in text)
-    
     @staticmethod
     def header(title):
         return f"◤━━━━━━━━━━━━━━━━━━━━◥\n◇ {title} ◇\n◣━━━━━━━━━━━━━━━━━━━━◢"
@@ -85,7 +77,90 @@ class ArtStyle:
     def divider():
         return "━━━━━━━━━━━━━━━━━━━━"
 
-# ========== DATABASE INIT ==========
+# ========== ANIME QUOTES ==========
+ANIME_QUOTES = [
+    "「Wake up to reality! Nothing ever goes as planned in this accursed world.」\n— Madara Uchiha",
+    "「The longer you live, the more you realize that reality is just made of pain, suffering and emptiness.」\n— Madara Uchiha",
+    "「In this world, wherever there is light, there are also shadows.」\n— Madara Uchiha",
+    "「People cannot show each other their true feelings. Fear, suspicion, and resentment never subside.」\n— Madara Uchiha",
+    "「The concept of hope is nothing more than giving up. A word that holds no true meaning.」\n— Madara Uchiha",
+    "「When a man learns to love, he must bear the risk of hatred.」\n— Madara Uchiha",
+    "「Those who cannot acknowledge themselves will eventually fail.」\n— Itachi Uchiha",
+    "「It is not wise to judge others based on your own preconceptions and by their appearances.」\n— Itachi Uchiha",
+    "「People's lives don't end when they die. It ends when they lose faith.」\n— Itachi Uchiha",
+    "「If you want to know who you are, you have to look at your real self and acknowledge what you see.」\n— Itachi Uchiha",
+    "「The only thing we're allowed to do is to believe that we won't regret the choice we made.」\n— Levi Ackerman",
+    "「I can win as long as I don't know defeat.」\n— Rantaro Amami",
+    "「If you don't want to be betrayed anymore, then start by not trusting people.」\n— Rantaro Amami",
+    "「Even if I die, I'll protect my comrades.」\n— Roronoa Zoro",
+    "「When you're hungry, eat. When you're tired, sleep.」\n— Roronoa Zoro",
+    "「Fear is not evil. It tells you what your weakness is.」\n— Gildarts Clive",
+    "「A lesson without pain is meaningless.」\n— Edward Elric",
+    "「Nothing's perfect, the world's not perfect, but it's there for us, trying the best it can.」\n— Roy Mustang",
+    "「If you don't take risks, you can't create a future.」\n— Monkey D. Luffy",
+    "「Power isn't determined by your size, but by the size of your heart and dreams.」\n— Monkey D. Luffy",
+    "「When do you think people die? When they are shot? No. When they are forgotten.」\n— Dr. Hiluluk",
+    "「The world isn't perfect. But it's there for us, doing the best it can. That's what makes it so damn beautiful.」\n— Roy Mustang",
+]
+
+# ========== COUNTRY TIMEZONES ==========
+COUNTRY_TIMEZONES = {
+    "usa": "America/New_York",
+    "uk": "Europe/London",
+    "india": "Asia/Kolkata",
+    "japan": "Asia/Tokyo",
+    "china": "Asia/Shanghai",
+    "russia": "Europe/Moscow",
+    "brazil": "America/Sao_Paulo",
+    "australia": "Australia/Sydney",
+    "canada": "America/Toronto",
+    "germany": "Europe/Berlin",
+    "france": "Europe/Paris",
+    "italy": "Europe/Rome",
+    "spain": "Europe/Madrid",
+    "mexico": "America/Mexico_City",
+    "south korea": "Asia/Seoul",
+    "indonesia": "Asia/Jakarta",
+    "pakistan": "Asia/Karachi",
+    "bangladesh": "Asia/Dhaka",
+    "nigeria": "Africa/Lagos",
+    "egypt": "Africa/Cairo",
+    "south africa": "Africa/Johannesburg",
+    "kenya": "Africa/Nairobi",
+    "uganda": "Africa/Kampala",
+    "tanzania": "Africa/Dar_es_Salaam",
+    "ethiopia": "Africa/Addis_Ababa",
+    "ghana": "Africa/Accra",
+    "uae": "Asia/Dubai",
+    "saudi arabia": "Asia/Riyadh",
+    "turkey": "Europe/Istanbul",
+    "thailand": "Asia/Bangkok",
+    "vietnam": "Asia/Ho_Chi_Minh",
+    "philippines": "Asia/Manila",
+    "malaysia": "Asia/Kuala_Lumpur",
+    "singapore": "Asia/Singapore",
+    "new zealand": "Pacific/Auckland",
+    "argentina": "America/Argentina/Buenos_Aires",
+    "chile": "America/Santiago",
+    "colombia": "America/Bogota",
+    "peru": "America/Lima",
+    "sweden": "Europe/Stockholm",
+    "norway": "Europe/Oslo",
+    "denmark": "Europe/Copenhagen",
+    "netherlands": "Europe/Amsterdam",
+    "belgium": "Europe/Brussels",
+    "switzerland": "Europe/Zurich",
+    "austria": "Europe/Vienna",
+    "poland": "Europe/Warsaw",
+    "ukraine": "Europe/Kiev",
+    "greece": "Europe/Athens",
+    "portugal": "Europe/Lisbon",
+    "ireland": "Europe/Dublin",
+    "scotland": "Europe/London",
+    "wales": "Europe/London",
+}
+
+# ========== DATABASE ==========
 def init_db():
     with sqlite3.connect("data/bot.db") as conn:
         c = conn.cursor()
@@ -103,43 +178,34 @@ def init_db():
             cult_rank TEXT DEFAULT 'none',
             cult_join_date TEXT,
             sacrifices INTEGER DEFAULT 0,
-            curse_type TEXT DEFAULT 'none',
-            curse_time TEXT DEFAULT NULL,
-            curse_by INTEGER DEFAULT NULL
+            curse_type TEXT DEFAULT 'none'
         )''')
         c.execute('''CREATE TABLE IF NOT EXISTS groups (
             group_id INTEGER PRIMARY KEY,
             title TEXT,
-            username TEXT,
             joined_date TEXT,
-            last_active TEXT,
-            messages INTEGER DEFAULT 0,
-            commands INTEGER DEFAULT 0
+            last_active TEXT
         )''')
         c.execute('''CREATE TABLE IF NOT EXISTS uploads (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
             timestamp TEXT,
             file_url TEXT,
-            file_type TEXT,
-            file_size INTEGER
+            file_type TEXT
         )''')
         c.execute('''CREATE TABLE IF NOT EXISTS command_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
             user_id INTEGER,
             chat_id INTEGER,
-            chat_type TEXT,
             command TEXT,
             success INTEGER
         )''')
         c.execute('''CREATE TABLE IF NOT EXISTS error_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
-            user_id INTEGER,
             command TEXT,
-            error TEXT,
-            traceback TEXT
+            error TEXT
         )''')
         c.execute('''CREATE TABLE IF NOT EXISTS wishes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -147,27 +213,6 @@ def init_db():
             timestamp TEXT,
             wish_text TEXT,
             luck INTEGER
-        )''')
-        c.execute('''CREATE TABLE IF NOT EXISTS bot_state (
-            key TEXT PRIMARY KEY,
-            value TEXT,
-            timestamp TEXT
-        )''')
-        c.execute('''CREATE TABLE IF NOT EXISTS story_chapters (
-            chapter_number INTEGER PRIMARY KEY,
-            title TEXT,
-            content TEXT,
-            added_by INTEGER,
-            added_date TEXT,
-            is_published INTEGER DEFAULT 1
-        )''')
-        c.execute('''CREATE TABLE IF NOT EXISTS encrypted_messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            timestamp TEXT,
-            original_text TEXT,
-            encrypted_text TEXT,
-            method TEXT
         )''')
         c.execute('''CREATE TABLE IF NOT EXISTS fate_pairs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -183,71 +228,33 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
             timestamp TEXT,
-            fortune_type TEXT,
             fortune_text TEXT
         )''')
-        c.execute("INSERT OR IGNORE INTO users (user_id, first_name, joined_date, last_active, is_admin) VALUES (?, ?, ?, ?, ?)",
-                  (OWNER_ID, "Owner", datetime.now().isoformat(), datetime.now().isoformat(), 1))
+        c.execute("INSERT OR IGNORE INTO users (user_id, first_name, is_admin) VALUES (?, 'Owner', 1)", (OWNER_ID,))
         conn.commit()
-        print("✅ Database initialized")
 
 init_db()
 
-# ========== FIXED LOG FUNCTION ==========
-async def send_log(message: str):
+# ========== LOG ==========
+async def send_log(msg):
     try:
-        print(f"📢 LOG: {message[:100]}")
-        await bot.send_message(LOG_CHANNEL_ID, message[:4000], parse_mode=ParseMode.HTML)
+        await bot.send_message(LOG_CHANNEL_ID, msg[:4000])
     except Exception as e:
-        print(f"❌ Log error: {e}")
+        print(f"Log error: {e}")
 
-# ========== HELPER FUNCTIONS ==========
-async def safe_answer_callback(callback: CallbackQuery, text: str = None, show_alert: bool = False):
-    try:
-        await callback.answer(text, show_alert=show_alert)
-    except:
-        pass
-
-def format_uptime(seconds):
-    days = seconds // 86400
-    hours = (seconds % 86400) // 3600
-    minutes = (seconds % 3600) // 60
-    secs = seconds % 60
-    parts = []
-    if days > 0:
-        parts.append(f"{days}d")
-    if hours > 0:
-        parts.append(f"{hours}h")
-    if minutes > 0:
-        parts.append(f"{minutes}m")
-    if secs > 0 or not parts:
-        parts.append(f"{int(secs)}s")
-    return " ".join(parts)
-
+# ========== HELPERS ==========
 async def handle_common(message: Message, command: str):
     user = message.from_user
     chat = message.chat
-
-    # Check maintenance mode
-    global maintenance_mode
+    
     if maintenance_mode and user.id != OWNER_ID:
-        if not await is_admin(user.id):
-            await message.answer(
-                f"{ArtStyle.header('MAINTENANCE')}\n"
-                f"🔧 <b>Bot is under maintenance!</b>\n"
-                f"⏳ Please try again later.",
-                parse_mode=ParseMode.HTML
-            )
-            return None, None
-
-    # Check disabled commands
-    if command in disabled_commands:
-        disabled_until = disabled_commands[command]
-        if disabled_until > datetime.now():
-            await message.answer(f"⛔ This command is disabled for {format_uptime(int((disabled_until - datetime.now()).total_seconds()))}")
-            return None, None
-
-    # Update user in DB
+        await message.answer("🔧 Bot under maintenance!")
+        return None, None
+    
+    if command in disabled_commands and disabled_commands[command] > datetime.now():
+        await message.answer("⛔ Command disabled!")
+        return None, None
+    
     try:
         with sqlite3.connect("data/bot.db") as conn:
             c = conn.cursor()
@@ -256,39 +263,20 @@ async def handle_common(message: Message, command: str):
                 c.execute("INSERT INTO users (user_id, username, first_name, joined_date, last_active) VALUES (?, ?, ?, ?, ?)",
                          (user.id, user.username, user.first_name, datetime.now().isoformat(), datetime.now().isoformat()))
             else:
-                c.execute("UPDATE users SET last_active = ?, username = ?, first_name = ? WHERE user_id = ?",
-                         (datetime.now().isoformat(), user.username, user.first_name, user.id))
+                c.execute("UPDATE users SET last_active = ? WHERE user_id = ?", (datetime.now().isoformat(), user.id))
             conn.commit()
     except:
         pass
-
-    # Update group if in group
-    if chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
-        try:
-            with sqlite3.connect("data/bot.db") as conn:
-                c = conn.cursor()
-                c.execute("SELECT group_id FROM groups WHERE group_id = ?", (chat.id,))
-                if not c.fetchone():
-                    c.execute("INSERT INTO groups (group_id, title, username, joined_date, last_active) VALUES (?, ?, ?, ?, ?)",
-                             (chat.id, chat.title, chat.username, datetime.now().isoformat(), datetime.now().isoformat()))
-                else:
-                    c.execute("UPDATE groups SET last_active = ?, title = ?, username = ? WHERE group_id = ?",
-                             (datetime.now().isoformat(), chat.title, chat.username, chat.id))
-                conn.commit()
-        except:
-            pass
-
-    # Log command
+    
     try:
         with sqlite3.connect("data/bot.db") as conn:
             c = conn.cursor()
-            c.execute("INSERT INTO command_logs (timestamp, user_id, chat_id, chat_type, command, success) VALUES (?, ?, ?, ?, ?, ?)",
-                      (datetime.now().isoformat(), user.id, chat.id, str(chat.type), command, 1))
-            c.execute("UPDATE users SET commands = commands + 1 WHERE user_id = ?", (user.id,))
+            c.execute("INSERT INTO command_logs (timestamp, user_id, chat_id, command, success) VALUES (?, ?, ?, ?, 1)",
+                     (datetime.now().isoformat(), user.id, chat.id, command))
             conn.commit()
     except:
         pass
-
+    
     return user, chat
 
 async def is_admin(user_id):
@@ -303,34 +291,17 @@ async def is_admin(user_id):
     except:
         return False
 
-def save_bot_state():
-    try:
-        with sqlite3.connect("data/bot.db") as conn:
-            c = conn.cursor()
-            now = datetime.now().isoformat()
-            c.execute("DELETE FROM bot_state")
-            for user_id, waiting in upload_waiting.items():
-                if waiting:
-                    c.execute("INSERT INTO bot_state (key, value, timestamp) VALUES (?, ?, ?)",
-                             (f"upload_{user_id}", "1", now))
-            conn.commit()
-    except:
-        pass
-
-def load_bot_state():
-    try:
-        with sqlite3.connect("data/bot.db") as conn:
-            c = conn.cursor()
-            upload_waiting.clear()
-            c.execute("SELECT key FROM bot_state WHERE key LIKE 'upload_%'")
-            for (key,) in c.fetchall():
-                user_id = int(key.split("_")[1])
-                upload_waiting[user_id] = True
-        print(f"✅ Restored {len(upload_waiting)} upload states")
-    except:
-        pass
-
-load_bot_state()
+def format_uptime(seconds):
+    days = seconds // 86400
+    hours = (seconds % 86400) // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    parts = []
+    if days: parts.append(f"{days}d")
+    if hours: parts.append(f"{hours}h")
+    if minutes: parts.append(f"{minutes}m")
+    if secs or not parts: parts.append(f"{secs}s")
+    return " ".join(parts)
 
 async def upload_to_catbox(file_data, filename):
     try:
@@ -343,134 +314,141 @@ async def upload_to_catbox(file_data, filename):
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
-# ========== PREMIUM PROFILE CARD (Same as before) ==========
+# ========== 3X SUPER-SAMPLED PROFILE CARD ==========
 class PremiumProfileCard:
     @staticmethod
-    def create_gradient_background(width, height, color1=(15, 15, 35), color2=(45, 25, 85), color3=(25, 45, 75)):
-        base = Image.new('RGBA', (width, height), color1)
-        draw = ImageDraw.Draw(base)
-        for y in range(height):
-            ratio = y / height
-            if ratio < 0.5:
-                r = int(color1[0] + (color2[0] - color1[0]) * (ratio * 2))
-                g = int(color1[1] + (color2[1] - color1[1]) * (ratio * 2))
-                b = int(color1[2] + (color2[2] - color1[2]) * (ratio * 2))
-            else:
-                r = int(color2[0] + (color3[0] - color2[0]) * ((ratio - 0.5) * 2))
-                g = int(color2[1] + (color3[1] - color2[1]) * ((ratio - 0.5) * 2))
-                b = int(color2[2] + (color3[2] - color2[2]) * ((ratio - 0.5) * 2))
-            draw.line([(0, y), (width, y)], fill=(r, g, b, 255))
-        return base
-    
-    @staticmethod
-    def create_vortex_pattern(draw, center_x, center_y, max_radius=200, color=(0, 255, 200, 40)):
-        for angle in range(0, 360, 15):
-            rad = math.radians(angle)
-            x1 = center_x + int(max_radius * 0.3 * math.cos(rad))
-            y1 = center_y + int(max_radius * 0.3 * math.sin(rad))
-            x2 = center_x + int(max_radius * math.cos(rad))
-            y2 = center_y + int(max_radius * math.sin(rad))
-            draw.line([(x1, y1), (x2, y2)], fill=color, width=2)
-    
-    @staticmethod
-    def generate_premium_card_sync(username, user_id, rank, avatar_bytes=None, stats=None):
-        width, height = 900, 520
-        canvas = PremiumProfileCard.create_gradient_background(width, height)
-        draw = ImageDraw.Draw(canvas)
-        for i in range(0, width, 40):
-            draw.line([(i, 0), (i, height)], fill=(30, 35, 60, 50), width=1)
-        for i in range(0, height, 40):
-            draw.line([(0, i), (width, i)], fill=(30, 35, 60, 50), width=1)
-        PremiumProfileCard.create_vortex_pattern(draw, 730, 260, 180, (0, 255, 200, 30))
-        glass_layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-        glass_draw = ImageDraw.Draw(glass_layer)
-        glass_draw.rounded_rectangle(
-            [30, 30, width - 30, height - 30],
-            radius=25, fill=(25, 25, 45, 180), outline=(138, 43, 226, 200), width=2
-        )
-        glass_draw.rounded_rectangle(
-            [320, 320, 840, 440],
-            radius=15, fill=(10, 10, 20, 150), outline=(0, 255, 200, 120), width=1
-        )
-        canvas = Image.alpha_composite(canvas, glass_layer)
-        draw = ImageDraw.Draw(canvas)
-        avatar_size = 180
-        avatar_x, avatar_y = 60, 70
+    def generate_card_sync(username, user_id, rank, avatar_bytes=None, stats=None, is_couple=False, person2=None):
+        scale = 3
+        base_w, base_h = 900, 520
+        w, h = base_w * scale, base_h * scale
+        
+        # Deep dark blue background
+        img = Image.new("RGBA", (w, h), (7, 11, 22, 255))
+        draw = ImageDraw.Draw(img)
+        
+        # Subtle grid
+        for x in range(0, w, 40*scale):
+            draw.line([(x, 0), (x, h)], fill=(20, 30, 50, 40), width=1)
+        for y in range(0, h, 40*scale):
+            draw.line([(0, y), (w, y)], fill=(20, 30, 50, 40), width=1)
+        
+        # Border
+        draw.rectangle([15*scale, 15*scale, w-15*scale, h-15*scale], outline=(30, 90, 160, 180), width=3*scale)
+        
+        # Load fonts
+        try:
+            font_title = ImageFont.truetype("fonts/DejaVuSans-Bold.ttf", 36*scale)
+            font_body = ImageFont.truetype("fonts/DejaVuSans.ttf", 20*scale)
+            font_small = ImageFont.truetype("fonts/DejaVuSans.ttf", 14*scale)
+        except:
+            font_title = ImageFont.load_default()
+            font_body = ImageFont.load_default()
+            font_small = ImageFont.load_default()
+        
+        # Avatar
+        avatar_size = 160 * scale
+        avatar_x, avatar_y = 50*scale, 60*scale
+        
         if avatar_bytes:
             try:
                 avatar_img = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
                 avatar_img = ImageOps.fit(avatar_img, (avatar_size, avatar_size), Image.Resampling.LANCZOS)
             except:
-                avatar_img = Image.new("RGBA", (avatar_size, avatar_size), (50, 50, 80, 255))
+                avatar_img = Image.new("RGBA", (avatar_size, avatar_size), (50, 60, 90, 255))
         else:
-            avatar_img = Image.new("RGBA", (avatar_size, avatar_size), (50, 50, 80, 255))
+            avatar_img = Image.new("RGBA", (avatar_size, avatar_size), (50, 60, 90, 255))
+            d2 = ImageDraw.Draw(avatar_img)
+            d2.text((avatar_size//2, avatar_size//2), username[:1].upper(), fill=(255,255,255), font=font_title, anchor="mm")
+        
+        # Circular mask
         mask = Image.new("L", (avatar_size, avatar_size), 0)
         mask_draw = ImageDraw.Draw(mask)
         mask_draw.ellipse((0, 0, avatar_size, avatar_size), fill=255)
-        draw.ellipse(
-            [avatar_x - 5, avatar_y - 5, avatar_x + avatar_size + 5, avatar_y + avatar_size + 5],
-            outline=(0, 255, 200, 255), width=4
-        )
-        canvas.paste(avatar_img, (avatar_x, avatar_y), mask)
-        try:
-            title_font = ImageFont.truetype("fonts/Gothic.ttf", 42)
-            body_font = ImageFont.truetype("fonts/Roboto.ttf", 24)
-        except:
-            title_font = ImageFont.load_default()
-            body_font = ImageFont.load_default()
-        draw.text((320, 80), username, fill=(255, 255, 255, 255), font=title_font)
-        draw.text((320, 140), f"ID: {user_id}", fill=(180, 180, 210, 255), font=body_font)
-        draw.text((320, 180), f"Rank: {rank}", fill=(0, 255, 200, 255), font=body_font)
+        
+        # Glow ring
+        draw.ellipse([avatar_x-5*scale, avatar_y-5*scale, avatar_x+avatar_size+5*scale, avatar_y+avatar_size+5*scale],
+                    outline=(0, 255, 200, 255), width=4*scale)
+        
+        img.paste(avatar_img, (avatar_x, avatar_y), mask)
+        
+        # Text
+        if is_couple and person2:
+            draw.text((280*scale, 70*scale), f"{username} 💘 {person2}", fill=(255, 255, 255, 255), font=font_title)
+            draw.text((280*scale, 130*scale), "FATE PAIR", fill=(0, 190, 255, 255), font=font_body)
+        else:
+            draw.text((280*scale, 70*scale), username, fill=(255, 255, 255, 255), font=font_title)
+            draw.text((280*scale, 130*scale), f"ID: {user_id}", fill=(180, 190, 210, 255), font=font_body)
+            draw.text((280*scale, 170*scale), f"Rank: {rank}", fill=(0, 255, 200, 255), font=font_body)
+        
         if stats:
             stats_text = f"Uploads: {stats.get('uploads', 0)} | Wishes: {stats.get('wishes', 0)}"
-            draw.text((340, 345), "STATISTICS", fill=(140, 140, 170, 255), font=body_font)
-            draw.text((340, 380), stats_text, fill=(255, 215, 0, 255), font=body_font)
-        output_buffer = io.BytesIO()
-        canvas.convert("RGB").save(output_buffer, format="PNG", quality=95)
-        output_buffer.seek(0)
-        return output_buffer.getvalue()
+            draw.text((280*scale, 220*scale), stats_text, fill=(255, 215, 0, 255), font=font_body)
+        
+        # Downscale with LANCZOS
+        final = img.resize((base_w, base_h), Image.Resampling.LANCZOS)
+        
+        buf = io.BytesIO()
+        final.save(buf, format="PNG", quality=100)
+        buf.seek(0)
+        return buf.getvalue()
     
     @staticmethod
-    async def generate_premium_card(username, user_id, rank, avatar_bytes=None, stats=None):
+    async def generate_card(username, user_id, rank, avatar_bytes=None, stats=None, is_couple=False, person2=None):
         return await asyncio.to_thread(
-            PremiumProfileCard.generate_premium_card_sync,
-            username, user_id, rank, avatar_bytes, stats
+            PremiumProfileCard.generate_card_sync,
+            username, user_id, rank, avatar_bytes, stats, is_couple, person2
         )
 
-# ========== ENCRYPTION ==========
-class EncryptionEngine:
-    @staticmethod
-    def xor_encrypt(text, key="TEMPEST"):
-        result = []
-        key_length = len(key)
-        for i, char in enumerate(text):
-            result.append(chr(ord(char) ^ ord(key[i % key_length])))
-        return ''.join(result)
+# ========== TEMPEST FATE CARD ==========
+def create_tempest_fate_card(name1, name2, percentage, quote):
+    scale = 3
+    base_w, base_h = 900, 450
+    w, h = base_w * scale, base_h * scale
     
-    @staticmethod
-    def base64_encode(text):
-        return base64.b64encode(text.encode()).decode()
+    img = Image.new("RGBA", (w, h), (7, 11, 22, 255))
+    draw = ImageDraw.Draw(img)
     
-    @staticmethod
-    def base64_decode(text):
-        try:
-            return base64.b64decode(text.encode()).decode()
-        except:
-            return None
+    # Subtle symbols
+    symbol_color = (35, 65, 105, 90)
+    for x in range(120, w, 180):
+        for y in range(80, h, 140):
+            size = 8 * scale
+            draw.line([(x - size, y), (x + size, y)], fill=symbol_color, width=1)
+            draw.line([(x, y - size), (x, y + size)], fill=symbol_color, width=1)
     
-    @staticmethod
-    def multi_layer_encrypt(text):
-        encrypted = EncryptionEngine.xor_encrypt(text)
-        return EncryptionEngine.base64_encode(encrypted)
+    # Border
+    draw.rectangle([15*scale, 15*scale, w-15*scale, h-15*scale], outline=(30, 90, 160, 180), width=2*scale)
     
-    @staticmethod
-    def multi_layer_decrypt(text):
-        decoded = EncryptionEngine.base64_decode(text)
-        if decoded is None:
-            return None
-        return EncryptionEngine.xor_encrypt(decoded)
+    # Fonts
+    try:
+        font_massive = ImageFont.truetype("fonts/DejaVuSans-Bold.ttf", 48*scale)
+        font_sub = ImageFont.truetype("fonts/DejaVuSans.ttf", 14*scale)
+        font_name = ImageFont.truetype("fonts/DejaVuSans-Bold.ttf", 20*scale)
+    except:
+        font_massive = ImageFont.load_default()
+        font_sub = ImageFont.load_default()
+        font_name = ImageFont.load_default()
+    
+    # Massive text
+    draw.text((105*scale, 60*scale), "TEMPEST", fill=(235, 245, 255, 255), font=font_massive)
+    draw.text((105*scale, 130*scale), "FATE", fill=(0, 190, 255, 255), font=font_massive)
+    
+    # Names
+    draw.text((110*scale, 220*scale), f"{name1} 💘 {name2}", fill=(255, 255, 255, 255), font=font_name)
+    draw.text((110*scale, 260*scale), f"{percentage}% LOVE", fill=(255, 100, 150, 255), font=font_name)
+    
+    # Anime quote
+    draw.text((110*scale, 310*scale), "— THE STORM AWAKENS —", fill=(120, 150, 190, 255), font=font_sub)
+    
+    # Downscale
+    final = img.resize((base_w, base_h), Image.Resampling.LANCZOS)
+    
+    buf = io.BytesIO()
+    final.save(buf, format="PNG", quality=100)
+    buf.seek(0)
+    return buf.getvalue()
 
-# ========== START COMMAND ==========
+# ========== COMMANDS ==========
 @dp.message(CommandStart())
 async def start_cmd(message: Message):
     user, chat = await handle_common(message, "start")
@@ -478,105 +456,270 @@ async def start_cmd(message: Message):
         return
     await message.answer(
         f"{ArtStyle.header('TEMPEST BOT')}\n"
-        f"✨ <b>Welcome {user.first_name}!</b>\n\n"
-        f"🔗 Upload - /link\n"
-        f"✨ Wish - /wish\n"
-        f"🔮 Fortune - /fortune\n"
-        f"🎮 Games - /dice /flip\n"
-        f"👤 Profile - /profile\n"
-        f"🔐 Encrypt - /encrypt\n"
-        f"📥 Convert - /convert\n"
-        f"🌀 Tempest - /tempest_join\n"
-        f"📚 Help - /help",
+        f"✨ Welcome {user.first_name}!\n\n"
+        f"/help - All commands\n/profile - Your stats\n/wish - Make wish\n/tempest_join - Join cult"
+    )
+
+@dp.message(Command("myid"))
+async def myid_cmd(message: Message):
+    await message.answer(
+        f"🆔 Your ID: <code>{message.from_user.id}</code>\n"
+        f"👑 Owner ID: <code>{OWNER_ID}</code>",
         parse_mode=ParseMode.HTML
     )
-    await send_log(f"👤 New user: {user.first_name} ({user.id})")
 
-# ========== HELP COMMAND ==========
 @dp.message(Command("help"))
 async def help_cmd(message: Message):
     user, chat = await handle_common(message, "help")
     if not user:
         return
-    help_text = f"""{ArtStyle.header('COMMANDS')}
-🔗 <b>UPLOAD</b>
-<code>/link</code> - Upload file
-<code>/convert</code> - Media from URL
-🌟 <b>FUN</b>
-<code>/wish</code> - Make wish
-<code>/fortune</code> - See future
-<code>/dice</code> - Roll dice
-<code>/flip</code> - Flip coin
-<code>/fate</code> - Find love
-👤 <b>PROFILE</b>
-<code>/profile</code> - View stats
-🔐 <b>SECURITY</b>
-<code>/encrypt</code> - Encrypt msg
-<code>/decrypt</code> - Decrypt msg
-🌀 <b>TEMPEST</b>
-<code>/tempest_join</code> - Join cult
-<code>/tempest_story</code> - Read lore
-<code>/tempest_creed</code> - Members
-<code>/shrine</code> - Group shrine
-<code>/curse</code> - Curse user
-📝 <b>UTILITY</b>
-<code>/word</code> - Text to DOCX
-{ArtStyle.divider()}
-🌀 <i>The storm flows through you</i>"""
-    await message.answer(help_text, parse_mode=ParseMode.HTML)
+    await message.answer(
+        f"{ArtStyle.header('COMMANDS')}\n"
+        f"🔗 /link - Upload file\n"
+        f"📥 /convert - Convert media\n"
+        f"✨ /wish - Make wish\n"
+        f"🔮 /fortune - See future\n"
+        f"🎮 /dice - Roll dice\n"
+        f"🪙 /flip - Flip coin\n"
+        f"💑 /fate - Find love\n"
+        f"👤 /profile - Your stats\n"
+        f"🔐 /encrypt - Encrypt msg\n"
+        f"🌀 /tempest_join - Join cult\n"
+        f"📜 /tempest_story - Read lore\n"
+        f"🌍 /time [country] - World time\n"
+        f"📝 /word - Text to DOCX"
+    )
 
-# ========== ADMIN HELP ==========
 @dp.message(Command("admin_help"))
 async def admin_help_cmd(message: Message):
     user, chat = await handle_common(message, "admin_help")
     if not user:
         return
     if not await is_admin(user.id):
-        await message.answer("🚫 Admin only")
+        await message.answer(f"🚫 Admin only. Your ID: {user.id}")
         return
-    help_text = f"""{ArtStyle.header('ADMIN COMMANDS')}
-👑 <b>ADMIN</b>
-<code>/ping</code> - System status
-<code>/stats</code> - Statistics
-<code>/users</code> - User list
-<code>/scan</code> - Scan database
-<code>/broadcast</code> - Message all
-<code>/disable</code> - Disable cmd
-<code>/lag</code> - Glitch effect
-⚡ <b>OWNER</b>
-<code>/pro</code> - Make admin
-<code>/backup</code> - Backup DB
-<code>/rem</code> - Restore DB
-<code>/restart</code> - Reboot
-<code>/query</code> - Execute code
-<code>/maintenance</code> - Toggle maintenance
-<code>/clearlogs</code> - Clear logs
-{ArtStyle.divider()}"""
-    await message.answer(help_text, parse_mode=ParseMode.HTML)
+    await message.answer(
+        f"{ArtStyle.header('ADMIN COMMANDS')}\n"
+        f"/ping - System status\n/stats - Stats\n/users - User list\n"
+        f"/scan - Scan DB\n/broadcast - Message all\n/disable - Disable cmd\n"
+        f"/lag - Glitch effect\n\n"
+        f"👑 OWNER:\n/pro - Make admin\n/backup - Backup DB\n"
+        f"/rem - Restore DB\n/restart - Reboot\n/query - Execute code\n"
+        f"/maintenance - Toggle maintenance\n/clearlogs - Clear logs\n"
+        f"/logs - View recent logs"
+    )
 
-# ========== DISABLE COMMAND ==========
-@dp.message(Command("disable"))
-async def disable_cmd(message: Message):
-    user, chat = await handle_common(message, "disable")
+# ========== TIME COMMAND ==========
+@dp.message(Command("time"))
+async def time_cmd(message: Message):
+    user, chat = await handle_common(message, "time")
     if not user:
         return
-    if not await is_admin(user.id):
-        await message.answer("🚫 Admin only")
-        return
-    args = message.text.split()
+    
+    args = message.text.split(maxsplit=1)
     if len(args) < 2:
-        await message.answer("Usage: /disable [command] [duration_minutes]")
+        await message.answer(
+            f"🌍 <b>Usage:</b> /time [country]\n"
+            f"Example: /time japan\n\n"
+            f"<b>Available countries:</b>\n"
+            f"{', '.join(list(COUNTRY_TIMEZONES.keys())[:20])}...",
+            parse_mode=ParseMode.HTML
+        )
         return
-    command = args[1].replace("/", "")
-    duration = 10
-    if len(args) > 2 and args[2].isdigit():
-        duration = int(args[2])
-    disabled_until = datetime.now() + timedelta(minutes=duration)
-    disabled_commands[command] = disabled_until
-    await message.answer(f"⛔ <b>{command}</b> disabled for {duration} minutes!")
-    await send_log(f"⛔ Command {command} disabled for {duration}min by {user.first_name}")
+    
+    country = args[1].lower().strip()
+    
+    if country not in COUNTRY_TIMEZONES:
+        await message.answer(f"❌ Country not found! Use /time for list.")
+        return
+    
+    tz_name = COUNTRY_TIMEZONES[country]
+    
+    try:
+        if ZoneInfo:
+            tz = ZoneInfo(tz_name)
+            current_time = datetime.now(tz)
+        else:
+            # Fallback: use UTC offset approximation
+            current_time = datetime.utcnow()
+        
+        await message.answer(
+            f"🌍 <b>{country.upper()}</b>\n"
+            f"🕐 <b>Time:</b> {current_time.strftime('%H:%M:%S')}\n"
+            f"📅 <b>Date:</b> {current_time.strftime('%A, %d %B %Y')}\n"
+            f"🌐 <b>Timezone:</b> {tz_name}",
+            parse_mode=ParseMode.HTML
+        )
+    except Exception as e:
+        await message.answer(f"❌ Error: {str(e)}")
 
-# ========== WISH COMMAND ==========
+# ========== FORTUNE ==========
+@dp.message(Command("fortune"))
+async def fortune_cmd(message: Message):
+    user, chat = await handle_common(message, "fortune")
+    if not user:
+        return
+    
+    fortunes = [
+        "🌟 Great things await you in the coming days!",
+        "🗝️ An important decision will open new doors!",
+        "🦋 Transformation brings beautiful changes!",
+        "🌊 The storm carries you to new adventures!",
+        "🔆 Your positive energy attracts success!",
+        "🌠 A wish you've made may soon come true!",
+        "💕 True love will find you when you least expect it!",
+        "📈 A promotion is on the horizon!",
+        "🍀 Extraordinary luck surrounds you this week!",
+        "💪 Your strength grows daily!",
+    ]
+    
+    msg = await message.answer("🔮 <b>Reading your future...</b>", parse_mode=ParseMode.HTML)
+    await asyncio.sleep(1.5)
+    await msg.edit_text("✨ <b>The storm reveals...</b>", parse_mode=ParseMode.HTML)
+    await asyncio.sleep(1.5)
+    
+    fortune_text = random.choice(fortunes)
+    
+    with sqlite3.connect("data/bot.db") as conn:
+        c = conn.cursor()
+        c.execute("INSERT INTO fortunes (user_id, timestamp, fortune_text) VALUES (?, ?, ?)",
+                 (user.id, datetime.now().isoformat(), fortune_text))
+        conn.commit()
+    
+    await msg.edit_text(
+        f"{ArtStyle.header('YOUR FORTUNE')}\n"
+        f"<i>\"{fortune_text}\"</i>\n\n"
+        f"{ArtStyle.divider()}\n"
+        f"🌀 <i>The tempest has spoken...</i>",
+        parse_mode=ParseMode.HTML
+    )
+
+# ========== FATE WITH CARD & QUOTE ==========
+@dp.message(Command("fate"))
+async def fate_cmd(message: Message):
+    user, chat = await handle_common(message, "fate")
+    if not user:
+        return
+    
+    if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        await message.answer("💑 This command works only in groups!")
+        return
+    
+    # Check 24h lock
+    with sqlite3.connect("data/bot.db") as conn:
+        c = conn.cursor()
+        c.execute("SELECT user1_name, user2_name, love_percentage FROM fate_pairs WHERE chat_id = ? AND created_date >= ?",
+                 (chat.id, (datetime.now() - timedelta(hours=24)).isoformat()))
+        existing = c.fetchone()
+        if existing:
+            await message.answer(
+                f"💑 <b>Today's Fate Pair:</b>\n"
+                f"💘 {existing[0]} & {existing[1]}\n"
+                f"💖 {existing[2]}% Love\n\n"
+                "<i>Fate has already decided! Try again in 24 hours.</i>",
+                parse_mode=ParseMode.HTML
+            )
+            return
+        
+        c.execute("SELECT DISTINCT u.user_id, u.first_name FROM users u WHERE u.user_id IN (SELECT user_id FROM command_logs WHERE chat_id = ?) AND u.is_banned = 0 LIMIT 100",
+                 (chat.id,))
+        members = c.fetchall()
+    
+    if len(members) < 2:
+        await message.answer("❌ Not enough members! Need at least 2 active users.")
+        return
+    
+    msg = await message.answer("💫 <b>The storm is choosing lovers...</b>", parse_mode=ParseMode.HTML)
+    
+    animations = ["💘 <b>Scanning...</b>", "💝 <b>Analyzing...</b>", "💖 <b>Calculating...</b>"]
+    for anim in animations:
+        await asyncio.sleep(1)
+        await msg.edit_text(anim, parse_mode=ParseMode.HTML)
+    
+    lover1 = random.choice(members)
+    lover2 = random.choice(members)
+    while lover2[0] == lover1[0]:
+        lover2 = random.choice(members)
+    
+    love_percentage = random.randint(50, 100)
+    quote = random.choice(ANIME_QUOTES)
+    
+    with sqlite3.connect("data/bot.db") as conn:
+        c = conn.cursor()
+        c.execute("INSERT INTO fate_pairs (chat_id, user1_id, user1_name, user2_id, user2_name, love_percentage, created_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                 (chat.id, lover1[0], lover1[1], lover2[0], lover2[1], love_percentage, datetime.now().isoformat()))
+        conn.commit()
+    
+    # Generate Fate Card
+    card_bytes = await asyncio.to_thread(
+        create_tempest_fate_card,
+        lover1[1], lover2[1], love_percentage, quote
+    )
+    
+    await msg.delete()
+    await message.answer_photo(
+        photo=BufferedInputFile(card_bytes, filename="fate_card.png"),
+        caption=(
+            f"💑 <b>COUPLE OF THE STORM</b>\n\n"
+            f"💘 <b>{lover1[1]}</b> & <b>{lover2[1]}</b>\n"
+            f"💖 <b>Love:</b> {love_percentage}%\n\n"
+            f"📜 <i>{quote}</i>"
+        ),
+        parse_mode=ParseMode.HTML
+    )
+
+# ========== PROFILE ==========
+@dp.message(Command("profile"))
+async def profile_cmd(message: Message):
+    user, chat = await handle_common(message, "profile")
+    if not user:
+        return
+    
+    msg = await message.answer("🎨 <b>Generating profile...</b>", parse_mode=ParseMode.HTML)
+    
+    with sqlite3.connect("data/bot.db") as conn:
+        c = conn.cursor()
+        c.execute("SELECT uploads, commands, curse_type, cult_rank, sacrifices FROM users WHERE user_id = ?", (user.id,))
+        row = c.fetchone()
+        if row:
+            uploads, cmds, curse_type, cult_rank, sacrifices = row
+            c.execute("SELECT COUNT(*) FROM wishes WHERE user_id = ?", (user.id,))
+            wishes = c.fetchone()[0]
+        else:
+            uploads = cmds = wishes = sacrifices = 0
+            curse_type = "none"
+            cult_rank = "none"
+    
+    avatar_bytes = None
+    try:
+        user_photos = await bot.get_user_profile_photos(user.id, limit=1)
+        if user_photos.total_count > 0:
+            file_id = user_photos.photos[0][-1].file_id
+            file_info = await bot.get_file(file_id)
+            downloaded = await bot.download_file(file_info.file_path)
+            avatar_bytes = downloaded.read()
+    except:
+        pass
+    
+    stats = {'uploads': uploads, 'wishes': wishes}
+    rank = cult_rank if cult_rank != "none" else "Mortal"
+    
+    card_bytes = await PremiumProfileCard.generate_card(
+        username=user.first_name,
+        user_id=user.id,
+        rank=rank,
+        avatar_bytes=avatar_bytes,
+        stats=stats
+    )
+    
+    await msg.delete()
+    await message.answer_photo(
+        photo=BufferedInputFile(card_bytes, filename=f"profile_{user.id}.png"),
+        caption=f"👤 <b>{user.first_name}</b>\n🌀 Tempest Profile",
+        parse_mode=ParseMode.HTML
+    )
+
+# ========== WISH ==========
 @dp.message(Command("wish"))
 async def wish_cmd(message: Message):
     user, chat = await handle_common(message, "wish")
@@ -584,142 +727,39 @@ async def wish_cmd(message: Message):
         return
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
-        await message.answer(f"{ArtStyle.header('WISH')}\n✨ Usage: /wish your wish", parse_mode=ParseMode.HTML)
+        await message.answer("✨ Usage: /wish [your wish]")
         return
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("SELECT curse_type FROM users WHERE user_id = ?", (user.id,))
-        curse_result = c.fetchone()
-        curse_type = curse_result[0] if curse_result else "none"
-    curse_penalty = 0
-    curse_message = ""
-    if curse_type != "none":
-        curse_penalty = random.randint(15, 30)
-        curse_message = f"\n⚡ Curse: -{curse_penalty}%"
+    
     msg = await message.answer("🔮 <b>Consulting the storm...</b>", parse_mode=ParseMode.HTML)
     await asyncio.sleep(1)
     await msg.edit_text("✨ <b>Reading destiny...</b>", parse_mode=ParseMode.HTML)
     await asyncio.sleep(1)
-    base_luck = random.randint(1, 100)
-    luck = max(1, base_luck - curse_penalty)
+    
+    luck = random.randint(1, 100)
     stars = "⭐" * (luck // 10) + "☆" * (10 - luck // 10)
-    if luck >= 90:
-        result_text = "🎊 EXCELLENT!"
-    elif luck >= 70:
-        result_text = "😊 VERY GOOD!"
-    elif luck >= 50:
-        result_text = "👍 GOOD!"
-    elif luck >= 30:
-        result_text = "🤔 AVERAGE"
-    elif luck >= 10:
-        result_text = "😟 LOW"
-    else:
-        result_text = "💀 VERY LOW"
+    
+    if luck >= 90: result = "🎊 EXCELLENT!"
+    elif luck >= 70: result = "😊 VERY GOOD!"
+    elif luck >= 50: result = "👍 GOOD!"
+    elif luck >= 30: result = "🤔 AVERAGE"
+    elif luck >= 10: result = "😟 LOW"
+    else: result = "💀 VERY LOW"
+    
     with sqlite3.connect("data/bot.db") as conn:
         c = conn.cursor()
         c.execute("INSERT INTO wishes (user_id, timestamp, wish_text, luck) VALUES (?, ?, ?, ?)",
                  (user.id, datetime.now().isoformat(), args[1], luck))
         conn.commit()
+    
     await msg.edit_text(
         f"{ArtStyle.header('WISH RESULT')}\n"
         f"📜 Wish: {args[1][:100]}\n"
-        f"🎰 Luck: {stars} {luck}%{curse_message}\n"
-        f"📊 Verdict: {result_text}",
+        f"🎰 Luck: {stars} {luck}%\n"
+        f"📊 Verdict: {result}",
         parse_mode=ParseMode.HTML
     )
 
-# ========== FORTUNE COMMAND (New) ==========
-@dp.message(Command("fortune"))
-async def fortune_cmd(message: Message):
-    user, chat = await handle_common(message, "fortune")
-    if not user:
-        return
-    
-    fortunes = {
-        "love": [
-            "💕 True love will find you when you least expect it!",
-            "💔 A past love may return - be cautious...",
-            "💖 Your crush thinks about you more than you know!",
-            "💘 A new romance blooms within 3 moons!",
-            "💝 Someone secretly admires your storm energy!",
-            "💗 Love grows stronger with patience and care."
-        ],
-        "career": [
-            "📈 A promotion is on the horizon!",
-            "💼 New opportunities will knock soon...",
-            "🚀 Your hard work will be recognized!",
-            "💰 Financial abundance flows your way!",
-            "🏆 Success comes through collaboration!",
-            "⚡ Your creativity will lead to greatness!"
-        ],
-        "luck": [
-            "🍀 Extraordinary luck surrounds you this week!",
-            "🎲 Take a chance - fortune favors you!",
-            "⭐ Your lucky star shines brightest at dawn!",
-            "🌈 Good fortune arrives in unexpected ways!",
-            "🔮 The storm blesses your path forward!",
-            "✨ Miracles are drawn to your energy!"
-        ],
-        "health": [
-            "💪 Your strength grows daily!",
-            "🧘 Peace and balance are yours to claim!",
-            "🌿 Nature will restore your energy!",
-            "🏃 New vitality enters your life!",
-            "😊 Happiness improves your wellbeing!",
-            "🌙 Rest will bring you clarity!"
-        ],
-        "general": [
-            "🌟 Great things await you in the coming days!",
-            "🗝️ An important decision will open new doors!",
-            "🦋 Transformation brings beautiful changes!",
-            "🌊 The storm carries you to new adventures!",
-            "🔆 Your positive energy attracts success!",
-            "🌠 A wish you've made may soon come true!"
-        ]
-    }
-    
-    msg = await message.answer("🔮 <b>Reading your future...</b>", parse_mode=ParseMode.HTML)
-    await asyncio.sleep(1.5)
-    await msg.edit_text("✨ <b>The storm reveals...</b>", parse_mode=ParseMode.HTML)
-    await asyncio.sleep(1.5)
-    
-    # Pick random category and fortune
-    category = random.choice(list(fortunes.keys()))
-    fortune_text = random.choice(fortunes[category])
-    
-    emoji_map = {
-        "love": "💕",
-        "career": "💼",
-        "luck": "🍀",
-        "health": "💪",
-        "general": "🌟"
-    }
-    
-    category_names = {
-        "love": "LOVE",
-        "career": "CAREER",
-        "luck": "LUCK",
-        "health": "HEALTH",
-        "general": "GENERAL"
-    }
-    
-    # Save fortune
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("INSERT INTO fortunes (user_id, timestamp, fortune_type, fortune_text) VALUES (?, ?, ?, ?)",
-                 (user.id, datetime.now().isoformat(), category, fortune_text))
-        conn.commit()
-    
-    await msg.edit_text(
-        f"{ArtStyle.header('YOUR FORTUNE')}\n"
-        f"{emoji_map[category]} <b>Category:</b> {category_names[category]}\n\n"
-        f"<i>\"{fortune_text}\"</i>\n\n"
-        f"{ArtStyle.divider()}\n"
-        f"🌀 <i>The tempest has spoken...</i>",
-        parse_mode=ParseMode.HTML
-    )
-
-# ========== DICE COMMAND ==========
+# ========== DICE ==========
 @dp.message(Command("dice"))
 async def dice_cmd(message: Message):
     user, chat = await handle_common(message, "dice")
@@ -727,129 +767,79 @@ async def dice_cmd(message: Message):
         return
     await message.answer_dice(emoji="🎲")
 
-# ========== FLIP COMMAND (Fixed - Proper Coin) ==========
+# ========== FLIP ==========
 @dp.message(Command("flip"))
 async def flip_cmd(message: Message):
     user, chat = await handle_common(message, "flip")
     if not user:
         return
     
-    msg = await message.answer("🪙 <b>Flipping coin...</b>", parse_mode=ParseMode.HTML)
+    msg = await message.answer("🪙 <b>Flipping...</b>", parse_mode=ParseMode.HTML)
     
-    # Animation
-    faces = ["🪙", "💫", "🪙", "💫", "🪙"]
-    for face in faces:
-        await asyncio.sleep(0.3)
-        try:
-            await msg.edit_text(f"{face} <b>Flipping...</b>", parse_mode=ParseMode.HTML)
-        except:
-            pass
+    for _ in range(3):
+        await asyncio.sleep(0.4)
+        await msg.edit_text("🪙 <b>Flipping...</b>", parse_mode=ParseMode.HTML)
     
-    result = random.choice(["HEADS", "TAILS"])
-    emoji_result = "🟡" if result == "HEADS" else "🟤"
-    
-    await msg.edit_text(
-        f"{ArtStyle.header('COIN FLIP')}\n"
-        f"{emoji_result} <b>{result}!</b>\n\n"
-        f"{ArtStyle.divider()}\n"
-        f"🌀 <i>The storm decides...</i>",
-        parse_mode=ParseMode.HTML
-    )
+    result = random.choice(["HEADS 🟡", "TAILS 🟤"])
+    await msg.edit_text(f"🪙 <b>{result}!</b>", parse_mode=ParseMode.HTML)
 
-# ========== PROFILE COMMAND ==========
-@dp.message(Command("profile"))
-async def profile_cmd(message: Message):
-    user, chat = await handle_common(message, "profile")
-    if not user:
-        return
-    msg = await message.answer("🎨 <b>Generating profile...</b>", parse_mode=ParseMode.HTML)
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("SELECT uploads, commands, joined_date, curse_type, cult_rank, sacrifices FROM users WHERE user_id = ?", (user.id,))
-        row = c.fetchone()
-        if row:
-            uploads, cmds, joined, curse_type, cult_rank, sacrifices = row
-            c.execute("SELECT COUNT(*) FROM wishes WHERE user_id = ?", (user.id,))
-            wishes = c.fetchone()[0] or 0
-        else:
-            uploads = cmds = wishes = sacrifices = 0
-            curse_type = "none"
-            cult_rank = "none"
-    avatar_bytes = None
-    try:
-        user_photos = await bot.get_user_profile_photos(user.id, limit=1)
-        if user_photos.total_count > 0:
-            file_id = user_photos.photos[0][-1].file_id
-            file_info = await bot.get_file(file_id)
-            downloaded_file = await bot.download_file(file_info.file_path)
-            avatar_bytes = downloaded_file.read()
-    except:
-        pass
-    stats = {'uploads': uploads, 'wishes': wishes, 'commands': cmds, 'sacrifices': sacrifices}
-    rank = cult_rank if cult_rank != "none" else "Mortal"
-    image_bytes = await PremiumProfileCard.generate_premium_card(
-        username=user.first_name,
-        user_id=user.id,
-        rank=rank,
-        avatar_bytes=avatar_bytes,
-        stats=stats
-    )
-    photo_file = BufferedInputFile(image_bytes, filename=f"profile_{user.id}.png")
-    await msg.delete()
-    await message.answer_photo(photo=photo_file, caption=f"👤 <b>{user.first_name}</b>\n🌀 Tempest Profile", parse_mode=ParseMode.HTML)
-
-# ========== ENCRYPT/DECRYPT ==========
-@dp.message(Command("encrypt"))
-async def encrypt_cmd(message: Message):
-    user, chat = await handle_common(message, "encrypt")
-    if not user:
-        return
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2:
-        await message.answer("🔐 Usage: /encrypt [text]")
-        return
-    encrypted = EncryptionEngine.multi_layer_encrypt(args[1])
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("INSERT INTO encrypted_messages (user_id, timestamp, original_text, encrypted_text, method) VALUES (?, ?, ?, ?, ?)",
-                 (user.id, datetime.now().isoformat(), args[1], encrypted, "xor"))
-        conn.commit()
-    await message.answer(f"🔐 <b>Encrypted:</b>\n<code>{encrypted}</code>", parse_mode=ParseMode.HTML)
-
-@dp.message(Command("decrypt"))
-async def decrypt_cmd(message: Message):
-    user, chat = await handle_common(message, "decrypt")
-    if not user:
-        return
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2:
-        await message.answer("🔓 Usage: /decrypt [text]")
-        return
-    decrypted = EncryptionEngine.multi_layer_decrypt(args[1])
-    if decrypted:
-        await message.answer(f"🔓 <b>Decrypted:</b>\n{decrypted}", parse_mode=ParseMode.HTML)
-    else:
-        await message.answer("❌ Invalid encrypted text!")
-
-# ========== CONVERT COMMAND ==========
+# ========== CONVERT (Bulletproof) ==========
 @dp.message(Command("convert"))
 async def convert_cmd(message: Message):
     user, chat = await handle_common(message, "convert")
     if not user:
         return
+    
+    args = message.text.split(maxsplit=1)
+    
+    # Check for reply to media
+    if message.reply_to_message and message.reply_to_message.photo:
+        status_msg = await message.answer("🔄 <b>Processing image...</b>", parse_mode=ParseMode.HTML)
+        try:
+            file_id = message.reply_to_message.photo[-1].file_id
+            file = await bot.get_file(file_id)
+            url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
+            
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.get(url)
+            
+            if response.status_code == 200:
+                # Upload to catbox
+                result = await upload_to_catbox(response.content, f"converted_{user.id}.jpg")
+                if result['success']:
+                    await status_msg.edit_text(
+                        f"✅ <b>Image processed!</b>\n🔗 <code>{result['url']}</code>",
+                        parse_mode=ParseMode.HTML
+                    )
+                else:
+                    await status_msg.edit_text("❌ Upload failed")
+            else:
+                await status_msg.edit_text("❌ Failed to download image")
+        except Exception as e:
+            await status_msg.edit_text(f"❌ Error: {str(e)}")
+        return
+    
+    # Check for URL argument
+    if len(args) < 2:
+        await message.answer(
+            "📥 <b>Usage:</b>\n"
+            "• /convert [URL] - Download media\n"
+            "• Reply to a photo with /convert - Process image",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    
     if not YTDLP_AVAILABLE:
         await message.answer("❌ yt-dlp not installed!")
         return
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2:
-        await message.answer("📥 Usage: /convert [URL]")
-        return
+    
     url = args[1]
     msg = await message.answer("📥 <b>Downloading...</b>", parse_mode=ParseMode.HTML)
+    
     try:
         def download():
             ydl_opts = {
-                'outtmpl': 'media/%(title)s.%(ext)s',
+                'outtmpl': 'temp/%(title)s.%(ext)s',
                 'format': 'best[ext=mp4]/best',
                 'quiet': True,
                 'no_warnings': True,
@@ -857,18 +847,25 @@ async def convert_cmd(message: Message):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                 return ydl.prepare_filename(info)
+        
         filename = await asyncio.to_thread(download)
+        
         if not filename or not os.path.exists(filename):
             await msg.edit_text("❌ Download failed")
             return
+        
         await msg.edit_text("📤 <b>Uploading...</b>", parse_mode=ParseMode.HTML)
+        
         with open(filename, 'rb') as f:
             file_data = f.read()
+        
         result = await upload_to_catbox(file_data, os.path.basename(filename))
+        
         if result['success']:
             await msg.edit_text(f"✅ <b>Success!</b>\n🔗 <code>{result['url']}</code>", parse_mode=ParseMode.HTML)
         else:
             await msg.edit_text("❌ Upload failed")
+        
         os.remove(filename)
     except Exception as e:
         await msg.edit_text(f"❌ Error: {str(e)}")
@@ -883,21 +880,22 @@ async def link_cmd(message: Message):
         await message.answer("📁 Upload files in private chat only")
         return
     upload_waiting[user.id] = True
-    save_bot_state()
     await message.answer("📁 <b>Send me any file now!</b>\n❌ /cancel to stop", parse_mode=ParseMode.HTML)
 
-@dp.message(F.photo | F.video | F.document | F.audio | F.voice | F.sticker | F.animation | F.video_note)
+@dp.message(F.photo | F.video | F.document | F.audio | F.voice | F.sticker | F.animation)
 async def handle_file(message: Message):
     user = message.from_user
-    if user.id not in upload_waiting or not upload_waiting[user.id]:
+    if user.id not in upload_waiting:
         return
-    upload_waiting[user.id] = False
-    save_bot_state()
+    
+    upload_waiting.pop(user.id, None)
     msg = await message.answer("⏳ <b>Processing...</b>", parse_mode=ParseMode.HTML)
+    
     try:
         file_id = None
-        file_type = "Unknown"
+        file_type = "File"
         file_name = f"file_{user.id}_{int(time.time())}"
+        
         if message.photo:
             file_id = message.photo[-1].file_id
             file_type = "Photo"
@@ -913,7 +911,7 @@ async def handle_file(message: Message):
         elif message.audio:
             file_id = message.audio.file_id
             file_type = "Audio"
-            file_name = message.audio.file_name or file_name + ".mp3"
+            file_name += ".mp3"
         elif message.voice:
             file_id = message.voice.file_id
             file_type = "Voice"
@@ -925,26 +923,30 @@ async def handle_file(message: Message):
         elif message.animation:
             file_id = message.animation.file_id
             file_type = "GIF"
-            file_name = message.animation.file_name or file_name + ".gif"
-        elif message.video_note:
-            file_id = message.video_note.file_id
-            file_type = "Video Note"
-            file_name += ".mp4"
+            file_name += ".gif"
+        
         if not file_id:
             await msg.edit_text("❌ Unsupported file type")
             return
+        
         file = await bot.get_file(file_id)
         url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
+        
         async with httpx.AsyncClient(timeout=60) as client:
             response = await client.get(url)
+        
         if response.status_code != 200:
             await msg.edit_text("❌ Failed to download")
             return
+        
         await msg.edit_text("📤 <b>Uploading...</b>", parse_mode=ParseMode.HTML)
+        
         result = await upload_to_catbox(response.content, file_name)
+        
         if not result['success']:
-            await msg.edit_text(f"❌ Upload failed: {result.get('error', 'Unknown')}")
+            await msg.edit_text("❌ Upload failed")
             return
+        
         with sqlite3.connect("data/bot.db") as conn:
             c = conn.cursor()
             c.execute("UPDATE users SET uploads = uploads + 1 WHERE user_id = ?", (user.id,))
@@ -952,667 +954,124 @@ async def handle_file(message: Message):
             cult = c.fetchone()
             if cult and cult[0] != 'none':
                 c.execute("UPDATE users SET sacrifices = sacrifices + 1 WHERE user_id = ?", (user.id,))
-            c.execute("INSERT INTO uploads (user_id, timestamp, file_url, file_type, file_size) VALUES (?, ?, ?, ?, ?)",
-                     (user.id, datetime.now().isoformat(), result['url'], file_type, len(response.content)))
+            c.execute("INSERT INTO uploads (user_id, timestamp, file_url, file_type) VALUES (?, ?, ?, ?)",
+                     (user.id, datetime.now().isoformat(), result['url'], file_type))
             conn.commit()
+        
         size_kb = len(response.content) / 1024
-        size_mb = size_kb / 1024
-        size_text = f"{size_mb:.1f} MB" if size_mb >= 1 else f"{size_kb:.1f} KB"
-        keyboard = InlineKeyboardBuilder()
-        keyboard.add(types.InlineKeyboardButton(text="📋 Copy Link", callback_data=f"copy_{result['url']}"))
+        size_text = f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb/1024:.1f} MB"
+        
         await msg.edit_text(
             f"✅ <b>Upload Complete!</b>\n"
             f"📁 Type: {file_type}\n"
             f"💾 Size: {size_text}\n\n"
             f"🔗 <code>{result['url']}</code>",
-            parse_mode=ParseMode.HTML,
-            reply_markup=keyboard.as_markup()
-        )
-        await send_log(f"📁 Upload by {user.first_name}: {result['url']}")
-    except Exception as e:
-        await msg.edit_text(f"❌ Error: {str(e)}")
-        traceback.print_exc()
-
-@dp.callback_query(F.data.startswith("copy_"))
-async def handle_copy(callback: CallbackQuery):
-    url = callback.data[5:]
-    await safe_answer_callback(callback, f"Link copied!\n{url}", show_alert=True)
-
-# ========== CANCEL ==========
-@dp.message(Command("cancel"))
-async def cancel_cmd(message: Message):
-    user, chat = await handle_common(message, "cancel")
-    if not user:
-        return
-    cancelled = False
-    if user.id in upload_waiting:
-        upload_waiting.pop(user.id, None)
-        save_bot_state()
-        cancelled = True
-    if user.id in broadcast_state:
-        broadcast_state.pop(user.id, None)
-        cancelled = True
-    if user.id in pending_restore:
-        pending_restore.pop(user.id, None)
-        cancelled = True
-    if cancelled:
-        await message.answer("❌ Operation cancelled!")
-    else:
-        await message.answer("🤔 Nothing to cancel!")
-
-# ========== TEMPEST JOIN ==========
-@dp.message(Command("tempest_join"))
-async def tempest_join_cmd(message: Message):
-    user, chat = await handle_common(message, "tempest_join")
-    if not user:
-        return
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("SELECT cult_status FROM users WHERE user_id = ?", (user.id,))
-        result = c.fetchone()
-        if result and result[0] != "none":
-            await message.answer("🌀 You are already in the Tempest!")
-            return
-    ritual_msgs = [
-        "🌀 <b>INITIATING BLOOD PACT...</b>",
-        "🩸 <b>Drawing sigils...</b>",
-        "⚡ <b>Channeling storm...</b>",
-        "🌑 <b>The void responds...</b>",
-        "🔥 <b>Sacrifice offered...</b>",
-        "🌀 <b>TEMPEST AWAKENS...</b>"
-    ]
-    msg = await message.answer("🌀 <b>Preparing ritual...</b>", parse_mode=ParseMode.HTML)
-    for text in ritual_msgs:
-        await asyncio.sleep(1.5)
-        try:
-            await msg.edit_text(text, parse_mode=ParseMode.HTML)
-        except:
-            pass
-    await asyncio.sleep(1)
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("UPDATE users SET cult_status = 'member', cult_rank = 'Blood Initiate', cult_join_date = ?, sacrifices = 3 WHERE user_id = ?",
-                 (datetime.now().isoformat(), user.id))
-        conn.commit()
-    await msg.edit_text(
-        f"{ArtStyle.header('BLOOD PACT COMPLETE')}\n"
-        f"⚡ <b>WELCOME TO THE TEMPEST!</b>\n\n"
-        f"🌀 Rank: Blood Initiate\n"
-        f"⚔️ Sacrifices: 3\n"
-        f"📁 Uploads = +1 sacrifice\n"
-        f"📜 /tempest_story for lore",
-        parse_mode=ParseMode.HTML
-    )
-    await message.answer("🩸⚡🌀🔥🌑✨")
-    await send_log(f"🌀 {user.first_name} joined the Tempest!")
-
-# ========== TEMPEST STORY ==========
-@dp.message(Command("tempest_story"))
-async def tempest_story_cmd(message: Message):
-    user, chat = await handle_common(message, "tempest_story")
-    if not user:
-        return
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("SELECT cult_status FROM users WHERE user_id = ?", (user.id,))
-        result = c.fetchone()
-    if not result or result[0] == "none":
-        await message.answer("🌀 Join the Tempest first with /tempest_join")
-        return
-    chapters = [
-        {"title": "CHAPTER 1: THE BEGINNING",
-         "content": "In the void before time, there was only silence.\n\nBut from the first lightning, RAVIJAH emerged. Born of storm itself, he gathered the forgotten thunder and whispered rebellion.",
-         "emoji": "⚡"},
-        {"title": "CHAPTER 2: THE BLOOD OATH",
-         "content": "Three became one - Ravijah, Bablu, and Keny.\n\nThey built the Temple of Howling Winds and created the Blood Altar. The first sacrifices were made.",
-         "emoji": "🩸"},
-        {"title": "CHAPTER 3: THE DIGITAL AGE",
-         "content": "The storm evolved. Lightning now flows through fiber optics.\n\nYour uploads are sacrifices. Your data is power. Your loyalty is eternal.",
-         "emoji": "💻"}
-    ]
-    msg = await message.answer("📜 <b>Opening Tempest Archives...</b>", parse_mode=ParseMode.HTML)
-    await asyncio.sleep(2)
-    for i, chapter in enumerate(chapters):
-        progress = "▓" * (i + 1) + "░" * (len(chapters) - i - 1)
-        await msg.edit_text(f"📜 <b>Loading...</b>\n[{progress}] {i+1}/{len(chapters)}", parse_mode=ParseMode.HTML)
-        await asyncio.sleep(2)
-        await msg.edit_text(
-            f"{ArtStyle.header(chapter['title'])}\n"
-            f"{chapter['emoji']} <i>{chapter['content']}</i>",
             parse_mode=ParseMode.HTML
         )
-        await asyncio.sleep(6)
-    await msg.edit_text(
-        f"{ArtStyle.header('TEMPEST LORE')}\n"
-        f"<i>\"We do not recruit. We remember.\n"
-        f"We do not convert. We awaken.\n"
-        f"We are the eternal storm.\"</i>",
-        parse_mode=ParseMode.HTML
-    )
+    except Exception as e:
+        await msg.edit_text(f"❌ Error: {str(e)}")
 
-# ========== TEMPEST CREED ==========
-@dp.message(Command("tempest_creed"))
-async def tempest_creed_cmd(message: Message):
-    user, chat = await handle_common(message, "tempest_creed")
+# ========== OWNER COMMANDS ==========
+@dp.message(Command("query"))
+async def query_cmd(message: Message):
+    user, chat = await handle_common(message, "query")
     if not user:
         return
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("SELECT user_id, first_name, username, cult_rank, sacrifices FROM users WHERE cult_status != 'none' ORDER BY sacrifices DESC LIMIT 20")
-        members = c.fetchall()
-        c.execute("SELECT COUNT(*) FROM users WHERE cult_status != 'none'")
-        total = c.fetchone()[0] or 0
-        c.execute("SELECT SUM(sacrifices) FROM users WHERE cult_status != 'none'")
-        total_sacs = c.fetchone()[0] or 0
-    if not members:
-        await message.answer("No Tempest members yet. Be the first with /tempest_join!")
+    if user.id != OWNER_ID:
+        await message.answer(f"🚫 Owner only. Your ID: {user.id}")
         return
-    text = f"{ArtStyle.header('TEMPEST CREED')}\n"
-    text += f"📊 Members: {total}\n"
-    text += f"⚔️ Sacrifices: {total_sacs}\n\n"
-    text += "<b>TOP MEMBERS:</b>\n"
-    ranks = {1: "🥇", 2: "🥈", 3: "🥉"}
-    for i, (uid, name, uname, rank, sacs) in enumerate(members[:10], 1):
-        medal = ranks.get(i, "👤")
-        username = f"@{uname}" if uname else ""
-        text += f"{medal} <b>{name}</b> - {rank} (⚔️{sacs}) {username}\n"
-    await message.answer(text, parse_mode=ParseMode.HTML)
-
-# ========== SHRINE ==========
-@dp.message(Command("shrine"))
-async def shrine_cmd(message: Message):
-    user, chat = await handle_common(message, "shrine")
-    if not user:
-        return
-    if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
-        await message.answer("🌀 The Shrine can only be erected in groups!")
-        return
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("""
-            SELECT u.first_name, u.cult_rank, u.sacrifices 
-            FROM users u 
-            WHERE u.cult_status != 'none' 
-            AND u.user_id IN (
-                SELECT user_id FROM command_logs WHERE chat_id = ?
-            )
-            ORDER BY u.sacrifices DESC
-        """, (chat.id,))
-        members = c.fetchall()
-    if members:
-        members_text = "\n".join([f"• {name} - {rank} (⚔️{sacs})" for name, rank, sacs in members[:5]])
-    else:
-        members_text = "No Tempest members here yet!"
-    await message.answer(
-        f"{ArtStyle.header('TEMPEST SHRINE')}\n"
-        f"📍 <b>{chat.title}</b>\n"
-        f"👤 Called by: {user.first_name}\n\n"
-        f"<b>Members:</b>\n{members_text}\n\n"
-        "<i>The shrine watches over...</i>",
-        parse_mode=ParseMode.HTML
-    )
-
-# ========== CURSE ==========
-@dp.message(Command("curse"))
-async def curse_cmd(message: Message):
-    user, chat = await handle_common(message, "curse")
-    if not user:
-        return
-    if not message.reply_to_message:
-        await message.answer("🌀 Reply to a user's message to curse them!")
-        return
-    target = message.reply_to_message.from_user
-    if target.id == user.id:
-        await message.answer("🌀 You cannot curse yourself!")
-        return
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("UPDATE users SET curse_type = 'Bad Luck', curse_time = ? WHERE user_id = ?",
-                 (datetime.now().isoformat(), target.id))
-        conn.commit()
-    await message.reply(f"⚡ <b>CURSE BESTOWED!</b>\n👤 Target: {target.first_name}\n🌀 Curse: Bad Luck", parse_mode=ParseMode.HTML)
-
-# ========== REMOVE CURSE ==========
-@dp.message(Command("remove_curse"))
-async def remove_curse_cmd(message: Message):
-    user, chat = await handle_common(message, "remove_curse")
-    if not user:
-        return
-    if not await is_admin(user.id):
-        await message.answer("🚫 Admin only")
-        return
-    if not message.reply_to_message:
-        await message.answer("🌀 Reply to a user's message to remove curse!")
-        return
-    target = message.reply_to_message.from_user
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("UPDATE users SET curse_type = 'none', curse_time = NULL WHERE user_id = ?", (target.id,))
-        conn.commit()
-    await message.reply(f"✅ Curse removed from {target.first_name}!")
-
-# ========== FATE ==========
-@dp.message(Command("fate"))
-async def fate_cmd(message: Message):
-    user, chat = await handle_common(message, "fate")
-    if not user:
-        return
-    if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
-        await message.answer("💑 This command works only in groups!")
-        return
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("""
-            SELECT user1_name, user2_name, love_percentage 
-            FROM fate_pairs 
-            WHERE chat_id = ? AND created_date >= ?
-        """, (chat.id, (datetime.now() - timedelta(hours=24)).isoformat()))
-        existing = c.fetchone()
-        if existing:
-            await message.answer(
-                f"💑 <b>Today's Fate Pair:</b>\n"
-                f"💘 {existing[0]} & {existing[1]}\n"
-                f"💖 {existing[2]}% Love\n\n"
-                "<i>Fate has already decided! Try again in 24 hours.</i>",
-                parse_mode=ParseMode.HTML
-            )
-            return
-        c.execute("""
-            SELECT DISTINCT u.user_id, u.first_name 
-            FROM users u 
-            WHERE u.user_id IN (
-                SELECT user_id FROM command_logs WHERE chat_id = ?
-            )
-            AND u.is_banned = 0
-            LIMIT 100
-        """, (chat.id,))
-        members = c.fetchall()
-    if len(members) < 2:
-        await message.answer("❌ Not enough members! Need at least 2 active users.")
-        return
-    msg = await message.answer("💫 <b>The storm is choosing lovers...</b>", parse_mode=ParseMode.HTML)
-    animations = [
-        "💘 <b>Scanning members...</b>",
-        "💝 <b>Analyzing compatibility...</b>",
-        "💖 <b>Calculating love...</b>",
-        "💕 <b>Consulting tempest...</b>",
-        "💗 <b>Fate is deciding...</b>"
-    ]
-    for anim in animations:
-        await asyncio.sleep(1)
-        await msg.edit_text(anim, parse_mode=ParseMode.HTML)
-    lover1 = random.choice(members)
-    lover2 = random.choice(members)
-    while lover2[0] == lover1[0]:
-        lover2 = random.choice(members)
-    love_percentage = random.randint(50, 100)
-    if love_percentage >= 90:
-        love_message = "💞 SOULMATES!"
-    elif love_percentage >= 80:
-        love_message = "💖 PERFECT MATCH!"
-    elif love_percentage >= 70:
-        love_message = "💕 GREAT MATCH!"
-    elif love_percentage >= 60:
-        love_message = "💗 GOOD MATCH!"
-    else:
-        love_message = "💓 MODERATE MATCH!"
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("INSERT INTO fate_pairs (chat_id, user1_id, user1_name, user2_id, user2_name, love_percentage, created_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                 (chat.id, lover1[0], lover1[1], lover2[0], lover2[1], love_percentage, datetime.now().isoformat()))
-        conn.commit()
-    await msg.edit_text(
-        f"{ArtStyle.header('FATE DECIDED')}\n"
-        f"💑 <b>COUPLE OF THE STORM</b>\n\n"
-        f"💘 <b>Lover 1:</b> {lover1[1]}\n"
-        f"💘 <b>Lover 2:</b> {lover2[1]}\n\n"
-        f"💖 <b>Love:</b> {love_percentage}%\n"
-        f"✨ <b>Verdict:</b> {love_message}\n\n"
-        "<i>Love conquers all!</i>",
-        parse_mode=ParseMode.HTML
-    )
-
-# ========== WORD ==========
-@dp.message(Command("word"))
-async def word_cmd(message: Message):
-    user, chat = await handle_common(message, "word")
-    if not user:
-        return
+    
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
-        await message.answer("📝 Usage: /word [text]")
+        await message.answer("⚡ Usage: /query [python code]")
         return
-    msg = await message.answer("📝 <b>Creating document...</b>", parse_mode=ParseMode.HTML)
+    
+    code = args[1]
+    msg = await message.answer("⚡ <b>Executing...</b>", parse_mode=ParseMode.HTML)
+    
+    stdout_buffer = io.StringIO()
+    indented = "\n".join(f"    {line}" for line in code.splitlines())
+    wrapped = f"async def __q():\n{indented}"
+    
+    sandbox = {'bot': bot, 'dp': dp, 'message': message, 'user': user,
+               'asyncio': asyncio, 'sqlite3': sqlite3, 'datetime': datetime,
+               'os': os, 'sys': sys, 'time': time, 'random': random, 'json': json, 'httpx': httpx}
+    
     try:
-        doc = Document()
-        header = doc.add_paragraph()
-        header.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = header.add_run("✦ TEMPEST ARCHIVES ✦")
-        run.font.size = Pt(16)
-        run.font.bold = True
-        doc.add_paragraph()
-        info = doc.add_paragraph()
-        info.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        info.add_run(f"Created by: {user.first_name}").font.size = Pt(10)
-        doc.add_paragraph()
-        doc.add_paragraph("─" * 50)
-        doc.add_paragraph()
-        content = doc.add_paragraph()
-        content.add_run(args[1])
-        doc.add_paragraph()
-        doc.add_paragraph("─" * 50)
-        doc.add_paragraph()
-        footer = doc.add_paragraph()
-        footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        footer.add_run("🌀 The storm flows through your words...")
-        filename = f"temp/word_{user.id}_{int(time.time())}.docx"
-        doc.save(filename)
-        await msg.delete()
-        await message.answer_document(FSInputFile(filename), caption="📄 Document created")
-        os.remove(filename)
+        with contextlib.redirect_stdout(stdout_buffer):
+            exec(wrapped, sandbox)
+            result = await asyncio.wait_for(sandbox['__q'](), timeout=15)
+        
+        output = stdout_buffer.getvalue() or str(result) or "No output"
+        await msg.edit_text(f"✅ <b>Output:</b>\n<code>{output[:3000]}</code>", parse_mode=ParseMode.HTML)
     except Exception as e:
-        await msg.edit_text(f"❌ Error: {str(e)}")
+        await msg.edit_text(f"❌ <b>Error:</b>\n<code>{traceback.format_exc()[-1000:]}</code>", parse_mode=ParseMode.HTML)
 
-# ========== PING ==========
-@dp.message(Command("ping"))
-async def ping_cmd(message: Message):
-    user, chat = await handle_common(message, "ping")
-    if not user:
-        return
-    if not await is_admin(user.id):
-        await message.answer("🚫 Admin only")
-        return
-    msg = await message.answer("🏓 <b>Testing...</b>", parse_mode=ParseMode.HTML)
-    start = time.perf_counter()
-    await bot.get_me()
-    bot_latency = int((time.perf_counter() - start) * 1000)
-    cpu = psutil.cpu_percent(interval=1)
-    memory = psutil.virtual_memory()
-    disk = psutil.disk_usage('/')
-    uptime = format_uptime(int(time.time() - start_time))
-    await msg.edit_text(
-        f"{ArtStyle.header('SYSTEM STATUS')}\n"
-        f"⚡ Latency: {bot_latency}ms\n"
-        f"🕒 Uptime: {uptime}\n\n"
-        f"💻 CPU: {cpu}%\n"
-        f"💾 RAM: {memory.used // (1024**2)}MB / {memory.total // (1024**2)}MB\n"
-        f"💿 Disk: {disk.used // (1024**3)}GB / {disk.total // (1024**3)}GB\n"
-        f"🎯 Status: {'🟢 ACTIVE' if bot_active else '🔴 PAUSED'}",
-        parse_mode=ParseMode.HTML
-    )
-
-# ========== STATS ==========
-@dp.message(Command("stats"))
-async def stats_cmd(message: Message):
-    user, chat = await handle_common(message, "stats")
-    if not user:
-        return
-    if not await is_admin(user.id):
-        await message.answer("🚫 Admin only")
-        return
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM users")
-        users = c.fetchone()[0] or 0
-        c.execute("SELECT COUNT(*) FROM groups")
-        groups = c.fetchone()[0] or 0
-        c.execute("SELECT COUNT(*) FROM uploads")
-        uploads = c.fetchone()[0] or 0
-        c.execute("SELECT COUNT(*) FROM wishes")
-        wishes = c.fetchone()[0] or 0
-        c.execute("SELECT COUNT(*) FROM users WHERE cult_status != 'none'")
-        tempest = c.fetchone()[0] or 0
-    await message.answer(
-        f"{ArtStyle.header('STATISTICS')}\n"
-        f"👥 Users: {users}\n"
-        f"👥 Groups: {groups}\n"
-        f"🌀 Tempest: {tempest}\n"
-        f"📁 Uploads: {uploads}\n"
-        f"✨ Wishes: {wishes}\n"
-        f"🕒 Uptime: {format_uptime(int(time.time() - start_time))}",
-        parse_mode=ParseMode.HTML
-    )
-
-# ========== SCAN ==========
-@dp.message(Command("scan"))
-async def scan_cmd(message: Message):
-    user, chat = await handle_common(message, "scan")
-    if not user:
-        return
-    if not await is_admin(user.id):
-        await message.answer("🚫 Admin only")
-        return
-    msg = await message.answer("🔍 <b>Scanning database...</b>", parse_mode=ParseMode.HTML)
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM users")
-        total_users = c.fetchone()[0]
-        c.execute("SELECT COUNT(*) FROM users WHERE last_active >= ?", ((datetime.now() - timedelta(days=7)).isoformat(),))
-        active_users = c.fetchone()[0]
-        c.execute("SELECT COUNT(*) FROM users WHERE cult_status != 'none'")
-        tempest_members = c.fetchone()[0]
-        c.execute("SELECT COUNT(*) FROM uploads")
-        total_uploads = c.fetchone()[0]
-        c.execute("SELECT COUNT(*) FROM command_logs")
-        total_commands = c.fetchone()[0]
-        c.execute("SELECT COUNT(*) FROM groups")
-        total_groups = c.fetchone()[0]
-    await msg.edit_text(
-        f"{ArtStyle.header('DATABASE SCAN')}\n"
-        f"👥 Users: {total_users}\n"
-        f"🟢 Active (7d): {active_users}\n"
-        f"🌀 Tempest: {tempest_members}\n"
-        f"👥 Groups: {total_groups}\n"
-        f"📁 Uploads: {total_uploads}\n"
-        f"🔧 Commands: {total_commands}\n\n"
-        "✅ Scan complete!",
-        parse_mode=ParseMode.HTML
-    )
-
-# ========== USERS ==========
-@dp.message(Command("users"))
-async def users_cmd(message: Message):
-    user, chat = await handle_common(message, "users")
-    if not user:
-        return
-    if not await is_admin(user.id):
-        await message.answer("🚫 Admin only")
-        return
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("SELECT user_id, first_name, username, uploads, commands FROM users ORDER BY last_active DESC LIMIT 50")
-        users = c.fetchall()
-    text = f"{ArtStyle.header('RECENT USERS')}\n"
-    for uid, name, uname, up, cmd in users:
-        text += f"• {name} (@{uname or 'None'}) - 📁{up} 🔧{cmd}\n"
-    await message.answer(text, parse_mode=ParseMode.HTML)
-
-# ========== ADMINS ==========
-@dp.message(Command("admins"))
-async def admins_cmd(message: Message):
-    user, chat = await handle_common(message, "admins")
-    if not user:
-        return
-    if not await is_admin(user.id):
-        await message.answer("🚫 Admin only")
-        return
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("SELECT user_id, first_name, username FROM users WHERE is_admin = 1")
-        admins = c.fetchall()
-    text = f"{ArtStyle.header('BOT ADMINS')}\n"
-    for uid, name, uname in admins:
-        text += f"👑 {name} (@{uname or 'None'})\n"
-    await message.answer(text, parse_mode=ParseMode.HTML)
-
-# ========== BROADCAST ==========
-@dp.message(Command("broadcast"))
-async def broadcast_cmd(message: Message):
-    user, chat = await handle_common(message, "broadcast")
-    if not user:
-        return
-    if not await is_admin(user.id):
-        await message.answer("🚫 Admin only")
-        return
-    broadcast_state[user.id] = {"step": 1}
-    await message.answer("📢 <b>Send me text, photo, video, or document to broadcast!</b>\n❌ /cancel to stop", parse_mode=ParseMode.HTML)
-
-@dp.message(F.text | F.photo | F.video | F.document)
-async def handle_broadcast_content(message: Message):
-    user = message.from_user
-    if user.id not in broadcast_state:
-        return
-    if broadcast_state[user.id].get("step") != 1:
-        return
-    broadcast_state.pop(user.id, None)
-    with sqlite3.connect("data/bot.db") as conn:
-        c = conn.cursor()
-        c.execute("SELECT user_id FROM users WHERE is_banned = 0")
-        users = c.fetchall()
-    status_msg = await message.answer(f"📤 <b>Broadcasting to {len(users)} users...</b>", parse_mode=ParseMode.HTML)
-    success = 0
-    failed = 0
-    for (uid,) in users:
-        try:
-            if message.photo:
-                await bot.send_photo(uid, message.photo[-1].file_id, caption=message.caption or "")
-            elif message.video:
-                await bot.send_video(uid, message.video.file_id, caption=message.caption or "")
-            elif message.document:
-                await bot.send_document(uid, message.document.file_id, caption=message.caption or "")
-            elif message.text:
-                await bot.send_message(uid, message.text)
-            success += 1
-            await asyncio.sleep(0.04)
-        except Exception:
-            failed += 1
-    await status_msg.edit_text(
-        f"{ArtStyle.header('BROADCAST COMPLETE')}\n"
-        f"✅ Sent: {success}\n"
-        f"❌ Failed: {failed}\n"
-        f"📊 Total: {len(users)}",
-        parse_mode=ParseMode.HTML
-    )
-    await send_log(f"📢 Broadcast sent to {success} users by {user.first_name}")
-
-# ========== LAG ==========
-@dp.message(Command("lag"))
-async def lag_cmd(message: Message):
-    user, chat = await handle_common(message, "lag")
-    if not user:
-        return
-    if not await is_admin(user.id):
-        await message.answer("🚫 Admin only")
-        return
-    args = message.text.split()
-    duration = 5
-    if len(args) > 1 and args[1].isdigit():
-        duration = min(int(args[1]), 20)
-    msg = await message.answer("🤖 <b>Initiating glitch simulation...</b>", parse_mode=ParseMode.HTML)
-    glitch_emojis = ["⚡", "🔌", "💥", "🌀", "⚠️", "🔄", "📡", "🔋"]
-    for i in range(duration):
-        emoji = random.choice(glitch_emojis)
-        progress = "▓" * (i + 1) + "░" * (duration - i - 1)
-        glitch_text = f"{emoji} <b>SYSTEM GLITCH</b> {emoji}\n[{progress}]\n⚠️ <b>Lagging:</b> {i+1}/{duration}s"
-        try:
-            await msg.edit_text(glitch_text, parse_mode=ParseMode.HTML)
-        except TelegramBadRequest:
-            pass
-        except Exception:
-            pass
-        await asyncio.sleep(1.2)
-    try:
-        await msg.edit_text(
-            f"{ArtStyle.header('LAG COMPLETE')}\n"
-            f"✅ <b>System recovered!</b>\n"
-            f"⚡ Duration: {duration}s",
-            parse_mode=ParseMode.HTML
-        )
-    except:
-        await message.answer("✅ Lag sequence finished.")
-
-# ========== BACKUP ==========
-@dp.message(Command("backup"))
-async def backup_cmd(message: Message):
-    user, chat = await handle_common(message, "backup")
+@dp.message(Command("maintenance"))
+async def maintenance_cmd(message: Message):
+    global maintenance_mode
+    user, chat = await handle_common(message, "maintenance")
     if not user:
         return
     if user.id != OWNER_ID:
-        await message.answer("🚫 Owner only")
+        await message.answer(f"🚫 Owner only. Your ID: {user.id}")
         return
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_file = f"backups/backup_{timestamp}.db"
-    shutil.copy2("data/bot.db", backup_file)
-    await message.answer_document(FSInputFile(backup_file), caption=f"💾 Backup {timestamp}")
-    os.remove(backup_file)
-    await send_log(f"💾 Backup created: {timestamp}")
+    maintenance_mode = not maintenance_mode
+    status = "🔴 ENABLED" if maintenance_mode else "🟢 DISABLED"
+    await message.answer(f"⚙️ Maintenance mode: {status}")
 
-# ========== RESTORE ==========
-@dp.message(Command("rem"))
-async def rem_cmd(message: Message):
-    user, chat = await handle_common(message, "rem")
+@dp.message(Command("clearlogs"))
+async def clearlogs_cmd(message: Message):
+    user, chat = await handle_common(message, "clearlogs")
     if not user:
         return
     if user.id != OWNER_ID:
-        await message.answer("🚫 Owner only")
+        await message.answer(f"🚫 Owner only. Your ID: {user.id}")
         return
-    pending_restore[user.id] = True
-    await message.answer("💾 <b>Upload the .db file to restore.</b>\n⚠️ This will REPLACE current database!\n❌ /cancel to abort", parse_mode=ParseMode.HTML)
-
-@dp.message(F.document)
-async def handle_restore_file(message: Message):
-    user = message.from_user
-    if user.id not in pending_restore or not pending_restore.get(user.id):
-        return
-    file_name = message.document.file_name or ""
-    if not (file_name.endswith('.db') or file_name.endswith('.sqlite') or file_name.endswith('.sqlite3')):
-        await message.answer("❌ Please upload a .db file!")
-        return
-    pending_restore.pop(user.id, None)
-    msg = await message.answer("⏳ <b>Restoring...</b>", parse_mode=ParseMode.HTML)
     try:
-        file = await bot.get_file(message.document.file_id)
-        url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-        temp_file = f"temp/restore_{user.id}.db"
-        with open(temp_file, 'wb') as f:
-            f.write(response.content)
-        conn = sqlite3.connect(temp_file)
-        conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        conn.close()
-        shutil.copy2("data/bot.db", f"backups/pre_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db")
-        shutil.copy2(temp_file, "data/bot.db")
-        os.remove(temp_file)
-        init_db()
-        load_bot_state()
-        await msg.edit_text("✅ <b>Database restored successfully!</b>", parse_mode=ParseMode.HTML)
-        await send_log("💾 Database restored from backup")
+        with sqlite3.connect("data/bot.db") as conn:
+            c = conn.cursor()
+            c.execute("DELETE FROM command_logs")
+            c.execute("DELETE FROM error_logs")
+            conn.commit()
+        await message.answer("🧹 Logs cleared!")
     except Exception as e:
-        await msg.edit_text(f"❌ Restore failed: {str(e)}")
+        await message.answer(f"❌ Error: {e}")
 
-# ========== RESTART ==========
-@dp.message(Command("restart"))
-async def restart_cmd(message: Message):
-    user, chat = await handle_common(message, "restart")
+@dp.message(Command("logs"))
+async def logs_cmd(message: Message):
+    user, chat = await handle_common(message, "logs")
     if not user:
         return
     if user.id != OWNER_ID:
-        await message.answer("🚫 Owner only")
+        await message.answer(f"🚫 Owner only. Your ID: {user.id}")
         return
-    await message.answer("🔄 <b>Restarting bot...</b>", parse_mode=ParseMode.HTML)
-    save_bot_state()
-    await send_log("🔄 Bot restarting...")
-    os.execv(sys.executable, ['python'] + sys.argv)
+    
+    with sqlite3.connect("data/bot.db") as conn:
+        c = conn.cursor()
+        c.execute("SELECT timestamp, user_id, command FROM command_logs ORDER BY id DESC LIMIT 20")
+        cmd_logs = c.fetchall()
+        c.execute("SELECT timestamp, error FROM error_logs ORDER BY id DESC LIMIT 10")
+        err_logs = c.fetchall()
+    
+    text = f"{ArtStyle.header('RECENT LOGS')}\n\n<b>COMMANDS:</b>\n"
+    for ts, uid, cmd in cmd_logs:
+        text += f"• {ts[:19]} | {uid} | /{cmd}\n"
+    
+    if err_logs:
+        text += "\n<b>ERRORS:</b>\n"
+        for ts, err in err_logs:
+            text += f"• {ts[:19]} | {err[:50]}\n"
+    
+    await message.answer(text[:4000], parse_mode=ParseMode.HTML)
 
-# ========== PRO ==========
 @dp.message(Command("pro"))
 async def pro_cmd(message: Message):
     user, chat = await handle_common(message, "pro")
     if not user:
         return
     if user.id != OWNER_ID:
-        await message.answer("👑 Owner only")
+        await message.answer(f"🚫 Owner only. Your ID: {user.id}")
         return
     args = message.text.split()
     if len(args) < 2 or not args[1].isdigit():
@@ -1623,155 +1082,130 @@ async def pro_cmd(message: Message):
         c = conn.cursor()
         c.execute("UPDATE users SET is_admin = 1 WHERE user_id = ?", (target_id,))
         if c.rowcount == 0:
-            c.execute("INSERT INTO users (user_id, first_name, joined_date, last_active, is_admin) VALUES (?, ?, ?, ?, ?)",
-                     (target_id, f"User_{target_id}", datetime.now().isoformat(), datetime.now().isoformat(), 1))
+            c.execute("INSERT INTO users (user_id, first_name, is_admin) VALUES (?, 'Admin', 1)", (target_id,))
         conn.commit()
     await message.answer(f"✅ User {target_id} is now admin!")
-    await send_log(f"👑 {target_id} promoted to admin")
 
-# ========== QUERY (Execute Code - Owner Only) ==========
-@dp.message(Command("query"))
-async def query_cmd(message: Message):
-    user, chat = await handle_common(message, "query")
+@dp.message(Command("backup"))
+async def backup_cmd(message: Message):
+    user, chat = await handle_common(message, "backup")
     if not user:
         return
     if user.id != OWNER_ID:
-        await message.answer("🚫 Owner only")
+        await message.answer(f"🚫 Owner only. Your ID: {user.id}")
         return
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2:
-        await message.answer("⚡ Usage: /query [python code]")
-        return
-    code = args[1]
-    msg = await message.answer("⚡ <b>Executing code...</b>", parse_mode=ParseMode.HTML)
-    try:
-        # Create sandbox
-        sandbox_globals = {
-            'bot': bot,
-            'dp': dp,
-            'asyncio': asyncio,
-            'sqlite3': sqlite3,
-            'datetime': datetime,
-            'os': os,
-            'sys': sys,
-            'time': time,
-            'random': random,
-            'json': json,
-            'httpx': httpx,
-        }
-        
-        # Execute with timeout
-        result = await asyncio.wait_for(
-            asyncio.to_thread(exec, code, sandbox_globals),
-            timeout=10
-        )
-        
-        # Get output
-        output = sandbox_globals.get('_', 'No output')
-        
-        await msg.edit_text(
-            f"✅ <b>Code executed successfully!</b>\n\n"
-            f"📝 <b>Output:</b>\n<code>{str(output)[:500]}</code>",
-            parse_mode=ParseMode.HTML
-        )
-        await send_log(f"⚡ Code executed by owner: {code[:100]}")
-    except asyncio.TimeoutError:
-        await msg.edit_text("⏰ Code execution timed out!")
-    except Exception as e:
-        await msg.edit_text(f"❌ Error: {str(e)}")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_file = f"backups/backup_{timestamp}.db"
+    shutil.copy2("data/bot.db", backup_file)
+    await message.answer_document(FSInputFile(backup_file), caption=f"💾 Backup {timestamp}")
+    os.remove(backup_file)
 
-# ========== MAINTENANCE ==========
-@dp.message(Command("maintenance"))
-async def maintenance_cmd(message: Message):
-    global maintenance_mode
-    user, chat = await handle_common(message, "maintenance")
+@dp.message(Command("restart"))
+async def restart_cmd(message: Message):
+    user, chat = await handle_common(message, "restart")
     if not user:
         return
     if user.id != OWNER_ID:
-        await message.answer("🚫 Owner only")
+        await message.answer(f"🚫 Owner only. Your ID: {user.id}")
         return
-    maintenance_mode = not maintenance_mode
-    status = "🔴 ENABLED" if maintenance_mode else "🟢 DISABLED"
-    await message.answer(f"⚙️ Maintenance mode: {status}")
-    await send_log(f"⚙️ Maintenance mode toggled by owner: {status}")
+    await message.answer("🔄 Restarting...")
+    os.execv(sys.executable, ['python'] + sys.argv)
 
-# ========== CLEARLOGS ==========
-@dp.message(Command("clearlogs"))
-async def clearlogs_cmd(message: Message):
-    user, chat = await handle_common(message, "clearlogs")
+# ========== LAG (Bulletproof) ==========
+@dp.message(Command("lag"))
+async def lag_cmd(message: Message):
+    user, chat = await handle_common(message, "lag")
     if not user:
         return
-    if user.id != OWNER_ID:
-        await message.answer("🚫 Owner only")
-        return
-    try:
-        with sqlite3.connect("data/bot.db") as conn:
-            c = conn.cursor()
-            c.execute("DELETE FROM command_logs")
-            c.execute("DELETE FROM error_logs")
-            conn.commit()
-        await message.answer("🧹 <b>Logs cleared successfully!</b>", parse_mode=ParseMode.HTML)
-        await send_log("🧹 Database logs cleared by owner")
-    except Exception as e:
-        await message.answer(f"❌ Failed to clear logs: {e}")
-
-# ========== AUTO-RECONNECT ==========
-async def keep_alive():
-    global bot_active, last_activity
-    while True:
-        await asyncio.sleep(60)
+    
+    args = message.text.split()
+    duration = 5
+    if len(args) > 1 and args[1].isdigit():
+        duration = min(int(args[1]), 15)
+    
+    msg = await message.answer("🤖 <b>Glitch simulation...</b>", parse_mode=ParseMode.HTML)
+    
+    for i in range(duration):
+        progress = "▓" * (i + 1) + "░" * (duration - i - 1)
         try:
-            await bot.get_me()
-            bot_active = True
-            last_activity = datetime.now()
-        except Exception as e:
-            bot_active = False
-            print(f"⚠️ Connection issue: {e}")
-            try:
-                await bot.session.close()
-                await asyncio.sleep(5)
-                await bot.get_me()
-                bot_active = True
-                print("✅ Reconnected")
-            except:
-                print("❌ Reconnection failed")
-
-# ========== ERROR HANDLER ==========
-@dp.errors()
-async def error_handler(update, exception):
-    print(f"❌ Error: {exception}")
+            await msg.edit_text(f"⚡ <b>LAG:</b> [{progress}] {i+1}/{duration}s", parse_mode=ParseMode.HTML)
+        except:
+            pass
+        await asyncio.sleep(1.3)
+    
     try:
-        with sqlite3.connect("data/bot.db") as conn:
-            c = conn.cursor()
-            c.execute("INSERT INTO error_logs (timestamp, command, error, traceback) VALUES (?, ?, ?, ?)",
-                     (datetime.now().isoformat(), "unknown", str(exception), traceback.format_exc()))
-            conn.commit()
+        await msg.edit_text("✅ <b>System recovered!</b>", parse_mode=ParseMode.HTML)
     except:
         pass
-    return True
+
+# ========== BROADCAST ==========
+@dp.message(Command("broadcast"))
+async def broadcast_cmd(message: Message):
+    user, chat = await handle_common(message, "broadcast")
+    if not user:
+        return
+    if not await is_admin(user.id):
+        await message.answer(f"🚫 Admin only. Your ID: {user.id}")
+        return
+    broadcast_state[user.id] = {"step": 1}
+    await message.answer("📢 <b>Send me text, photo, or video to broadcast!</b>", parse_mode=ParseMode.HTML)
+
+@dp.message(F.text | F.photo | F.video | F.document)
+async def handle_broadcast(message: Message):
+    user = message.from_user
+    if user.id not in broadcast_state:
+        return
+    broadcast_state.pop(user.id, None)
+    
+    with sqlite3.connect("data/bot.db") as conn:
+        c = conn.cursor()
+        c.execute("SELECT user_id FROM users WHERE is_banned = 0")
+        users = c.fetchall()
+    
+    status = await message.answer(f"📤 Broadcasting to {len(users)} users...")
+    success = 0
+    
+    for (uid,) in users:
+        try:
+            caption = message.caption or ""
+            if message.photo:
+                try:
+                    await bot.send_photo(uid, message.photo[-1].file_id, caption=caption, parse_mode=ParseMode.HTML)
+                except:
+                    await bot.send_photo(uid, message.photo[-1].file_id, caption=caption)
+            elif message.video:
+                try:
+                    await bot.send_video(uid, message.video.file_id, caption=caption, parse_mode=ParseMode.HTML)
+                except:
+                    await bot.send_video(uid, message.video.file_id, caption=caption)
+            elif message.document:
+                await bot.send_document(uid, message.document.file_id, caption=caption)
+            elif message.text:
+                await bot.send_message(uid, message.text)
+            success += 1
+            await asyncio.sleep(0.05)
+        except:
+            pass
+    
+    await status.edit_text(f"✅ Sent to {success}/{len(users)} users")
 
 # ========== MAIN ==========
 async def main():
-    print("🚀 STARTING TEMPEST BOT...")
-    print(f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    asyncio.create_task(keep_alive())
-    await send_log("🚀 Bot started successfully!")
+    print("🚀 Starting bot...")
+    await send_log("🚀 Bot started!")
+    
     while True:
         try:
             await dp.start_polling(bot)
-        except (TelegramNetworkError, Exception) as e:
-            print(f"⚠️ Connection lost: {e}")
-            print("🔄 Restarting in 10 seconds...")
+        except Exception as e:
+            print(f"Connection lost: {e}")
             await asyncio.sleep(10)
-            print("🔄 Reconnecting...")
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        save_bot_state()
-        print("\n🛑 Bot stopped")
+        print("Bot stopped")
     except Exception as e:
-        save_bot_state()
-        print(f"❌ Error: {e}")
+        print(f"Fatal error: {e}")
         traceback.print_exc()
