@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ========== TEMPEST BOT - COMPLETE ==========
+# ========== TEMPEST BOT - FULL COMPLETE ==========
 import os
 import asyncio
 import time
@@ -29,7 +29,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
 
 print("=" * 60)
-print("TEMPEST BOT - COMPLETE")
+print("TEMPEST BOT - FULL COMPLETE")
 print("=" * 60)
 
 # ========== CONFIG ==========
@@ -281,36 +281,27 @@ class EncryptionEngine:
         except:
             return None
 
-# ========== CARD GENERATOR - LARGE TEXT ==========
+# ========== CARD GENERATOR ==========
 def generate_profile_card(username, user_id, rank, uploads=0, wishes=0):
     w, h = 800, 400
     img = Image.new("RGB", (w, h), (10, 15, 30))
     draw = ImageDraw.Draw(img)
-    
     for y in range(h):
         r = int(10 + 25 * (y/h))
         g = int(15 + 35 * (y/h))
         b = int(30 + 55 * (y/h))
         draw.line([(0, y), (w, y)], fill=(r, g, b))
-    
     draw.rectangle([10, 10, w-10, h-10], outline=(0, 200, 255), width=3)
-    
     try:
         font_name = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
         font_info = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
     except:
-        try:
-            font_name = ImageFont.truetype("arial.ttf", 36)
-            font_info = ImageFont.truetype("arial.ttf", 24)
-        except:
-            font_name = ImageFont.load_default()
-            font_info = ImageFont.load_default()
-    
+        font_name = ImageFont.load_default()
+        font_info = ImageFont.load_default()
     draw.text((30, 40), username, fill=(255, 255, 255), font=font_name)
     draw.text((30, 90), f"ID: {user_id}", fill=(180, 200, 230), font=font_info)
     draw.text((30, 130), f"Rank: {rank}", fill=(0, 255, 200), font=font_info)
     draw.text((30, 170), f"Uploads: {uploads}  |  Wishes: {wishes}", fill=(255, 215, 0), font=font_info)
-    
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
@@ -320,33 +311,23 @@ def generate_fate_card(name1, name2, percentage, quote):
     w, h = 800, 500
     img = Image.new("RGB", (w, h), (10, 15, 30))
     draw = ImageDraw.Draw(img)
-    
     for y in range(h):
         r = int(10 + 25 * (y/h))
         g = int(15 + 35 * (y/h))
         b = int(30 + 55 * (y/h))
         draw.line([(0, y), (w, y)], fill=(r, g, b))
-    
     draw.rectangle([10, 10, w-10, h-10], outline=(0, 200, 255), width=3)
-    
     try:
         font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)
         font_name = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
         font_quote = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
     except:
-        try:
-            font_title = ImageFont.truetype("arial.ttf", 40)
-            font_name = ImageFont.truetype("arial.ttf", 28)
-            font_quote = ImageFont.truetype("arial.ttf", 18)
-        except:
-            font_title = ImageFont.load_default()
-            font_name = ImageFont.load_default()
-            font_quote = ImageFont.load_default()
-    
+        font_title = ImageFont.load_default()
+        font_name = ImageFont.load_default()
+        font_quote = ImageFont.load_default()
     draw.text((w//2, 50), "TEMPEST FATE", fill=(0, 200, 255), font=font_title, anchor="mm")
     draw.text((w//2, 130), f"{name1}  💘  {name2}", fill=(255, 255, 255), font=font_name, anchor="mm")
     draw.text((w//2, 190), f"{percentage}% LOVE", fill=(255, 100, 150), font=font_name, anchor="mm")
-    
     words = quote.split()
     lines = []
     current = ""
@@ -358,12 +339,10 @@ def generate_fate_card(name1, name2, percentage, quote):
             current = word + " "
     if current:
         lines.append(current.strip())
-    
     y_pos = 250
     for line in lines[:4]:
         draw.text((w//2, y_pos), line, fill=(200, 210, 230), font=font_quote, anchor="mm")
         y_pos += 30
-    
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
@@ -380,7 +359,7 @@ async def start_cmd(message: Message):
         f"✨ Welcome {user.first_name}!\n\n"
         f"/help - Commands"
     )
-    await send_log(f"👤 {user.first_name} ({user.id}) started bot")
+    await send_log(f"👤 {user.first_name} ({user.id}) started")
 
 @dp.message(Command("myid"))
 async def myid_cmd(message: Message):
@@ -391,25 +370,15 @@ async def help_cmd(message: Message):
     await handle_common(message, "help")
     await message.answer(
         f"{header('COMMANDS')}\n"
-        f"🔗 /link - Upload\n"
-        f"📥 /convert - Media URL\n"
-        f"✨ /wish - Wish\n"
-        f"🔮 /fortune - Future\n"
-        f"🎮 /dice - Dice\n"
-        f"🪙 /flip - Coin\n"
-        f"💑 /fate - Love\n"
-        f"👤 /profile - Stats\n"
-        f"🔐 /encrypt - Encrypt\n"
-        f"🔓 /decrypt - Decrypt\n"
-        f"🌀 /tempest_join - Cult\n"
-        f"📜 /tempest_story - Lore\n"
-        f"🌀 /tempest_creed - Members\n"
-        f"⛩️ /shrine - Shrine\n"
-        f"⚡ /curse - Curse\n"
-        f"⚡ /remove_curse - Uncurse\n"
-        f"🌍 /time - World time\n"
-        f"📝 /word - DOCX\n"
-        f"🆔 /myid - Your ID\n"
+        f"🔗 /link - Upload\n📥 /convert - Media URL\n"
+        f"✨ /wish - Wish\n🔮 /fortune - Future\n"
+        f"🎮 /dice - Dice\n🪙 /flip - Coin\n💑 /fate - Love\n"
+        f"👤 /profile - Stats\n🔐 /encrypt - Encrypt\n"
+        f"🔓 /decrypt - Decrypt\n🌀 /tempest_join - Cult\n"
+        f"📜 /tempest_story - Lore\n🌀 /tempest_creed - Members\n"
+        f"⛩️ /shrine - Shrine\n⚡ /curse - Curse\n"
+        f"⚡ /remove_curse - Uncurse\n🌍 /time - World time\n"
+        f"📝 /word - DOCX\n🆔 /myid - Your ID\n"
         f"👑 /admin_help - Admin"
     )
 
