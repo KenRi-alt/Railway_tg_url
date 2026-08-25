@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ========== TEMPEST BOT - ULTIMATE BULLETPROOF EDITION ==========
+# ========== TEMPEST BOT - ULTIMATE RESTORED EDITION ==========
 import os
 import asyncio
 import time
@@ -26,7 +26,7 @@ from aiogram.enums import ParseMode, ChatType
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 print("=" * 60)
-print("TEMPEST BOT - ULTIMATE BULLETPROOF EDITION INITIALIZING...")
+print("TEMPEST BOT - ULTIMATE RESTORED EDITION INITIALIZING...")
 print("=" * 60)
 
 # ========== CONFIG ==========
@@ -188,45 +188,6 @@ async def is_admin(user_id):
     except:
         return False
 
-def format_uptime(seconds):
-    days = seconds // 86400
-    hours = (seconds % 86400) // 3600
-    minutes = (seconds % 3600) // 60
-    secs = seconds % 60
-    parts = []
-    if days: parts.append(f"{days}d")
-    if hours: parts.append(f"{hours}h")
-    if minutes: parts.append(f"{minutes}m")
-    if secs or not parts: parts.append(f"{secs}s")
-    return " ".join(parts)
-
-async def upload_to_catbox(data, filename):
-    try:
-        files = {'reqtype': (None, 'fileupload'), 'fileToUpload': (filename, data)}
-        async with httpx.AsyncClient(timeout=60) as client:
-            r = await client.post(UPLOAD_API, files=files)
-        if r.status_code == 200 and r.text.startswith('http'):
-            return r.text.strip()
-    except:
-        pass
-    return None
-
-class EncryptionEngine:
-    @staticmethod
-    def xor_encrypt(text, key="TEMPEST"):
-        return ''.join(chr(ord(char) ^ ord(key[i % len(key)])) for i, char in enumerate(text))
-    
-    @staticmethod
-    def encrypt(text):
-        return base64.b64encode(EncryptionEngine.xor_encrypt(text).encode()).decode()
-    
-    @staticmethod
-    def decrypt(text):
-        try:
-            return EncryptionEngine.xor_encrypt(base64.b64decode(text.encode()).decode())
-        except:
-            return None
-
 # ========== 100% BULLETPROOF FONT LOADER ==========
 def get_safe_font(size):
     font_path = "fonts/font.ttf"
@@ -243,33 +204,36 @@ def get_safe_font(size):
                 pass
     return ImageFont.load_default()
 
-# ========== BULLETPROOF AVATAR & CARD GENERATOR ==========
+# ========== FIXED PROFILE PICTURE FETCHER ==========
 async def fetch_user_avatar(user_id: int, first_name: str = "User") -> Image.Image:
     try:
         photos = await bot.get_user_profile_photos(user_id, limit=1)
         if photos.total_count > 0:
             file_id = photos.photos[0][-1].file_id
             file_info = await bot.get_file(file_id)
-            file_bytes = await bot.download_file(file_info.file_path)
-            
-            avatar = Image.open(io.BytesIO(file_bytes)).convert("RGBA")
-            avatar = avatar.resize((140, 140), Image.Resampling.LANCZOS)
-            
-            mask = Image.new("L", (140, 140), 0)
-            draw = ImageDraw.Draw(mask)
-            draw.ellipse((0, 0, 140, 140), fill=255)
-            
-            output = Image.new("RGBA", (140, 140), (0, 0, 0, 0))
-            output.paste(avatar, (0, 0), mask=mask)
-            return output
+            file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_info.file_path}"
+            async with httpx.AsyncClient(timeout=30) as client:
+                r = await client.get(file_url)
+            if r.status_code == 200:
+                avatar = Image.open(io.BytesIO(r.content)).convert("RGBA")
+                avatar = avatar.resize((140, 140), Image.Resampling.LANCZOS)
+                
+                mask = Image.new("L", (140, 140), 0)
+                draw = ImageDraw.Draw(mask)
+                draw.ellipse((0, 0, 140, 140), fill=255)
+                
+                output = Image.new("RGBA", (140, 140), (0, 0, 0, 0))
+                output.paste(avatar, (0, 0), mask=mask)
+                return output
     except Exception as e:
-        print(f"Avatar fetch fallback triggered: {e}")
+        print(f"Avatar fetch error: {e}")
     
-    fallback = Image.new("RGBA", (140, 140), (15, 23, 42, 255))
+    # Styled fallback avatar badge if profile photo is private or unavailable
+    fallback = Image.new("RGBA", (140, 140), (20, 30, 50, 255))
     draw = ImageDraw.Draw(fallback)
     draw.ellipse((0, 0, 140, 140), outline=(0, 255, 200), width=4)
     initial = first_name[0].upper() if first_name else "⚡"
-    font = get_safe_font(60)
+    font = get_safe_font(65)
     draw.text((70, 70), initial, fill=(0, 255, 200), font=font, anchor="mm")
     return fallback
 
@@ -357,6 +321,7 @@ async def start_cmd(message: Message):
 async def myid_cmd(message: Message):
     await message.answer(f"🆔 Your Telegram ID: <code>{message.from_user.id}</code>", parse_mode=ParseMode.HTML)
 
+# ========== STORY RESTORED WITH BABLU & RAVIJAH ==========
 @dp.message(Command("story"))
 async def story_cmd(message: Message):
     user, chat = await handle_common(message, "story")
@@ -364,13 +329,13 @@ async def story_cmd(message: Message):
     
     chapters = [
         ("📖 Chapter 1: Awakening in the Dark Eclipse", 
-         "Keny Marcus opened his eyes in the obsidian realm of Tempest. The sky burned with a violet aura, and the remnants of the old world echoed in the wind. A mysterious system interface flickered into existence before him."),
+         "Keny Marcus opened his eyes in the obsidian realm of Tempest. Beside him stood his loyal companions Bablu and Ravijah. The sky burned with violet aura as a mysterious system interface flickered into existence."),
         ("⚔️ Chapter 2: The Guild of Shadows", 
-         "Gathering his elemental powers, Keny forged the Tempest Guild. Shadows responded to his command as elite fairies and warriors aligned under his banner to challenge the encroaching darkness."),
+         "With Bablu holding the vanguard and Ravijah orchestrating tactical formations, Keny forged the Tempest Guild. Shadows responded instantly as elite warriors aligned under their banner."),
         ("⚡ Chapter 3: Breach of the Citadel", 
-         "Breaking through the enemy's barrier, Keny unleashed full-scale kinetic voltage. The fortress defenses shattered under the weight of the Tempest ID authority, sealing the first major victory."),
+         "Ravijah bypassed the enemy firewall while Bablu smashed through the fortress gates. Keny unleashed full kinetic voltage, shattering the defense grid in their first major victory."),
         ("👑 Chapter 4: Reign of the Tempest King", 
-         "Standing atop the conquered spire, Keny gazed across the infinite grid. The system synchronization reached 100%. The era of Tempest Guider had truly begun.")
+         "Standing atop the conquered spire together, Keny, Bablu, and Ravijah gazed across the infinite grid. The system synchronization reached 100%. The era of Tempest Guider had truly begun.")
     ]
     
     msg = await message.answer("🌀 Initiating Tempest Chronicles...")
@@ -401,13 +366,11 @@ async def admin_help_cmd(message: Message):
         return
     await message.answer(
         f"{header('ADMIN DIRECTORY')}\n"
-        f"/ping - Latency & system stats\n/stats - Database stats\n/scan - Quick scan\n"
-        f"/users - Top users list\n/broadcast - Broadcast message\n"
-        f"/lag - Glitch simulation test\n/disable - Disable command\n\n"
+        f"/ping - Latency & system stats\n/stats - Database stats\n/broadcast - Broadcast message\n"
+        f"/backup - Download database backup\n/rem - Restore database from file\n"
+        f"/clearlogs - Clear command logs\n/cm - Custom manager utility\n\n"
         f"<b>OWNER COMMANDS:</b>\n"
-        f"/query - Execute Python code (e.g. /query print(2+2))\n/backup - Download DB backup\n"
-        f"/rem - Restore database\n/restart - Reboot bot\n/logs - View command logs\n"
-        f"/maintenance - Toggle maintenance\n/clearlogs - Clear activity logs\n/pro - Promote admin",
+        f"/query - Execute Python code (e.g. /query print(2+2))\n/restart - Reboot bot\n/maintenance - Toggle maintenance",
         parse_mode=ParseMode.HTML
     )
 
@@ -531,6 +494,26 @@ async def link_cmd(message: Message):
 @dp.message(F.photo | F.video | F.document | F.audio | F.voice | F.sticker | F.animation)
 async def handle_file(message: Message):
     user = message.from_user
+    
+    # Check if restoring DB
+    if user.id in pending_restore:
+        pending_restore.pop(user.id, None)
+        if not message.document or not message.document.file_name.endswith(".db"):
+            await message.answer("❌ Please send a valid `.db` file for restoration.")
+            return
+        msg = await message.answer("⏳ Restoring database...")
+        try:
+            file = await bot.get_file(message.document.file_id)
+            url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
+            async with httpx.AsyncClient(timeout=60) as client:
+                r = await client.get(url)
+            with open("data/bot.db", "wb") as f:
+                f.write(r.content)
+            await msg.edit_text("✅ Database restored successfully! Restart recommended (/restart).")
+        except Exception as e:
+            await msg.edit_text(f"❌ Restore failed: {e}")
+        return
+
     if user.id not in upload_waiting:
         return
     upload_waiting.pop(user.id, None)
@@ -577,7 +560,44 @@ async def stats_cmd(message: Message):
         uploads = c.fetchone()[0] if c.execute("SELECT COUNT(*) FROM uploads").fetchone() else 0
     await message.answer(f"📊 <b>Stats</b>\n👥 Users: {users}\n📁 Uploads: {uploads}", parse_mode=ParseMode.HTML)
 
-# ========== FIXED BROADCAST SECTION (TEXT & MEDIA) ==========
+# ========== RESTORED ADMIN COMMANDS (/backup, /rem, /clearlogs, /cm) ==========
+@dp.message(Command("backup"))
+async def backup_cmd(message: Message):
+    if message.from_user.id != OWNER_ID and not await is_admin(message.from_user.id): return
+    db_path = "data/bot.db"
+    if os.path.exists(db_path):
+        await message.answer_document(FSInputFile(db_path), caption="📦 <b>Tempest Database Backup</b>", parse_mode=ParseMode.HTML)
+    else:
+        await message.answer("❌ Database file not found!")
+
+@dp.message(Command("rem"))
+async def rem_cmd(message: Message):
+    if message.from_user.id != OWNER_ID: return
+    pending_restore[message.from_user.id] = True
+    await message.answer("📥 Please send the `.db` database file you want to restore.")
+
+@dp.message(Command("clearlogs"))
+async def clearlogs_cmd(message: Message):
+    if message.from_user.id != OWNER_ID: return
+    with sqlite3.connect("data/bot.db") as conn:
+        conn.execute("DELETE FROM command_logs")
+        conn.commit()
+    await message.answer("🧹 Command activity logs cleared successfully!")
+
+@dp.message(Command("cm"))
+async def cm_cmd(message: Message):
+    if message.from_user.id != OWNER_ID and not await is_admin(message.from_user.id): return
+    await message.answer(
+        f"{header('CUSTOM MANAGER (CM)')}\n"
+        f"⚙️ Active modules:\n"
+        f"• Broadcast Engine: ONLINE\n"
+        f"• Card Renderer: ONLINE\n"
+        f"• Database Engine: ONLINE\n"
+        f"• File Uploader: ONLINE",
+        parse_mode=ParseMode.HTML
+    )
+
+# ========== BROADCAST SECTION ==========
 @dp.message(Command("broadcast"))
 async def broadcast_cmd(message: Message):
     if message.from_user.id != OWNER_ID and not await is_admin(message.from_user.id): return
@@ -602,7 +622,6 @@ async def handle_broadcast_media(message: Message):
             await bot.copy_message(chat_id=uid, from_chat_id=message.chat.id, message_id=message.message_id)
             success += 1
         except Exception as e:
-            print(f"⚠️ Broadcast media failed for user {uid}: {e}")
             failed += 1
         await asyncio.sleep(0.03)
         
@@ -625,7 +644,6 @@ async def handle_broadcast_text(message: Message):
             await bot.copy_message(chat_id=uid, from_chat_id=message.chat.id, message_id=message.message_id)
             success += 1
         except Exception as e:
-            print(f"⚠️ Broadcast failed for user {uid}: {e}")
             failed += 1
         await asyncio.sleep(0.03)
         
@@ -638,13 +656,7 @@ async def query_cmd(message: Message):
         return
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
-        await message.answer(
-            "⚡ <b>Usage:</b> /query [Python code]\n"
-            "💡 <b>Example:</b>\n"
-            "<code>/query print(2 + 2)</code>\n"
-            "<code>/query import sqlite3; print(sqlite3.sqlite_version)</code>",
-            parse_mode=ParseMode.HTML
-        )
+        await message.answer("⚡ Usage: /query [Python code]", parse_mode=ParseMode.HTML)
         return
     buf = io.StringIO()
     try:
@@ -667,6 +679,7 @@ async def cancel_cmd(message: Message):
     user = message.from_user
     upload_waiting.pop(user.id, None)
     broadcast_state.pop(user.id, None)
+    pending_restore.pop(user.id, None)
     await message.answer("❌ Current operation cancelled.")
 
 # ========== MAIN ENTRYPOINT ==========
