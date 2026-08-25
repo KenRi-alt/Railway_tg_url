@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ========== TEMPEST BOT - FULL COMPLETE WITH AVATARS & AUTO-MIGRATE ==========
+# ========== TEMPEST BOT - FULL COMPLETE WITH UNIVERSAL BROADCAST & AVATARS ==========
 import os
 import asyncio
 import time
@@ -29,7 +29,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
 
 print("=" * 60)
-print("TEMPEST BOT - FULL COMPLETE (WITH AVATARS)")
+print("TEMPEST BOT - FULL COMPLETE (BROADCAST & AVATARS FIXED)")
 print("=" * 60)
 
 # ========== CONFIG ==========
@@ -119,7 +119,6 @@ def init_db():
             curse_time TEXT DEFAULT NULL
         )''')
         
-        # Auto-migrate missing columns for existing databases
         columns_to_add = [
             ("cult_status", "TEXT DEFAULT 'none'"),
             ("cult_rank", "TEXT DEFAULT 'none'"),
@@ -132,7 +131,7 @@ def init_db():
             try:
                 c.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
             except sqlite3.OperationalError:
-                pass # Column already exists
+                pass
 
         c.execute('''CREATE TABLE IF NOT EXISTS groups (
             group_id INTEGER PRIMARY KEY,
@@ -297,9 +296,26 @@ class EncryptionEngine:
         except:
             return None
 
+# ========== FONT LOADER ==========
+def get_safe_font(size):
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/system/fonts/Roboto-Bold.ttf",
+        "/system/fonts/DroidSans.ttf",
+        "/Library/Fonts/Arial Bold.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf"
+    ]
+    for path in font_paths:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except:
+                pass
+    return ImageFont.load_default()
+
 # ========== AVATAR & CARD GENERATOR ==========
 async def fetch_user_avatar(user_id: int) -> Image.Image:
-    """Fetches user profile photo from Telegram and returns a circular PIL image, or a fallback icon."""
     try:
         photos = await bot.get_user_profile_photos(user_id, limit=1)
         if photos.total_count > 0:
@@ -307,11 +323,9 @@ async def fetch_user_avatar(user_id: int) -> Image.Image:
             file_info = await bot.get_file(file_id)
             file_bytes = await bot.download_file(file_info.file_path)
             
-            # Read image bytes
             avatar = Image.open(io.BytesIO(file_bytes)).convert("RGBA")
             avatar = avatar.resize((140, 140), Image.Resampling.LANCZOS)
             
-            # Create circular mask
             mask = Image.new("L", (140, 140), 0)
             draw = ImageDraw.Draw(mask)
             draw.ellipse((0, 0, 140, 140), fill=255)
@@ -322,11 +336,10 @@ async def fetch_user_avatar(user_id: int) -> Image.Image:
     except Exception as e:
         print(f"Avatar fetch error: {e}")
     
-    # Fallback default avatar circle
     fallback = Image.new("RGBA", (140, 140), (30, 41, 59, 255))
     draw = ImageDraw.Draw(fallback)
     draw.ellipse((0, 0, 140, 140), outline=(0, 200, 255), width=3)
-    draw.text((70, 70), "⚡", fill=(0, 200, 255), anchor="mm", font_size=40)
+    draw.text((70, 70), "⚡", fill=(0, 200, 255), anchor="mm")
     return fallback
 
 def generate_profile_card_sync(username, user_id, rank, uploads, wishes, avatar_img):
@@ -334,35 +347,26 @@ def generate_profile_card_sync(username, user_id, rank, uploads, wishes, avatar_
     img = Image.new("RGB", (w, h), (10, 15, 30))
     draw = ImageDraw.Draw(img)
     
-    # Gradient background
     for y in range(h):
         r = int(10 + 25 * (y/h))
         g = int(15 + 35 * (y/h))
         b = int(30 + 55 * (y/h))
         draw.line([(0, y), (w, y)], fill=(r, g, b))
         
-    # Neon border & accents
     draw.rectangle([10, 10, w-10, h-10], outline=(0, 200, 255), width=3)
     draw.rectangle([30, 30, w-30, h-30], outline=(30, 60, 90), width=1)
     
-    # Paste Avatar with glow border
     avatar_x, avatar_y = 50, 80
     draw.ellipse((avatar_x-4, avatar_y-4, avatar_x+144, avatar_y+144), outline=(0, 255, 200), width=3)
     img.paste(avatar_img, (avatar_x, avatar_y), mask=avatar_img)
     
-    try:
-        font_name = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 34)
-        font_info = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
-    except:
-        font_name = ImageFont.load_default()
-        font_info = ImageFont.load_default()
+    font_name = get_safe_font(32)
+    font_info = get_safe_font(20)
         
     draw.text((215, 80), username[:22], fill=(255, 255, 255), font=font_name)
     draw.text((215, 130), f"🆔 ID: {user_id}", fill=(180, 200, 230), font=font_info)
     draw.text((215, 170), f"⚡ Rank: {rank}", fill=(0, 255, 200), font=font_info)
     draw.text((215, 220), f"📁 Uploads: {uploads}   |   ✨ Wishes: {wishes}", fill=(255, 215, 0), font=font_info)
-    
-    # Footer tag
     draw.text((w - 40, h - 35), "TEMPEST GUIDER", fill=(100, 116, 139), font=font_info, anchor="ra")
     
     buf = io.BytesIO()
@@ -380,14 +384,10 @@ def generate_fate_card_sync(name1, name2, percentage, quote):
         b = int(25 + 45 * (y/h))
         draw.line([(0, y), (w, y)], fill=(r, g, b))
     draw.rectangle([10, 10, w-10, h-10], outline=(255, 100, 180), width=3)
-    try:
-        font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 38)
-        font_name = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 26)
-        font_quote = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
-    except:
-        font_title = ImageFont.load_default()
-        font_name = ImageFont.load_default()
-        font_quote = ImageFont.load_default()
+    
+    font_title = get_safe_font(34)
+    font_name = get_safe_font(24)
+    font_quote = get_safe_font(18)
         
     draw.text((w//2, 50), "❤️ TEMPEST FATE MATRIX ❤️", fill=(255, 100, 180), font=font_title, anchor="mm")
     draw.text((w//2, 130), f"{name1}  💘  {name2}", fill=(255, 255, 255), font=font_name, anchor="mm")
@@ -464,7 +464,8 @@ async def admin_help_cmd(message: Message):
         f"<b>OWNER COMMANDS:</b>\n"
         f"/query - Execute Python code\n/backup - Download DB backup\n"
         f"/rem - Restore database\n/restart - Reboot bot\n/logs - View command logs\n"
-        f"/maintenance - Toggle maintenance\n/clearlogs - Clear activity logs\n/pro - Promote admin"
+        f"/maintenance - Toggle maintenance\n/clearlogs - Clear activity logs\n/pro - Promote admin",
+        parse_mode=ParseMode.HTML
     )
 
 # ========== FUN COMMANDS ==========
@@ -596,10 +597,7 @@ async def profile_cmd(message: Message):
         rank = "Mortal"
         curse = "none"
         
-    # Fetch Telegram Avatar image
     avatar_img = await fetch_user_avatar(user.id)
-    
-    # Generate card in background thread
     card = await asyncio.to_thread(
         generate_profile_card_sync,
         user.first_name,
@@ -1020,38 +1018,40 @@ async def broadcast_cmd(message: Message):
         await message.answer(f"🚫 Admin only. Your ID: {user.id}")
         return
     broadcast_state[user.id] = {"step": 1}
-    await message.answer("📢 Send me the text, photo, video, or document you wish to broadcast to all users!")
+    await message.answer("📢 Send me any message, photo, video, document, audio, voice note, sticker, or GIF you wish to broadcast!")
 
-@dp.message(F.text | F.photo | F.video | F.document)
+# ========== UNIVERSAL BROADCAST HANDLER ==========
+@dp.message(lambda msg: msg.from_user and msg.from_user.id in broadcast_state)
 async def handle_broadcast(message: Message):
     user = message.from_user
-    if user.id not in broadcast_state:
-        return
     broadcast_state.pop(user.id, None)
+    
     if message.text and message.text.startswith("/"):
         return
+        
     with sqlite3.connect("data/bot.db") as conn:
         c = conn.cursor()
         c.execute("SELECT user_id FROM users WHERE is_banned = 0")
         users = c.fetchall()
+        
     status = await message.answer(f"📤 Broadcasting to {len(users)} users...")
     success = 0
+    failed = 0
+    
     for (uid,) in users:
         try:
-            caption = message.caption or ""
-            if message.photo:
-                await bot.send_photo(uid, message.photo[-1].file_id, caption=caption)
-            elif message.video:
-                await bot.send_video(uid, message.video.file_id, caption=caption)
-            elif message.document:
-                await bot.send_document(uid, message.document.file_id, caption=caption)
-            elif message.text:
-                await bot.send_message(uid, message.text)
+            # copy_message natively and perfectly handles text, photo, video, audio, voice, sticker, GIF, document, caption, and formatting
+            await bot.copy_message(
+                chat_id=uid,
+                from_chat_id=message.chat.id,
+                message_id=message.message_id
+            )
             success += 1
-        except:
-            pass
-        await asyncio.sleep(0.05)
-    await status.edit_text(f"✅ Broadcast complete! Successfully delivered to {success}/{len(users)} users.")
+        except Exception as e:
+            failed += 1
+        await asyncio.sleep(0.04)
+        
+    await status.edit_text(f"✅ <b>Broadcast complete!</b>\nSuccess: {success}\nFailed: {failed}", parse_mode=ParseMode.HTML)
 
 @dp.message(Command("lag"))
 async def lag_cmd(message: Message):
@@ -1128,7 +1128,7 @@ async def maintenance_cmd(message: Message):
         await message.answer(f"🚫 Owner only. Your ID: {user.id}")
         return
     maintenance_mode = not maintenance_mode
-    await message.answer(f"⚙️ Maintenance mode: {'🔴 ON (Locked)' : '🟢 OFF (Active)'}")
+    await message.answer(f"⚙️ Maintenance mode: {'🔴 ON (Locked)' if maintenance_mode else '🟢 OFF (Active)'}")
 
 @dp.message(Command("clearlogs"))
 async def clearlogs_cmd(message: Message):
