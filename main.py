@@ -243,8 +243,8 @@ def get_safe_font(size):
                 pass
     return ImageFont.load_default()
 
-# ========== AVATAR & CARD GENERATOR ==========
-async def fetch_user_avatar(user_id: int) -> Image.Image:
+# ========== BULLETPROOF AVATAR & CARD GENERATOR ==========
+async def fetch_user_avatar(user_id: int, first_name: str = "User") -> Image.Image:
     try:
         photos = await bot.get_user_profile_photos(user_id, limit=1)
         if photos.total_count > 0:
@@ -263,12 +263,14 @@ async def fetch_user_avatar(user_id: int) -> Image.Image:
             output.paste(avatar, (0, 0), mask=mask)
             return output
     except Exception as e:
-        print(f"Avatar fetch error: {e}")
+        print(f"Avatar fetch fallback triggered: {e}")
     
-    fallback = Image.new("RGBA", (140, 140), (30, 41, 59, 255))
+    fallback = Image.new("RGBA", (140, 140), (15, 23, 42, 255))
     draw = ImageDraw.Draw(fallback)
-    draw.ellipse((0, 0, 140, 140), outline=(0, 200, 255), width=3)
-    draw.text((70, 70), "⚡", fill=(0, 200, 255), anchor="mm")
+    draw.ellipse((0, 0, 140, 140), outline=(0, 255, 200), width=4)
+    initial = first_name[0].upper() if first_name else "⚡"
+    font = get_safe_font(60)
+    draw.text((70, 70), initial, fill=(0, 255, 200), font=font, anchor="mm")
     return fallback
 
 def generate_profile_card_sync(username, user_id, rank, uploads, wishes, avatar_img):
@@ -355,6 +357,29 @@ async def start_cmd(message: Message):
 async def myid_cmd(message: Message):
     await message.answer(f"🆔 Your Telegram ID: <code>{message.from_user.id}</code>", parse_mode=ParseMode.HTML)
 
+@dp.message(Command("story"))
+async def story_cmd(message: Message):
+    user, chat = await handle_common(message, "story")
+    if not user: return
+    
+    chapters = [
+        ("📖 Chapter 1: Awakening in the Dark Eclipse", 
+         "Keny Marcus opened his eyes in the obsidian realm of Tempest. The sky burned with a violet aura, and the remnants of the old world echoed in the wind. A mysterious system interface flickered into existence before him."),
+        ("⚔️ Chapter 2: The Guild of Shadows", 
+         "Gathering his elemental powers, Keny forged the Tempest Guild. Shadows responded to his command as elite fairies and warriors aligned under his banner to challenge the encroaching darkness."),
+        ("⚡ Chapter 3: Breach of the Citadel", 
+         "Breaking through the enemy's barrier, Keny unleashed full-scale kinetic voltage. The fortress defenses shattered under the weight of the Tempest ID authority, sealing the first major victory."),
+        ("👑 Chapter 4: Reign of the Tempest King", 
+         "Standing atop the conquered spire, Keny gazed across the infinite grid. The system synchronization reached 100%. The era of Tempest Guider had truly begun.")
+    ]
+    
+    msg = await message.answer("🌀 Initiating Tempest Chronicles...")
+    await asyncio.sleep(1)
+    
+    for title, text in chapters:
+        await msg.edit_text(f"{header(title)}\n\n{text}")
+        await asyncio.sleep(6)
+
 @dp.message(Command("help"))
 async def help_cmd(message: Message):
     await handle_common(message, "help")
@@ -363,8 +388,8 @@ async def help_cmd(message: Message):
         f"🔗 /link - Upload any file\n📥 /convert - Convert media URL\n"
         f"✨ /wish - Make a wish\n🔮 /fortune - Future prediction\n"
         f"🎮 /dice - Roll dice\n🪙 /flip - Coin flip\n💑 /fate - Love compatibility\n"
-        f"👤 /profile - Profile card with avatar\n🔐 /encrypt - XOR encrypt\n"
-        f"🔓 /decrypt - XOR decrypt\n🌍 /time - World clocks\n"
+        f"👤 /profile - Profile card with avatar\n📖 /story - Tempest Chronicles\n"
+        f"🔐 /encrypt - XOR encrypt\n🔓 /decrypt - XOR decrypt\n🌍 /time - World clocks\n"
         f"👑 /admin_help - Admin commands"
     )
 
@@ -460,7 +485,7 @@ async def profile_cmd(message: Message):
     uploads, rank = (r[0], r[1]) if r else (0, "Mortal")
     if rank == 'none' or not rank: rank = "Mortal"
         
-    avatar_img = await fetch_user_avatar(user.id)
+    avatar_img = await fetch_user_avatar(user.id, user.first_name)
     card = await asyncio.to_thread(generate_profile_card_sync, user.first_name, user.id, rank, uploads, wishes, avatar_img)
     
     await msg.delete()
@@ -552,14 +577,39 @@ async def stats_cmd(message: Message):
         uploads = c.fetchone()[0] if c.execute("SELECT COUNT(*) FROM uploads").fetchone() else 0
     await message.answer(f"📊 <b>Stats</b>\n👥 Users: {users}\n📁 Uploads: {uploads}", parse_mode=ParseMode.HTML)
 
+# ========== FIXED BROADCAST SECTION (TEXT & MEDIA) ==========
 @dp.message(Command("broadcast"))
 async def broadcast_cmd(message: Message):
     if message.from_user.id != OWNER_ID and not await is_admin(message.from_user.id): return
-    broadcast_state[message.from_user.id] = True
+    broadcast_state[message.from_user.id] = "waiting"
     await message.answer("📢 Send me ANY message, photo, video, document, audio, voice note, sticker, or GIF to broadcast!")
 
-@dp.message(lambda msg: msg.from_user and msg.from_user.id in broadcast_state)
-async def handle_broadcast(message: Message):
+@dp.message(F.photo | F.video | F.document | F.audio | F.voice | F.sticker | F.animation)
+async def handle_broadcast_media(message: Message):
+    user = message.from_user
+    if user.id not in broadcast_state or broadcast_state[user.id] != "waiting":
+        return
+    broadcast_state.pop(user.id, None)
+    
+    with sqlite3.connect("data/bot.db") as conn:
+        users = conn.cursor().execute("SELECT user_id FROM users WHERE is_banned = 0").fetchall()
+        
+    status = await message.answer(f"📤 Broadcasting media to {len(users)} users...")
+    success, failed = 0, 0
+    
+    for (uid,) in users:
+        try:
+            await bot.copy_message(chat_id=uid, from_chat_id=message.chat.id, message_id=message.message_id)
+            success += 1
+        except Exception as e:
+            print(f"⚠️ Broadcast media failed for user {uid}: {e}")
+            failed += 1
+        await asyncio.sleep(0.03)
+        
+    await status.edit_text(f"✅ <b>Broadcast complete!</b>\nSuccess: {success}\nFailed: {failed}", parse_mode=ParseMode.HTML)
+
+@dp.message(lambda msg: msg.from_user and msg.from_user.id in broadcast_state and broadcast_state[msg.from_user.id] == "waiting" and msg.text)
+async def handle_broadcast_text(message: Message):
     user = message.from_user
     broadcast_state.pop(user.id, None)
     if message.text and message.text.startswith("/"): return
