@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ========== TEMPEST GUIDER - ULTIMATE COMPLETE (GitHub Safe) ==========
+# ========== TEMPEST GUIDER - MAXIMUM COMPLETE ==========
 import os
 import asyncio
 import time
@@ -28,18 +28,16 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
 
 print("=" * 60)
-print("TEMPEST GUIDER - ULTIMATE COMPLETE")
+print("TEMPEST GUIDER - MAXIMUM COMPLETE")
 print("=" * 60)
 
-# ========== CONFIG (GitHub Safe) ==========
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-OWNER_ID = int(os.getenv("OWNER_ID", "0"))
-LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "0"))
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+# ========== CONFIG ==========
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAGs1HNsyX-UobN6PVq7u4iPMxGnOX14AAg")
+OWNER_ID = int(os.getenv("OWNER_ID", "6108185460"))
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "-1003662720845"))
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")  # Empty - set via /management
 
-if not BOT_TOKEN:
-    print("ERROR: BOT_TOKEN not set!")
-    sys.exit(1)
+UPLOAD_API = "https://catbox.moe/user/api.php"
 
 try:
     import yt_dlp
@@ -65,6 +63,7 @@ pending_restore = {}
 disabled_commands = {}
 maintenance_mode = False
 conversation_memory = {}
+ai_enabled = True
 
 # ========== FONT ==========
 async def ensure_font():
@@ -87,15 +86,7 @@ def get_safe_font(size):
             return ImageFont.truetype(font_path, size)
         except:
             pass
-    for path in [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        "/system/fonts/Roboto-Bold.ttf",
-        "C:\\Windows\\Fonts\\arialbd.ttf",
-        "C:\\Windows\\Fonts\\segoeui.ttf"
-    ]:
+    for path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/system/fonts/Roboto-Bold.ttf"]:
         if os.path.exists(path):
             try:
                 return ImageFont.truetype(path, size)
@@ -103,18 +94,15 @@ def get_safe_font(size):
                 pass
     return ImageFont.load_default()
 
-def draw_visible_text(draw, position, text, font, fill_color, outline_color=(0, 0, 0), outline_width=2, anchor=None):
-    """Draw text with dark outline for visibility on any background"""
+def draw_visible_text(draw, position, text, font, fill_color, outline_color=(0,0,0), outline_width=2, anchor=None):
     x, y = position
-    # Draw outline
-    for ox in range(-outline_width, outline_width + 1):
-        for oy in range(-outline_width, outline_width + 1):
+    for ox in range(-outline_width, outline_width+1):
+        for oy in range(-outline_width, outline_width+1):
             if ox != 0 or oy != 0:
                 if anchor:
-                    draw.text((x + ox, y + oy), text, font=font, fill=outline_color, anchor=anchor)
+                    draw.text((x+ox, y+oy), text, font=font, fill=outline_color, anchor=anchor)
                 else:
-                    draw.text((x + ox, y + oy), text, font=font, fill=outline_color)
-    # Draw main text
+                    draw.text((x+ox, y+oy), text, font=font, fill=outline_color)
     if anchor:
         draw.text((x, y), text, font=font, fill=fill_color, anchor=anchor)
     else:
@@ -131,9 +119,12 @@ def divider():
 ANIME_QUOTES = [
     "Wake up to reality! Nothing ever goes as planned in this accursed world.\n- Madara Uchiha",
     "The longer you live, the more you realize that reality is just made of pain.\n- Madara Uchiha",
+    "People cannot show each other their true feelings.\n- Madara Uchiha",
     "The only thing we're allowed to do is believe we won't regret our choice.\n- Levi Ackerman",
     "If you don't take risks, you can't create a future.\n- Monkey D. Luffy",
+    "Power isn't determined by your size, but by the size of your heart.\n- Luffy",
     "Fear is not evil. It tells you what your weakness is.\n- Gildarts Clive",
+    "A lesson without pain is meaningless.\n- Edward Elric",
 ]
 
 # ========== TIMEZONES ==========
@@ -142,8 +133,14 @@ COUNTRY_TIMEZONES = {
     "japan": "Asia/Tokyo", "china": "Asia/Shanghai", "russia": "Europe/Moscow",
     "brazil": "America/Sao_Paulo", "australia": "Australia/Sydney",
     "canada": "America/Toronto", "germany": "Europe/Berlin",
-    "france": "Europe/Paris", "uganda": "Africa/Kampala",
-    "kenya": "Africa/Nairobi", "uae": "Asia/Dubai", "nigeria": "Africa/Lagos",
+    "france": "Europe/Paris", "italy": "Europe/Rome", "spain": "Europe/Madrid",
+    "south korea": "Asia/Seoul", "pakistan": "Asia/Karachi",
+    "bangladesh": "Asia/Dhaka", "nigeria": "Africa/Lagos",
+    "egypt": "Africa/Cairo", "south africa": "Africa/Johannesburg",
+    "kenya": "Africa/Nairobi", "uganda": "Africa/Kampala",
+    "uae": "Asia/Dubai", "saudi arabia": "Asia/Riyadh",
+    "turkey": "Europe/Istanbul", "thailand": "Asia/Bangkok",
+    "philippines": "Asia/Manila", "singapore": "Asia/Singapore",
 }
 
 # ========== DATABASE ==========
@@ -323,7 +320,7 @@ async def fetch_user_avatar(user_id: int, first_name: str = "User") -> Image.Ima
     draw_visible_text(draw, (60, 60), initial, font, (0, 255, 200), anchor="mm")
     return fallback
 
-# ========== PROFILE CARD (Fixed with visible text and avatar) ==========
+# ========== CARDS ==========
 def generate_profile_card_sync(username, user_id, rank, uploads, wishes, avatar_img):
     w, h = 800, 360
     img = Image.new("RGB", (w, h), (10, 15, 30))
@@ -334,29 +331,21 @@ def generate_profile_card_sync(username, user_id, rank, uploads, wishes, avatar_
         b = int(30 + 55 * (y/h))
         draw.line([(0, y), (w, y)], fill=(r, g, b))
     draw.rectangle([10, 10, w-10, h-10], outline=(0, 200, 255), width=3)
-    
-    # Avatar
     avatar_x, avatar_y = 50, 80
     draw.ellipse((avatar_x-3, avatar_y-3, avatar_x+123, avatar_y+123), outline=(0, 255, 200), width=3)
     img.paste(avatar_img, (avatar_x, avatar_y), mask=avatar_img)
-    
-    # Fonts
     font_name = get_safe_font(28)
     font_info = get_safe_font(20)
-    
-    # Text with outline for visibility
     draw_visible_text(draw, (200, 75), str(username)[:20], font_name, (255, 255, 255))
     draw_visible_text(draw, (200, 120), f"ID: {user_id}", font_info, (180, 200, 230))
     draw_visible_text(draw, (200, 160), f"Rank: {rank}", font_info, (0, 255, 200))
     draw_visible_text(draw, (200, 205), f"Uploads: {uploads}  |  Wishes: {wishes}", font_info, (255, 215, 0))
     draw_visible_text(draw, (w - 30, h - 30), "TEMPEST GUIDER", font_info, (100, 116, 139), anchor="ra")
-    
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
     return buf.getvalue()
 
-# ========== FATE CARD (Fixed with visible text) ==========
 def generate_fate_card_sync(name1, name2, percentage, quote, avatar1=None, avatar2=None):
     w, h = 800, 450
     img = Image.new("RGB", (w, h), (15, 10, 25))
@@ -367,24 +356,16 @@ def generate_fate_card_sync(name1, name2, percentage, quote, avatar1=None, avata
         b = int(25 + 45 * (y/h))
         draw.line([(0, y), (w, y)], fill=(r, g, b))
     draw.rectangle([10, 10, w-10, h-10], outline=(255, 100, 180), width=3)
-    
-    # Fonts
     font_title = get_safe_font(28)
     font_name = get_safe_font(20)
     font_quote = get_safe_font(14)
-    
-    # Avatars
     if avatar1:
         img.paste(avatar1, (100, 50), mask=avatar1)
     if avatar2:
         img.paste(avatar2, (580, 50), mask=avatar2)
-    
-    # Text
     draw_visible_text(draw, (w//2, 45), "TEMPEST FATE MATRIX", font_title, (255, 100, 180), anchor="mm")
     draw_visible_text(draw, (w//2, 200), f"{name1}  +  {name2}", font_name, (255, 255, 255), anchor="mm")
     draw_visible_text(draw, (w//2, 240), f"{percentage}% COMPATIBILITY", font_name, (255, 215, 0), anchor="mm")
-    
-    # Quote
     words = quote.split()
     lines, current = [], ""
     for word in words:
@@ -395,18 +376,15 @@ def generate_fate_card_sync(name1, name2, percentage, quote, avatar1=None, avata
             current = word + " "
     if current:
         lines.append(current.strip())
-    
     y_pos = 290
     for line in lines[:4]:
         draw_visible_text(draw, (w//2, y_pos), line, font_quote, (210, 220, 240), anchor="mm")
         y_pos += 30
-    
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
     return buf.getvalue()
-
-# ========== ALL COMMANDS ==========
+# ========== BASIC COMMANDS ==========
 @dp.message(CommandStart())
 async def start_cmd(message: Message):
     user, chat = await handle_common(message, "start")
@@ -429,7 +407,7 @@ async def help_cmd(message: Message):
         f"/encrypt - Encrypt\n/decrypt - Decrypt\n/tempest_join - Join\n"
         f"/tempest_story - Lore\n/tempest_creed - Members\n/shrine - Shrine\n"
         f"/curse - Curse\n/remove_curse - Uncurse\n/time - World time\n"
-        f"/word - DOCX\n/myid - Your ID\n/admin_help - Admin"
+        f"/word - DOCX\n/neko - Neko\n/waifu - Waifu\n/myid - Your ID\n/admin_help - Admin"
     )
 
 @dp.message(Command("admin_help"))
@@ -443,7 +421,8 @@ async def admin_help_cmd(message: Message):
     await message.answer(
         f"{header('ADMIN')}\n"
         f"/ping /stats /scan /users /broadcast /lag /disable /cm\n"
-        f"OWNER: /query /restart /maintenance /pro /backup /rem /clearlogs /logs"
+        f"/ban /unban /banlist\n"
+        f"OWNER: /query /restart /maintenance /pro /backup /rem /clearlogs /logs /management"
     )
 
 # ========== WISH WITH ANIMATION ==========
@@ -476,12 +455,21 @@ async def fortune_cmd(message: Message):
     user, chat = await handle_common(message, "fortune")
     if not user:
         return
-    fortunes = ["Great things await!", "New doors open!", "Adventure calls!", "Success is near!", "Love finds you!"]
+    fortunes = [
+        "Great things await you!", "New doors open!", "Adventure calls!",
+        "Success is near!", "Love finds you!", "Lucky week ahead!",
+        "A wish comes true!", "Strength grows daily!", "Hidden talent emerges!",
+        "The storm favors you!"
+    ]
     msg = await message.answer("Reading the crystal orb...")
     await asyncio.sleep(1.5)
     await msg.edit_text("The spirits are speaking...")
     await asyncio.sleep(1.5)
     f = random.choice(fortunes)
+    with sqlite3.connect("data/bot.db") as conn:
+        conn.execute("INSERT INTO fortunes (user_id, timestamp, fortune_text) VALUES (?, ?, ?)",
+                    (user.id, datetime.now().isoformat(), f))
+        conn.commit()
     await msg.edit_text(f"{header('FORTUNE')}\n{f}")
 
 # ========== DICE ==========
@@ -497,7 +485,7 @@ async def flip_cmd(message: Message):
     result = random.choice(["HEADS", "TAILS"])
     await message.answer(f"{result}!")
 
-# ========== FATE WITH ANIMATION + CARDS ==========
+# ========== FATE WITH CARDS ==========
 @dp.message(Command("fate"))
 async def fate_cmd(message: Message):
     user, chat = await handle_common(message, "fate")
@@ -512,7 +500,6 @@ async def fate_cmd(message: Message):
     await asyncio.sleep(1.5)
     await msg.edit_text("Calculating compatibility...")
     await asyncio.sleep(1.5)
-    
     with sqlite3.connect("data/bot.db") as conn:
         c = conn.cursor()
         c.execute("SELECT user1_name, user2_name, love_percentage FROM fate_pairs WHERE chat_id = ? AND created_date >= ?",
@@ -529,15 +516,12 @@ async def fate_cmd(message: Message):
     l1, l2 = random.sample(members, 2)
     love = random.randint(50, 100)
     quote = random.choice(ANIME_QUOTES)
-    
     avatar1 = await fetch_user_avatar(l1[0], l1[1])
     avatar2 = await fetch_user_avatar(l2[0], l2[1])
-    
     with sqlite3.connect("data/bot.db") as conn:
         conn.execute("INSERT INTO fate_pairs (chat_id, user1_id, user1_name, user2_id, user2_name, love_percentage, created_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (chat.id, l1[0], l1[1], l2[0], l2[1], love, datetime.now().isoformat()))
         conn.commit()
-    
     card = await asyncio.to_thread(generate_fate_card_sync, l1[1], l2[1], love, quote, avatar1, avatar2)
     await msg.delete()
     await message.answer_photo(
@@ -615,7 +599,7 @@ async def tempest_join_cmd(message: Message):
             pass
     await msg.edit_text("WELCOME TO THE TEMPEST!\nRank: Blood Initiate\nSacrifices: 3")
 
-# ========== TEMPEST STORY (6 Chapters + Keny, Ravijah, Bablu) ==========
+# ========== TEMPEST STORY (6 Chapters - Keny, Ravijah, Bablu) ==========
 @dp.message(Command("tempest_story"))
 async def tempest_story_cmd(message: Message):
     user, chat = await handle_common(message, "tempest_story")
@@ -657,7 +641,7 @@ async def tempest_creed_cmd(message: Message):
         text += f"{i}. {name} - {rank} ({sacs} sacrifices)\n"
     await message.answer(text)
 
-# ========== SHRINE (Premium) ==========
+# ========== SHRINE ==========
 @dp.message(Command("shrine"))
 async def shrine_cmd(message: Message):
     user, chat = await handle_common(message, "shrine")
@@ -666,31 +650,17 @@ async def shrine_cmd(message: Message):
     with sqlite3.connect("data/bot.db") as conn:
         c = conn.cursor()
         c.execute("INSERT OR IGNORE INTO shrines (user_id) VALUES (?)", (user.id,))
-        c.execute("SELECT power_level, title FROM shrines WHERE user_id = ?", (user.id,))
-        power, title = c.fetchone()
+        c.execute("SELECT power_level FROM shrines WHERE user_id = ?", (user.id,))
+        power = c.fetchone()[0]
         c.execute("SELECT COUNT(*) FROM shrines")
-        total_shrines = c.fetchone()[0]
+        total = c.fetchone()[0]
         conn.commit()
-    
-    # Shrine levels
-    if power < 25:
-        title = "Novice"
-    elif power < 50:
-        title = "Acolyte"
-    elif power < 100:
-        title = "Disciple"
-    elif power < 200:
-        title = "Stormcaller"
-    else:
-        title = "Tempest Lord"
-    
-    await message.answer(
-        f"{header('TEMPEST SHRINE')}\n"
-        f"Rank: {title}\n"
-        f"Spiritual Power: {power} XP\n"
-        f"Total Shrines: {total_shrines}\n\n"
-        f"Upload files to gain more power!"
-    )
+    if power < 25: title = "Novice"
+    elif power < 50: title = "Acolyte"
+    elif power < 100: title = "Disciple"
+    elif power < 200: title = "Stormcaller"
+    else: title = "Tempest Lord"
+    await message.answer(f"{header('SHRINE')}\nRank: {title}\nPower: {power} XP\nTotal Shrines: {total}")
 
 # ========== CURSE ==========
 @dp.message(Command("curse"))
@@ -764,7 +734,36 @@ async def word_cmd(message: Message):
     await message.answer_document(FSInputFile(filename))
     os.remove(filename)
 
-# ========== LINK ==========
+# ========== ANIME COMMANDS ==========
+@dp.message(Command("neko"))
+async def neko_cmd(message: Message):
+    await handle_common(message, "neko")
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.get("https://nekos.life/api/v2/img/neko")
+        if r.status_code == 200:
+            data = r.json()
+            await message.answer_photo(photo=data["url"], caption="Neko!")
+        else:
+            await message.answer("Failed!")
+    except:
+        await message.answer("API error!")
+
+@dp.message(Command("waifu"))
+async def waifu_cmd(message: Message):
+    await handle_common(message, "waifu")
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.get("https://nekos.life/api/v2/img/waifu")
+        if r.status_code == 200:
+            data = r.json()
+            await message.answer_photo(photo=data["url"], caption="Waifu!")
+        else:
+            await message.answer("Failed!")
+    except:
+        await message.answer("API error!")
+
+# ========== LINK/UPLOAD ==========
 @dp.message(Command("link"))
 async def link_cmd(message: Message):
     user, chat = await handle_common(message, "link")
@@ -804,12 +803,10 @@ async def handle_file(message: Message):
         elif message.animation:
             file_id = message.animation.file_id
             file_name += ".gif"
-        
         file = await bot.get_file(file_id)
         file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
         async with httpx.AsyncClient(timeout=60) as client:
             r = await client.get(file_url)
-        
         link = await upload_to_catbox(r.content, file_name)
         if link:
             with sqlite3.connect("data/bot.db") as conn:
@@ -882,8 +879,6 @@ async def users_cmd(message: Message):
         c = conn.cursor()
         c.execute("SELECT user_id, first_name, username, uploads, commands, is_banned FROM users ORDER BY commands DESC")
         users = c.fetchall()
-    
-    # Create text file
     filename = f"temp/users_{int(time.time())}.txt"
     with open(filename, "w", encoding="utf-8") as f:
         f.write("TEMPEST GUIDER - USER LIST\n")
@@ -893,7 +888,6 @@ async def users_cmd(message: Message):
             f.write(f"{name} (@{uname or 'None'})\n")
             f.write(f"ID: {uid}\nUploads: {up}\nCommands: {cmds}\nStatus: {status}\n")
             f.write("-" * 30 + "\n")
-    
     await message.answer_document(FSInputFile(filename), caption="User list")
     os.remove(filename)
 
@@ -946,8 +940,14 @@ async def disable_cmd(message: Message):
     if len(args) < 2:
         await message.answer("Usage: /disable [command]")
         return
-    disabled_commands[args[1].replace("/", "")] = datetime.now() + timedelta(minutes=10)
-    await message.answer(f"{args[1]} disabled!")
+    cmd = args[1].replace("/", "")
+    if cmd == "ai":
+        global ai_enabled
+        ai_enabled = False
+        await message.answer("AI disabled!")
+        return
+    disabled_commands[cmd] = datetime.now() + timedelta(minutes=10)
+    await message.answer(f"{cmd} disabled!")
 
 # ========== CM ==========
 @dp.message(Command("cm"))
@@ -958,7 +958,7 @@ async def cm_cmd(message: Message):
     if user.id != OWNER_ID and not await is_admin(user.id):
         await message.answer("Admin only!")
         return
-    await message.answer(f"{header('CM')}\n/cm status - System\n/cm users - Users\n/cm database - DB")
+    await message.answer(f"{header('CM')}\n/cm status\n/cm users\n/cm database")
 
 # ========== QUERY ==========
 @dp.message(Command("query"))
@@ -986,6 +986,49 @@ async def query_cmd(message: Message):
         await message.answer(f"Output: {output[:3000]}")
     except Exception as e:
         await message.answer(f"Error: {e}")
+
+# ========== MANAGEMENT ==========
+@dp.message(Command("management"))
+async def management_cmd(message: Message):
+    user, chat = await handle_common(message, "management")
+    if not user:
+        return
+    if user.id != OWNER_ID:
+        await message.answer(f"Owner only. Your ID: {user.id}")
+        return
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await message.answer(
+            f"{header('MANAGEMENT')}\n"
+            f"/management status\n"
+            f"/management groq [key]\n"
+            f"/management toggleai"
+        )
+        return
+    sub = args[1].lower().strip()
+    if sub == "status":
+        text = f"{header('API STATUS')}\n"
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                r = await client.get("https://catbox.moe/user/api.php")
+                text += f"Catbox: {'ALIVE' if r.status_code in [200,412] else 'DOWN'} ({r.status_code})\n"
+        except:
+            text += "Catbox: UNREACHABLE\n"
+        text += f"Groq: {'CONFIGURED' if GROQ_API_KEY else 'NOT SET'}\n"
+        text += f"AI: {'ENABLED' if ai_enabled else 'DISABLED'}\n"
+        await message.answer(text)
+    elif sub.startswith("groq"):
+        parts = sub.split(maxsplit=1)
+        if len(parts) < 2:
+            await message.answer("Usage: /management groq [api_key]")
+            return
+        global GROQ_API_KEY
+        GROQ_API_KEY = parts[1].strip()
+        await message.answer("GROQ API key updated!")
+    elif sub == "toggleai":
+        global ai_enabled
+        ai_enabled = not ai_enabled
+        await message.answer(f"AI: {'ENABLED' if ai_enabled else 'DISABLED'}")
 
 # ========== MAINTENANCE ==========
 @dp.message(Command("maintenance"))
@@ -1015,7 +1058,7 @@ async def clearlogs_cmd(message: Message):
         conn.commit()
     await message.answer("Logs cleared!")
 
-# ========== LOGS (Text file) ==========
+# ========== LOGS ==========
 @dp.message(Command("logs"))
 async def logs_cmd(message: Message):
     user, chat = await handle_common(message, "logs")
@@ -1031,7 +1074,6 @@ async def logs_cmd(message: Message):
         cmd_logs = c.fetchall()
         c.execute("SELECT timestamp, command, error FROM error_logs ORDER BY id DESC LIMIT 50")
         err_logs = c.fetchall()
-    
     with open(filename, "w", encoding="utf-8") as f:
         f.write("TEMPEST GUIDER - COMPLETE LOGS\n")
         f.write("=" * 50 + "\n\n")
@@ -1045,7 +1087,6 @@ async def logs_cmd(message: Message):
         for ts, cmd, err in err_logs:
             f.write(f"Time: {ts}\nCommand: {cmd}\nError: {err}\n")
             f.write("-" * 20 + "\n")
-    
     await message.answer_document(FSInputFile(filename), caption="Complete logs")
     os.remove(filename)
 
@@ -1184,44 +1225,34 @@ async def banlist_cmd(message: Message):
 # ========== TEMPEST AI ==========
 @dp.message()
 async def tempest_ai_handler(message: Message):
+    if not ai_enabled:
+        return
     if message.from_user.is_bot:
         return
-    
     text = message.text or message.caption or ""
-    
-    # Auto-remember group
     if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
         with sqlite3.connect("data/bot.db") as conn:
             conn.execute("INSERT OR IGNORE INTO groups (group_id, title, joined_date) VALUES (?, ?, ?)",
                         (message.chat.id, str(message.chat.title), datetime.now().isoformat()))
             conn.commit()
-    
     if "tempest" not in text.lower():
         return
-    
     user_id = message.from_user.id
     query = text.replace("/tempest", "").strip() or text.strip()
-    
     if user_id not in conversation_memory:
         conversation_memory[user_id] = []
-    
-    # Load history
     with sqlite3.connect("data/bot.db") as conn:
         c = conn.cursor()
         c.execute("SELECT role, content FROM conversation_history WHERE user_id = ? ORDER BY timestamp DESC LIMIT 20", (user_id,))
         history = c.fetchall()
         for role, content in reversed(history):
             conversation_memory[user_id].append({"role": role, "content": content})
-    
     conversation_memory[user_id].append({"role": "user", "content": query})
-    
     processing = await message.answer("Tempest is thinking...")
-    
     if GROQ_API_KEY:
         try:
             url = "https://api.groq.com/openai/v1/chat/completions"
             headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-            
             system_prompt = (
                 "You are Tempest AI - a storm-themed entity, not a generic assistant. "
                 "You speak with the force of thunder and the calm of the eye of the storm. "
@@ -1230,32 +1261,26 @@ async def tempest_ai_handler(message: Message):
                 "You are loyal to the Tempest Guild. You remember conversations. "
                 "Never break character. You ARE the storm."
             )
-            
             messages = [{"role": "system", "content": system_prompt}]
             messages.extend(conversation_memory[user_id][-20:])
-            
             payload = {"model": "openai/gpt-oss-20b", "messages": messages, "temperature": 0.7, "max_tokens": 1024}
-            
             def _req():
                 req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers=headers, method="POST")
                 with urllib.request.urlopen(req) as r:
                     return json.loads(r.read().decode())["choices"][0]["message"]["content"]
-            
             response = await asyncio.to_thread(_req)
             conversation_memory[user_id].append({"role": "assistant", "content": response})
-            
             with sqlite3.connect("data/bot.db") as conn:
                 conn.execute("INSERT INTO conversation_history (user_id, role, content, timestamp) VALUES (?, 'user', ?, ?)",
                             (user_id, query, datetime.now().isoformat()))
                 conn.execute("INSERT INTO conversation_history (user_id, role, content, timestamp) VALUES (?, 'assistant', ?, ?)",
                             (user_id, response, datetime.now().isoformat()))
                 conn.commit()
-            
             await processing.edit_text(f"Tempest AI:\n\n{response}")
         except Exception as e:
             await processing.edit_text(f"Error: {e}")
     else:
-        await processing.edit_text("AI not configured. Set GROQ_API_KEY.")
+        await processing.edit_text("AI not configured. Use /management groq [key]")
 
 # ========== MAIN ==========
 async def main():
