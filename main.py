@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ========== TEMPEST GUIDER - COMPLETE FULL ==========
+# ========== TEMPEST GUIDER - COMPLETE FIXED ==========
 import os
 import asyncio
 import time
@@ -19,7 +19,7 @@ import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 from docx import Document
-from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageEnhance, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, FSInputFile, CallbackQuery, BufferedInputFile
@@ -28,15 +28,13 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
 
 print("=" * 60)
-print("TEMPEST GUIDER - COMPLETE FULL")
+print("TEMPEST GUIDER - COMPLETE FIXED")
 print("=" * 60)
 
-# ========== CONFIG ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8017048722:AAGs1HNsyX-UobN6PVq7u4iPMxGnOX14AAg")
 OWNER_ID = int(os.getenv("OWNER_ID", "6108185460"))
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "-1003662720845"))
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-UPLOAD_API = "https://catbox.moe/user/api.php"
 
 try:
     import yt_dlp
@@ -64,26 +62,11 @@ maintenance_mode = False
 conversation_memory = {}
 ai_enabled = True
 
-# ========== ART ==========
 def header(t):
     return f"◤━━━━━━━━━━━━━━━━━━━━◥\n◇ {t} ◇\n◣━━━━━━━━━━━━━━━━━━━━◢"
 
 def divider():
     return "━━━━━━━━━━━━━━━━━━━━"
-
-# ========== FONT ==========
-async def ensure_font():
-    font_path = "fonts/font.ttf"
-    if not os.path.exists(font_path):
-        try:
-            url = "https://github.com/google/fonts/raw/main/ofl/roboto/Roboto-Regular.ttf"
-            async with httpx.AsyncClient(timeout=30) as client:
-                r = await client.get(url, follow_redirects=True)
-                if r.status_code == 200:
-                    with open(font_path, "wb") as f:
-                        f.write(r.content)
-        except:
-            pass
 
 def get_safe_font(size):
     for path in ["fonts/font.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/system/fonts/Roboto-Bold.ttf"]:
@@ -94,7 +77,7 @@ def get_safe_font(size):
                 pass
     return ImageFont.load_default()
 
-def draw_visible_text(draw, pos, text, font, fill, outline=(0,0,0), w=2, anchor=None):
+def draw_visible_text(draw, pos, text, font, fill, outline=(0,0,0), w=3, anchor=None):
     x, y = pos
     for ox in range(-w, w+1):
         for oy in range(-w, w+1):
@@ -108,7 +91,6 @@ def draw_visible_text(draw, pos, text, font, fill, outline=(0,0,0), w=2, anchor=
     else:
         draw.text((x, y), text, font=font, fill=fill)
 
-# ========== QUOTES ==========
 ANIME_QUOTES = [
     "Wake up to reality! Nothing ever goes as planned in this accursed world.\n- Madara Uchiha",
     "The longer you live, the more you realize that reality is just made of pain.\n- Madara Uchiha",
@@ -120,7 +102,6 @@ ANIME_QUOTES = [
     "A lesson without pain is meaningless.\n- Edward Elric",
 ]
 
-# ========== TIMEZONES ==========
 COUNTRY_TIMEZONES = {
     "usa": "America/New_York", "uk": "Europe/London", "india": "Asia/Kolkata",
     "japan": "Asia/Tokyo", "china": "Asia/Shanghai", "russia": "Europe/Moscow",
@@ -136,7 +117,6 @@ COUNTRY_TIMEZONES = {
     "philippines": "Asia/Manila", "singapore": "Asia/Singapore",
 }
 
-# ========== DATABASE ==========
 def init_db():
     with sqlite3.connect("data/bot.db") as conn:
         c = conn.cursor()
@@ -166,14 +146,12 @@ def init_db():
 
 init_db()
 
-# ========== LOG ==========
 async def send_log(msg):
     try:
         await bot.send_message(LOG_CHANNEL_ID, msg[:4000])
     except:
         pass
 
-# ========== HANDLE COMMON ==========
 async def handle_common(message, cmd):
     user = message.from_user
     chat = message.chat
@@ -226,7 +204,6 @@ def format_uptime(s):
     if sec or not parts: parts.append(f"{sec}s")
     return " ".join(parts)
 
-# ========== UPLOAD ==========
 async def upload_to_catbox(data, filename):
     headers = {'User-Agent': 'Mozilla/5.0'}
     try:
@@ -247,7 +224,6 @@ async def upload_to_catbox(data, filename):
         pass
     return None
 
-# ========== ENCRYPTION ==========
 class EncryptionEngine:
     @staticmethod
     def xor_encrypt(text, key="TEMPEST"):
@@ -262,7 +238,6 @@ class EncryptionEngine:
         except:
             return None
 
-# ========== AVATAR ==========
 async def fetch_user_avatar(uid, name="User"):
     try:
         photos = await bot.get_user_profile_photos(uid, limit=1)
@@ -289,9 +264,8 @@ async def fetch_user_avatar(uid, name="User"):
     draw_visible_text(d, (60, 60), name[0].upper() if name else "T", f, (0, 255, 200), anchor="mm")
     return fb
 
-# ========== PROFILE CARD ==========
 def gen_profile_card(username, uid, rank, up, ws, av):
-    w, h = 800, 360
+    w, h = 800, 400
     img = Image.new("RGB", (w, h), (10, 15, 30))
     d = ImageDraw.Draw(img)
     for y in range(h):
@@ -302,21 +276,20 @@ def gen_profile_card(username, uid, rank, up, ws, av):
     d.rectangle([10, 10, w-10, h-10], outline=(0, 200, 255), width=3)
     d.ellipse((47, 77, 173, 203), outline=(0, 255, 200), width=3)
     img.paste(av, (50, 80), mask=av)
-    fn = get_safe_font(28)
-    fi = get_safe_font(20)
-    draw_visible_text(d, (200, 75), str(username)[:20], fn, (255, 255, 255))
-    draw_visible_text(d, (200, 120), f"ID: {uid}", fi, (180, 200, 230))
-    draw_visible_text(d, (200, 160), f"Rank: {rank}", fi, (0, 255, 200))
-    draw_visible_text(d, (200, 205), f"Uploads: {up}  |  Wishes: {ws}", fi, (255, 215, 0))
-    draw_visible_text(d, (770, 330), "TEMPEST GUIDER", fi, (100, 116, 139), anchor="ra")
+    fn = get_safe_font(36)
+    fi = get_safe_font(24)
+    draw_visible_text(d, (200, 70), str(username)[:18], fn, (255, 255, 255))
+    draw_visible_text(d, (200, 125), f"ID: {uid}", fi, (180, 200, 230))
+    draw_visible_text(d, (200, 170), f"Rank: {rank}", fi, (0, 255, 200))
+    draw_visible_text(d, (200, 220), f"Uploads: {up}  |  Wishes: {ws}", fi, (255, 215, 0))
+    draw_visible_text(d, (770, 360), "TEMPEST GUIDER", fi, (100, 116, 139), anchor="ra")
     b = io.BytesIO()
     img.save(b, format="PNG")
     b.seek(0)
     return b.getvalue()
 
-# ========== FATE CARD ==========
 def gen_fate_card(n1, n2, pct, q, av1=None, av2=None):
-    w, h = 800, 450
+    w, h = 800, 500
     img = Image.new("RGB", (w, h), (15, 10, 25))
     d = ImageDraw.Draw(img)
     for y in range(h):
@@ -325,44 +298,42 @@ def gen_fate_card(n1, n2, pct, q, av1=None, av2=None):
         b = int(25 + 45 * (y/h))
         d.line([(0, y), (w, y)], fill=(r, g, b))
     d.rectangle([10, 10, w-10, h-10], outline=(255, 100, 180), width=3)
-    ft = get_safe_font(28)
-    fn = get_safe_font(20)
-    fq = get_safe_font(14)
+    ft = get_safe_font(32)
+    fn = get_safe_font(24)
+    fq = get_safe_font(16)
     if av1:
-        img.paste(av1, (100, 50), mask=av1)
+        img.paste(av1, (100, 60), mask=av1)
     if av2:
-        img.paste(av2, (580, 50), mask=av2)
+        img.paste(av2, (580, 60), mask=av2)
     draw_visible_text(d, (400, 45), "TEMPEST FATE MATRIX", ft, (255, 100, 180), anchor="mm")
-    draw_visible_text(d, (400, 200), f"{n1}  +  {n2}", fn, (255, 255, 255), anchor="mm")
-    draw_visible_text(d, (400, 240), f"{pct}% COMPATIBILITY", fn, (255, 215, 0), anchor="mm")
+    draw_visible_text(d, (400, 210), f"{n1}  +  {n2}", fn, (255, 255, 255), anchor="mm")
+    draw_visible_text(d, (400, 255), f"{pct}% COMPATIBILITY", fn, (255, 215, 0), anchor="mm")
     words = q.split()
     lines = []
     cur = ""
     for wrd in words:
-        if len(cur + wrd) < 50:
+        if len(cur + wrd) < 45:
             cur += wrd + " "
         else:
             lines.append(cur.strip())
             cur = wrd + " "
     if cur:
         lines.append(cur.strip())
-    yp = 290
-    for ln in lines[:4]:
+    yp = 310
+    for ln in lines[:5]:
         draw_visible_text(d, (400, yp), ln, fq, (210, 220, 240), anchor="mm")
-        yp += 30
+        yp += 32
     b = io.BytesIO()
     img.save(b, format="PNG")
     b.seek(0)
     return b.getvalue()
 
-# ========== COMMANDS ==========
 @dp.message(CommandStart())
 async def start_cmd(m: Message):
     u, _ = await handle_common(m, "start")
     if not u:
         return
     await m.answer(f"{header('TEMPEST GUIDER')}\nWelcome {u.first_name}!\n\n/help - Commands")
-    await send_log(f"{u.first_name} ({u.id}) started")
 
 @dp.message(Command("myid"))
 async def myid_cmd(m: Message):
@@ -1098,7 +1069,6 @@ async def banlist_cmd(m: Message):
         text += f"{n} ({uid})\n"
     await m.answer(text)
 
-# ========== TEMPEST AI ==========
 @dp.message()
 async def tempest_ai(m: Message):
     if not ai_enabled:
@@ -1148,11 +1118,9 @@ async def tempest_ai(m: Message):
     else:
         await proc.edit_text("AI not configured. Use /management groq [key]")
 
-# ========== MAIN ==========
 async def main():
-    await ensure_font()
     print("Starting Tempest Guider...")
-    await send_log("Bot started!")
+    await bot.delete_webhook(drop_pending_updates=True)
     while True:
         try:
             await dp.start_polling(bot)
