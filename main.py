@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ========== TEMPEST GUIDER - ULTIMATE FIXED ==========
+# ========== TEMPEST GUIDER - FULL COMPLETE (NO AI) ==========
 import os
 import asyncio
 import time
@@ -15,7 +15,6 @@ import io
 import base64
 import sys
 import contextlib
-import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 from docx import Document
@@ -28,14 +27,13 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
 
 print("=" * 60)
-print("TEMPEST GUIDER - ULTIMATE FIXED")
+print("TEMPEST GUIDER - FULL COMPLETE (NO AI)")
 print("=" * 60)
 
 BOT_TOKEN = "8017048722:AAGs1HNsyX-UobN6PVq7u4iPMxGnOX14AAg"
 OWNER_ID = 6108185460
 UPLOAD_API = "https://catbox.moe/user/api.php"
 LOG_CHANNEL_ID = -1003662720845
-GROQ_API_KEY = ""
 
 try:
     import yt_dlp
@@ -60,8 +58,6 @@ broadcast_state = {}
 pending_restore = {}
 disabled_commands = {}
 maintenance_mode = False
-conversation_memory = {}
-ai_enabled = True
 
 def header(t):
     return f"◤━━━━━━━━━━━━━━━━━━━━◥\n◇ {t} ◇\n◣━━━━━━━━━━━━━━━━━━━━◢"
@@ -141,7 +137,6 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS fate_pairs (chat_id INTEGER, user1_name TEXT, user2_name TEXT, love_percentage INTEGER, created_date TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS fortunes (user_id INTEGER, fortune_text TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS shrines (user_id INTEGER PRIMARY KEY, power_level INTEGER DEFAULT 10)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS conversation_history (user_id INTEGER, role TEXT, content TEXT)''')
         c.execute("INSERT OR IGNORE INTO users (user_id, first_name, is_admin) VALUES (?, 'Owner', 1)", (OWNER_ID,))
         conn.commit()
 
@@ -265,7 +260,6 @@ async def fetch_user_avatar(uid, name="User"):
     draw_visible_text(d, (60, 60), name[0].upper() if name else "T", f, (0, 255, 200), anchor="mm")
     return fb
 
-# LARGE FONT CARDS WITH PROFILE PICS
 def gen_profile_card(username, uid, rank, up, ws, av):
     w, h = 800, 400
     img = Image.new("RGB", (w, h), (10, 15, 30))
@@ -330,7 +324,6 @@ def gen_fate_card(n1, n2, pct, q, av1=None, av2=None):
     b.seek(0)
     return b.getvalue()
 
-# ========== BASIC COMMANDS ==========
 @dp.message(CommandStart())
 async def start_cmd(m: Message):
     u, _ = await handle_common(m, "start")
@@ -357,7 +350,6 @@ async def admin_help_cmd(m: Message):
         return
     await m.answer(f"{header('ADMIN')}\n/ping /stats /scan /users /broadcast /lag /disable /cm /ban /unban /banlist\nOWNER: /query /restart /maintenance /pro /backup /rem /clearlogs /logs /management")
 
-# ========== WISH WITH ANIMATION ==========
 @dp.message(Command("wish"))
 async def wish_cmd(m: Message):
     u, _ = await handle_common(m, "wish")
@@ -380,7 +372,6 @@ async def wish_cmd(m: Message):
         conn.commit()
     await msg.edit_text(f"{header('WISH')}\n{args[1][:100]}\nLuck: {stars} {luck}%")
 
-# ========== FORTUNE WITH ANIMATION ==========
 @dp.message(Command("fortune"))
 async def fortune_cmd(m: Message):
     u, _ = await handle_common(m, "fortune")
@@ -407,7 +398,6 @@ async def flip_cmd(m: Message):
     await handle_common(m, "flip")
     await m.answer(f"{random.choice(['HEADS', 'TAILS'])}!")
 
-# ========== FATE WITH AVATARS + ANIMATION ==========
 @dp.message(Command("fate"))
 async def fate_cmd(m: Message):
     u, ch = await handle_common(m, "fate")
@@ -446,7 +436,6 @@ async def fate_cmd(m: Message):
     await msg.delete()
     await m.answer_photo(photo=BufferedInputFile(card, filename="fate.png"), caption=f"{l1[1]} & {l2[1]} - {love}% Love")
 
-# ========== PROFILE WITH AVATAR ==========
 @dp.message(Command("profile"))
 async def profile_cmd(m: Message):
     u, _ = await handle_common(m, "profile")
@@ -467,7 +456,6 @@ async def profile_cmd(m: Message):
     await msg.delete()
     await m.answer_photo(photo=BufferedInputFile(card, filename="profile.png"), caption=f"{u.first_name}'s Tempest ID Card")
 
-# ========== SECURITY ==========
 @dp.message(Command("encrypt"))
 async def encrypt_cmd(m: Message):
     await handle_common(m, "encrypt")
@@ -487,7 +475,6 @@ async def decrypt_cmd(m: Message):
     dec = EncryptionEngine.decrypt(args[1])
     await m.answer(dec if dec else "Invalid!")
 
-# ========== TEMPEST JOIN WITH RITUAL ==========
 @dp.message(Command("tempest_join"))
 async def tempest_join_cmd(m: Message):
     u, _ = await handle_common(m, "tempest_join")
@@ -509,7 +496,6 @@ async def tempest_join_cmd(m: Message):
         await msg.edit_text(t)
     await msg.edit_text("WELCOME TO THE TEMPEST!\nRank: Blood Initiate\nSacrifices: 3")
 
-# ========== TEMPEST STORY 6 CHAPTERS ==========
 @dp.message(Command("tempest_story"))
 async def tempest_story_cmd(m: Message):
     u, _ = await handle_common(m, "tempest_story")
@@ -533,7 +519,6 @@ async def tempest_story_cmd(m: Message):
         await asyncio.sleep(5)
     await msg.edit_text("We are the eternal storm.")
 
-# ========== TEMPEST CREED ==========
 @dp.message(Command("tempest_creed"))
 async def tempest_creed_cmd(m: Message):
     u, _ = await handle_common(m, "tempest_creed")
@@ -551,7 +536,6 @@ async def tempest_creed_cmd(m: Message):
         text += f"{i}. {n} - {r} ({s} sacrifices)\n"
     await m.answer(text)
 
-# ========== SHRINE ==========
 @dp.message(Command("shrine"))
 async def shrine_cmd(m: Message):
     u, _ = await handle_common(m, "shrine")
@@ -572,7 +556,6 @@ async def shrine_cmd(m: Message):
     else: t = "Tempest Lord"
     await m.answer(f"{header('SHRINE')}\nRank: {t}\nPower: {p} XP\nTotal Shrines: {tot}")
 
-# ========== CURSE ==========
 @dp.message(Command("curse"))
 async def curse_cmd(m: Message):
     u, _ = await handle_common(m, "curse")
@@ -604,7 +587,6 @@ async def remove_curse_cmd(m: Message):
         conn.commit()
     await m.reply(f"Curse removed from {t.first_name}!")
 
-# ========== TIME ==========
 @dp.message(Command("time"))
 async def time_cmd(m: Message):
     u, _ = await handle_common(m, "time")
@@ -622,7 +604,6 @@ async def time_cmd(m: Message):
     except:
         await m.answer("Error!")
 
-# ========== WORD ==========
 @dp.message(Command("word"))
 async def word_cmd(m: Message):
     u, _ = await handle_common(m, "word")
@@ -644,7 +625,6 @@ async def word_cmd(m: Message):
     await m.answer_document(FSInputFile(fn))
     os.remove(fn)
 
-# ========== ANIME COMMANDS ==========
 @dp.message(Command("neko"))
 async def neko_cmd(m: Message):
     await handle_common(m, "neko")
@@ -671,7 +651,6 @@ async def waifu_cmd(m: Message):
     except:
         await m.answer("API error!")
 
-# ========== LINK ==========
 @dp.message(Command("link"))
 async def link_cmd(m: Message):
     u, _ = await handle_common(m, "link")
@@ -726,7 +705,6 @@ async def handle_file(m: Message):
     except Exception as e:
         await msg.edit_text(f"Error: {e}")
 
-# ========== CONVERT ==========
 @dp.message(Command("convert"))
 async def convert_cmd(m: Message):
     u, _ = await handle_common(m, "convert")
@@ -741,7 +719,6 @@ async def convert_cmd(m: Message):
         return
     await m.answer("Downloading...")
 
-# ========== ADMIN COMMANDS ==========
 @dp.message(Command("ping"))
 async def ping_cmd(m: Message):
     u, _ = await handle_common(m, "ping")
@@ -794,7 +771,6 @@ async def users_cmd(m: Message):
     await m.answer_document(FSInputFile(fn), caption="User list")
     os.remove(fn)
 
-# ========== BROADCAST ==========
 @dp.message(Command("broadcast"))
 async def broadcast_cmd(m: Message):
     u, _ = await handle_common(m, "broadcast")
@@ -824,13 +800,11 @@ async def handle_broadcast(m: Message):
         await asyncio.sleep(0.03)
     await m.answer(f"Sent to {s} users!")
 
-# ========== LAG ==========
 @dp.message(Command("lag"))
 async def lag_cmd(m: Message):
     await handle_common(m, "lag")
     await m.answer("Lag test complete!")
 
-# ========== DISABLE ==========
 @dp.message(Command("disable"))
 async def disable_cmd(m: Message):
     u, _ = await handle_common(m, "disable")
@@ -844,15 +818,9 @@ async def disable_cmd(m: Message):
         await m.answer("Usage: /disable [command]")
         return
     cmd = args[1].replace("/", "")
-    if cmd == "ai":
-        global ai_enabled
-        ai_enabled = False
-        await m.answer("AI disabled!")
-        return
     disabled_commands[cmd] = datetime.now() + timedelta(minutes=10)
     await m.answer(f"{cmd} disabled!")
 
-# ========== CM ==========
 @dp.message(Command("cm"))
 async def cm_cmd(m: Message):
     u, _ = await handle_common(m, "cm")
@@ -863,7 +831,6 @@ async def cm_cmd(m: Message):
         return
     await m.answer(f"{header('CM')}\n/cm status\n/cm users\n/cm database")
 
-# ========== QUERY ==========
 @dp.message(Command("query"))
 async def query_cmd(m: Message):
     u, _ = await handle_common(m, "query")
@@ -886,7 +853,6 @@ async def query_cmd(m: Message):
     except Exception as e:
         await m.answer(f"Error: {e}")
 
-# ========== MANAGEMENT ==========
 @dp.message(Command("management"))
 async def management_cmd(m: Message):
     u, _ = await handle_common(m, "management")
@@ -895,35 +861,8 @@ async def management_cmd(m: Message):
     if u.id != OWNER_ID:
         await m.answer(f"Owner only. Your ID: {u.id}")
         return
-    args = m.text.split(maxsplit=1)
-    if len(args) < 2:
-        await m.answer(f"{header('MANAGEMENT')}\n/management status\n/management groq [key]\n/management toggleai")
-        return
-    sub = args[1].lower().strip()
-    if sub == "status":
-        t = f"{header('API STATUS')}\n"
-        try:
-            async with httpx.AsyncClient(timeout=15) as c:
-                r = await c.get("https://catbox.moe/user/api.php")
-                t += f"Catbox: {'ALIVE' if r.status_code in [200, 412] else 'DOWN'} ({r.status_code})\n"
-        except:
-            t += "Catbox: UNREACHABLE\n"
-        t += f"Groq: {'CONFIGURED' if GROQ_API_KEY else 'NOT SET'}\nAI: {'ENABLED' if ai_enabled else 'DISABLED'}\n"
-        await m.answer(t)
-    elif sub.startswith("groq"):
-        parts = sub.split(maxsplit=1)
-        if len(parts) < 2:
-            await m.answer("Usage: /management groq [key]")
-            return
-        global GROQ_API_KEY
-        GROQ_API_KEY = parts[1].strip()
-        await m.answer("GROQ key updated!")
-    elif sub == "toggleai":
-        global ai_enabled
-        ai_enabled = not ai_enabled
-        await m.answer(f"AI: {'ON' if ai_enabled else 'OFF'}")
+    await m.answer(f"{header('MANAGEMENT')}\n/management status")
 
-# ========== MAINTENANCE ==========
 @dp.message(Command("maintenance"))
 async def maintenance_cmd(m: Message):
     global maintenance_mode
@@ -936,7 +875,6 @@ async def maintenance_cmd(m: Message):
     maintenance_mode = not maintenance_mode
     await m.answer(f"Maintenance: {'ON' if maintenance_mode else 'OFF'}")
 
-# ========== CLEARLOGS ==========
 @dp.message(Command("clearlogs"))
 async def clearlogs_cmd(m: Message):
     u, _ = await handle_common(m, "clearlogs")
@@ -950,7 +888,6 @@ async def clearlogs_cmd(m: Message):
         conn.commit()
     await m.answer("Logs cleared!")
 
-# ========== LOGS ==========
 @dp.message(Command("logs"))
 async def logs_cmd(m: Message):
     u, _ = await handle_common(m, "logs")
@@ -971,7 +908,6 @@ async def logs_cmd(m: Message):
     await m.answer_document(FSInputFile(fn), caption="Complete logs")
     os.remove(fn)
 
-# ========== PRO ==========
 @dp.message(Command("pro"))
 async def pro_cmd(m: Message):
     u, _ = await handle_common(m, "pro")
@@ -990,7 +926,6 @@ async def pro_cmd(m: Message):
         conn.commit()
     await m.answer(f"User {tid} is admin!")
 
-# ========== BACKUP ==========
 @dp.message(Command("backup"))
 async def backup_cmd(m: Message):
     u, _ = await handle_common(m, "backup")
@@ -1005,7 +940,6 @@ async def backup_cmd(m: Message):
     await m.answer_document(FSInputFile(bf))
     os.remove(bf)
 
-# ========== REM ==========
 @dp.message(Command("rem"))
 async def rem_cmd(m: Message):
     u, _ = await handle_common(m, "rem")
@@ -1017,7 +951,6 @@ async def rem_cmd(m: Message):
     pending_restore[u.id] = True
     await m.answer("Upload .db file!")
 
-# ========== RESTART ==========
 @dp.message(Command("restart"))
 async def restart_cmd(m: Message):
     u, _ = await handle_common(m, "restart")
@@ -1030,10 +963,8 @@ async def restart_cmd(m: Message):
     upload_waiting.clear()
     broadcast_state.clear()
     disabled_commands.clear()
-    conversation_memory.clear()
     os.execv(sys.executable, ['python'] + sys.argv)
 
-# ========== CANCEL ==========
 @dp.message(Command("cancel"))
 async def cancel_cmd(m: Message):
     u, _ = await handle_common(m, "cancel")
@@ -1044,7 +975,6 @@ async def cancel_cmd(m: Message):
     pending_restore.pop(u.id, None)
     await m.answer("Cancelled!")
 
-# ========== BAN SYSTEM ==========
 @dp.message(Command("ban"))
 async def ban_cmd(m: Message):
     u, _ = await handle_common(m, "ban")
@@ -1103,50 +1033,12 @@ async def banlist_cmd(m: Message):
         text += f"{n} ({uid})\n"
     await m.answer(text)
 
-# ========== TEMPEST AI ==========
-@dp.message()
-async def tempest_ai(m: Message):
-    if not ai_enabled:
-        return
-    if m.from_user.is_bot:
-        return
-    text = m.text or m.caption or ""
-    if m.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
-        with sqlite3.connect("data/bot.db") as conn:
-            conn.execute("INSERT OR IGNORE INTO groups (group_id, title, joined_date) VALUES (?, ?, ?)",
-                        (m.chat.id, str(m.chat.title), datetime.now().isoformat()))
-            conn.commit()
-    if "tempest" not in text.lower():
-        return
-    uid = m.from_user.id
-    query = text.replace("/tempest", "").strip() or text.strip()
-    if uid not in conversation_memory:
-        conversation_memory[uid] = []
-    conversation_memory[uid].append({"role": "user", "content": query})
-    proc = await m.answer("Tempest is thinking...")
-    if GROQ_API_KEY:
-        try:
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-            sp = "You are Tempest AI - a storm-themed entity. Creator: @Nocis_creed (Keny) - https://t.me/Nocis_creed. Dev: @dont_try_to_copy_mee (Ravijah) - https://t.me/dont_try_to_copy_mee. Remember conversations. Never break character."
-            msgs = [{"role": "system", "content": sp}] + conversation_memory[uid][-20:]
-            payload = {"model": "openai/gpt-oss-20b", "messages": msgs, "temperature": 0.7, "max_tokens": 1024}
-            def _req():
-                req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers=headers, method="POST")
-                with urllib.request.urlopen(req) as r:
-                    return json.loads(r.read().decode())["choices"][0]["message"]["content"]
-            resp = await asyncio.to_thread(_req)
-            conversation_memory[uid].append({"role": "assistant", "content": resp})
-            await proc.edit_text(f"Tempest AI:\n\n{resp}")
-        except Exception as e:
-            await proc.edit_text(f"Error: {e}")
-    else:
-        await proc.edit_text("AI not configured. Use /management groq [key]")
-
-# ========== MAIN (FIXED - Webhook + Polling) ==========
 async def main():
     print("Starting Tempest Guider...")
-    await bot.delete_webhook(drop_pending_updates=True)
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+    except:
+        pass
     while True:
         try:
             await dp.start_polling(bot)
