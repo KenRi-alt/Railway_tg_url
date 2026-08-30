@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ========== TEMPEST GUIDER - COMPLETE MAXIMUM ==========
+# ========== TEMPEST GUIDER - SECURE MAXIMUM ==========
 import os
 import asyncio
 import time
@@ -15,7 +15,6 @@ import io
 import base64
 import sys
 import contextlib
-import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 from docx import Document
@@ -25,17 +24,15 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, FSInputFile, CallbackQuery, BufferedInputFile
 from aiogram.enums import ParseMode, ChatType
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
 
 print("=" * 60)
-print("TEMPEST GUIDER - COMPLETE MAXIMUM")
+print("TEMPEST GUIDER - SECURE MAXIMUM")
 print("=" * 60)
 
-BOT_TOKEN = "8017048722:AAGs1HNsyX-UobN6PVq7u4iPMxGnOX14AAg"
+BOT_TOKEN = "8017048722:AAFl6XZ9DHSJ6vnb8gUJXmoL7CUJc8AgehA"
 OWNER_ID = 6108185460
 UPLOAD_API = "https://catbox.moe/user/api.php"
 LOG_CHANNEL_ID = -1003662720845
-GROQ_API_KEY = ""
 
 try:
     import yt_dlp
@@ -60,8 +57,6 @@ broadcast_state = {}
 pending_restore = {}
 disabled_commands = {}
 maintenance_mode = False
-conversation_memory = {}
-ai_enabled = True
 
 def header(t):
     return f"◤━━━━━━━━━━━━━━━━━━━━◥\n◇ {t} ◇\n◣━━━━━━━━━━━━━━━━━━━━◢"
@@ -148,9 +143,8 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS fate_pairs (chat_id INTEGER, user1_name TEXT, user2_name TEXT, love_percentage INTEGER, created_date TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS fortunes (user_id INTEGER, fortune_text TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS shrines (user_id INTEGER PRIMARY KEY, power_level INTEGER DEFAULT 10)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS conversation_history (user_id INTEGER, role TEXT, content TEXT)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS saved_commands (id INTEGER PRIMARY KEY AUTOINCREMENT, command_code TEXT, saved_date TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS bot_memory (key TEXT PRIMARY KEY, value TEXT)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS saved_commands (id INTEGER PRIMARY KEY AUTOINCREMENT, command_code TEXT, saved_date TEXT)''')
         c.execute("INSERT OR IGNORE INTO users (user_id, first_name, is_admin) VALUES (?, 'Owner', 1)", (OWNER_ID,))
         conn.commit()
 
@@ -238,8 +232,11 @@ def format_uptime(s):
 async def upload_to_catbox(data, filename):
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     try:
-        files = {'reqtype': (None, 'fileupload'), 'fileToUpload': (filename, data)}
-        async with httpx.AsyncClient(timeout=30, headers=headers) as client:
+        files = {
+            'reqtype': (None, 'fileupload'),
+            'fileToUpload': (filename, data, 'application/octet-stream')
+        }
+        async with httpx.AsyncClient(timeout=30, headers=headers, follow_redirects=True) as client:
             r = await client.post("https://catbox.moe/user/api.php", files=files)
         if r.status_code == 200 and r.text.startswith('http'):
             return r.text.strip()
@@ -579,8 +576,7 @@ async def tempest_creed_cmd(m: Message):
         return
     text = f"{header('TEMPEST CREED')}\n"
     for i, (n, r, s) in enumerate(members, 1):
-        medal = ["1.", "2.", "3."][i-1] if i <= 3 else f"{i}."
-        text += f"{medal} {n} - {r} ({s})\n"
+        text += f"{i}. {n} - {r} ({s})\n"
     await m.answer(text)
 
 @dp.message(Command("shrine"))
