@@ -623,7 +623,7 @@ async def tempest_join_cmd(m: Message):
             return
         c.execute("UPDATE users SET cult_status = 'member', cult_rank = 'Blood Initiate', cult_join_date = ?, sacrifices = 3 WHERE user_id = ?", (datetime.now().isoformat(), u.id))
         conn.commit()
-    ritual = ["🌀 INITIATING BLOOD PACT...", "🩸 Drawing sigils...", "⚡ Channeling storm...", "🌑 The void responds...", "🔥 Sacrifice offered...", "🌀 TEMPEST AWAKENS!"]
+    ritual = ["🌀 INITIATING BLOOD PACT...", "🩸 Drawing sigils...", "⚡ Channeling storm...", "🌑 The void responds...", "🔥 Sacrifice offered...Hm", "🌀 TEMPEST AWAKENS!"]
     msg = await m.answer("🌀 Preparing ritual...")
     for t in ritual:
         await asyncio.sleep(1.2)
@@ -637,12 +637,12 @@ async def tempest_story_cmd(m: Message):
     if not u:
         return
     chapters = [
-        ("📖 Chapter 1: Awakening", "Keny Marcus opened his eyes in the obsidian realm of Tempest alongside Bablu and Ravijah. The sky burned with violet aura."),
-        ("⚔️ Chapter 2: Guild of Shadows", "With Bablu holding the vanguard and Ravijah orchestrating tactics, Keny forged the Tempest Guild."),
-        ("⚡ Chapter 3: Breach of Citadel", "Ravijah bypassed the firewall while Bablu smashed through the fortress gates. Keny unleashed full kinetic voltage."),
-        ("👑 Chapter 4: Reign of King", "Standing atop the conquered spire, Keny, Bablu, and Ravijah gazed across the infinite grid."),
+        ("📖 Chapter 1: Awakening", "Keny Marcus opened his eyes in the dark realm(boredom), realm of Tempest alongside Bablu and Ravijah. The sky burned with violet aura ..ideas."),
+        ("⚔️ Chapter 2: In the realm of darkness", "With Bablu holding the oath and Ravijah orchestrating tactics, Keny forged the Tempest Guild...did nothin"),
+        ("⚡ Chapter 3: Breach of Weirdness", "Ravijah bypassed the firewall,...uff... while Bablu smashed through the fortress gates..became wise. Keny unleashed full idleness... Boredom at max."),
+        ("👑 Chapter 4: Reign of King", "Standing a top the conquered spire, Keny, Bablu, and Ravijah gazed across the infinite grid."),
         ("🌌 Chapter 5: The Void Calls", "An ancient entity stirred. The Void whispered promises of infinite power to the three founders."),
-        ("🔱 Chapter 6: Eternal Storm", "Lightning became their blood, thunder their voice. Keny, Ravijah, and Bablu - the eternal storm."),
+        ("🔱 Chapter 6: Eternal Storm", "Lightning became their blood, thunder their voice. Keny, Ravijah, and Bablu - the eternal storm... technically I'm bored so this story is chup."),
     ]
     msg = await m.answer("📜 Opening Tempest Archives...")
     await asyncio.sleep(1.5)
