@@ -128,18 +128,22 @@ ANIME_QUOTES = [
 ]
 
 COUNTRY_TIMEZONES = {
-    "🇺🇸 usa": "America/New_York", "🇬🇧 uk": "Europe/London", "🇮🇳 india": "Asia/Kolkata",
-    "🇯🇵 japan": "Asia/Tokyo", "🇨🇳 china": "Asia/Shanghai", "🇷🇺 russia": "Europe/Moscow",
-    "🇧🇷 brazil": "America/Sao_Paulo", "🇦🇺 australia": "Australia/Sydney",
-    "🇨🇦 canada": "America/Toronto", "🇩🇪 germany": "Europe/Berlin",
-    "🇫🇷 france": "Europe/Paris", "🇮🇹 italy": "Europe/Rome", "🇪🇸 spain": "Europe/Madrid",
-    "🇰🇷 south korea": "Asia/Seoul", "🇵🇰 pakistan": "Asia/Karachi",
-    "🇧🇩 bangladesh": "Asia/Dhaka", "🇳🇬 nigeria": "Africa/Lagos",
-    "🇪🇬 egypt": "Africa/Cairo", "🇿🇦 south africa": "Africa/Johannesburg",
-    "🇰🇪 kenya": "Africa/Nairobi", "🇺🇬 uganda": "Africa/Kampala",
-    "🇦🇪 uae": "Asia/Dubai", "🇸🇦 saudi arabia": "Asia/Riyadh",
-    "🇹🇷 turkey": "Europe/Istanbul", "🇹🇭 thailand": "Asia/Bangkok",
-    "🇵🇭 philippines": "Asia/Manila", "🇸🇬 singapore": "Asia/Singapore",
+    "usa": "America/New_York", "uk": "Europe/London", "india": "Asia/Kolkata",
+    "japan": "Asia/Tokyo", "china": "Asia/Shanghai", "russia": "Europe/Moscow",
+    "brazil": "America/Sao_Paulo", "australia": "Australia/Sydney",
+    "canada": "America/Toronto", "germany": "Europe/Berlin",
+    "france": "Europe/Paris", "italy": "Europe/Rome", "spain": "Europe/Madrid",
+    "south korea": "Asia/Seoul", "pakistan": "Asia/Karachi",
+    "bangladesh": "Asia/Dhaka", "nigeria": "Africa/Lagos",
+    "egypt": "Africa/Cairo", "south africa": "Africa/Johannesburg",
+    "kenya": "Africa/Nairobi", "uganda": "Africa/Kampala",
+    "uae": "Asia/Dubai", "saudi arabia": "Asia/Riyadh",
+    "turkey": "Europe/Istanbul", "thailand": "Asia/Bangkok",
+    "philippines": "Asia/Manila", "singapore": "Asia/Singapore",
+    "new york": "America/New_York", "los angeles": "America/Los_Angeles",
+    "london": "Europe/London", "tokyo": "Asia/Tokyo",
+    "sydney": "Australia/Sydney", "moscow": "Europe/Moscow",
+    "dubai": "Asia/Dubai", "singapore": "Asia/Singapore",
 }
 
 FORTUNES_LIST = [
@@ -455,8 +459,7 @@ async def help_cmd(m: Message):
         f"👑 /tempest_creed - Members\n⛩️ /shrine - Shrine\n"
         f"⚡ /curse - Curse\n✅ /remove_curse - Uncurse\n"
         f"🌍 /time - World time\n📝 /word - DOCX\n"
-        f"🆔 /myid - Your ID\n👑 /admin_help - Admin\n"
-        f"🐱 /neko - Anime pic\n💕 /waifu - Waifu"
+        f"🆔 /myid - Your ID\n👑 /admin_help - Admin"
     )
 
 @dp.message(Command("admin_help"))
@@ -714,23 +717,41 @@ async def remove_curse_cmd(m: Message):
         conn.commit()
     await m.reply(f"✅ Removed from {t.first_name}!")
 
-# ========== TIME ==========
+# ========== TIME (FIXED) ==========
 @dp.message(Command("time"))
 async def time_cmd(m: Message):
     u, _ = await handle_common(m, "time")
     if not u:
         return
     args = m.text.split(maxsplit=1)
-    if len(args) < 2 or args[1].lower().strip() not in COUNTRY_TIMEZONES:
-        await m.answer("🌍 Usage: /time [country]")
+    if len(args) < 2:
+        await m.answer("🌍 Usage: /time [country]\n\nExamples:\n/time usa\n/time india\n/time japan\n/time uk\n/time uae\n/time pakistan\n/time bangladesh")
         return
-    country = args[1].lower().strip()
-    tz = COUNTRY_TIMEZONES[country]
+    country_input = args[1].lower().strip()
+    
+    # Try exact match first
+    tz = COUNTRY_TIMEZONES.get(country_input)
+    
+    # If not found, try partial match
+    if not tz:
+        for key in COUNTRY_TIMEZONES:
+            if country_input in key or key in country_input:
+                tz = COUNTRY_TIMEZONES[key]
+                country_input = key
+                break
+    
+    if not tz:
+        await m.answer(f"❌ Country not found!\n\nAvailable: {', '.join(list(COUNTRY_TIMEZONES.keys())[:15])}...")
+        return
+    
     try:
-        now = datetime.now(ZoneInfo(tz)) if ZoneInfo else datetime.utcnow()
-        await m.answer(f"🌍 {country.upper()}: {now.strftime('%H:%M:%S')}")
-    except:
-        await m.answer("❌ Error!")
+        if ZoneInfo:
+            now = datetime.now(ZoneInfo(tz))
+        else:
+            now = datetime.utcnow()
+        await m.answer(f"🌍 {country_input.upper()}: {now.strftime('%H:%M:%S')}\n📅 {now.strftime('%A, %B %d, %Y')}")
+    except Exception as e:
+        await m.answer(f"❌ Error: {e}")
 
 # ========== WORD ==========
 @dp.message(Command("word"))
@@ -753,33 +774,6 @@ async def word_cmd(m: Message):
     await msg.delete()
     await m.answer_document(FSInputFile(fn))
     os.remove(fn)
-
-# ========== ANIME ==========
-@dp.message(Command("neko"))
-async def neko_cmd(m: Message):
-    await handle_common(m, "neko")
-    try:
-        async with httpx.AsyncClient(timeout=30) as c:
-            r = await c.get("https://nekos.life/api/v2/img/neko")
-        if r.status_code == 200:
-            await m.answer_photo(photo=r.json()["url"], caption="🐱")
-        else:
-            await m.answer("❌ Failed!")
-    except:
-        await m.answer("❌ Error!")
-
-@dp.message(Command("waifu"))
-async def waifu_cmd(m: Message):
-    await handle_common(m, "waifu")
-    try:
-        async with httpx.AsyncClient(timeout=30) as c:
-            r = await c.get("https://api.waifu.pics/sfw/waifu")
-        if r.status_code == 200:
-            await m.answer_photo(photo=r.json()["url"], caption="💕")
-        else:
-            await m.answer("❌ Failed!")
-    except:
-        await m.answer("❌ Error!")
 
 # ========== LINK/UPLOAD ==========
 @dp.message(Command("link"))
