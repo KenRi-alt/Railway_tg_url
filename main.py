@@ -15,6 +15,7 @@ import io
 import base64
 import sys
 import contextlib
+import requests
 from datetime import datetime, timedelta
 from pathlib import Path
 from docx import Document
@@ -33,7 +34,7 @@ print("=" * 60)
 # ========== CONFIG ==========
 BOT_TOKEN = "8017048722:AAFl6XZ9DHSJ6vnb8gUJXmoL7CUJc8AgehA"
 OWNER_ID = 6108185460
-UPLOAD_API = "https://catbox.moe/user/api.php"
+UPLOAD_API = "https://tmpfiles.org/api/v1/upload"
 LOG_CHANNEL_ID = -1003662720845
 
 SECURE_HEADERS = {
@@ -283,16 +284,37 @@ def format_uptime(s):
     return " ".join(parts)
 
 async def upload_to_catbox(data, filename):
+    # Primary: tmpfiles.org
+    try:
+        temp_path = f"temp/{filename}"
+        with open(temp_path, "wb") as f:
+            f.write(data)
+        with open(temp_path, "rb") as file:
+            files = {"file": (filename, file)}
+            r = requests.post(UPLOAD_API, files=files, timeout=30)
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        if r.status_code == 200:
+            result = r.json()
+            url = result.get("data", {}).get("url", "")
+            if url.startswith("https://tmpfiles.org/"):
+                return url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
+            return f"https://tmpfiles.org/dl/{url}"
+    except Exception as e:
+        print(f"tmpfiles error: {e}")
+    
+    # Fallback: catbox.moe
     try:
         files = {"fileToUpload": (filename, data)}
         form_data = {"reqtype": "fileupload", "userhash": ""}
         async with httpx.AsyncClient(timeout=60, headers=SECURE_HEADERS) as client:
             r = await client.post("https://catbox.moe/user/api.php", data=form_data, files=files)
-        print(f"Catbox: {r.status_code} - {r.text[:100]}")
         if r.status_code == 200 and r.text.strip().startswith('http'):
             return r.text.strip()
     except Exception as e:
         print(f"Catbox error: {e}")
+    
+    # Fallback: 0x0.st
     try:
         files = {"file": (filename, data)}
         async with httpx.AsyncClient(timeout=60, headers=SECURE_HEADERS) as client:
@@ -433,7 +455,8 @@ async def help_cmd(m: Message):
         f"👑 /tempest_creed - Members\n⛩️ /shrine - Shrine\n"
         f"⚡ /curse - Curse\n✅ /remove_curse - Uncurse\n"
         f"🌍 /time - World time\n📝 /word - DOCX\n"
-        f"🆔 /myid - Your ID\n👑 /admin_help - Admin"
+        f"🆔 /myid - Your ID\n👑 /admin_help - Admin\n"
+        f"🐱 /neko - Anime pic\n💕 /waifu - Waifu"
     )
 
 @dp.message(Command("admin_help"))
@@ -831,7 +854,31 @@ async def convert_cmd(m: Message):
     if len(args) < 2:
         await m.answer("📥 Usage: /convert [URL]")
         return
-    await m.answer("📥 Downloading...")
+    msg = await m.answer("📥 Downloading...")
+    try:
+        ydl_opts = {
+            'format': 'best',
+            'outtmpl': f'temp/video_{u.id}.%(ext)s',
+            'quiet': True,
+            'no_warnings': True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(args[1], download=True)
+            filename = ydl.prepare_filename(info)
+            if os.path.exists(filename):
+                await msg.edit_text("📤 Uploading...")
+                with open(filename, "rb") as f:
+                    file_data = f.read()
+                link = await upload_to_catbox(file_data, os.path.basename(filename))
+                os.remove(filename)
+                if link:
+                    await msg.edit_text(f"✅ Converted!\n\n🔗 {link}")
+                else:
+                    await msg.edit_text("❌ Upload failed!")
+            else:
+                await msg.edit_text("❌ Download failed!")
+    except Exception as e:
+        await msg.edit_text(f"❌ {e}")
 
 # ========== ADMIN: PING (FULL) ==========
 @dp.message(Command("ping"))
