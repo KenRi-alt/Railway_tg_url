@@ -652,7 +652,7 @@ async def tempest_story_cmd(m: Message):
         await asyncio.sleep(2)
         await msg.edit_text(f"{header(t)}\n\n{c}")
         await asyncio.sleep(5)
-    await msg.edit_text("🌀 We are the eternal storm.")
+    await msg.edit_text("🌀 We are the eternal storm.-As u can see I was bored")
 
 # ========== TEMPEST CREED ==========
 @dp.message(Command("tempest_creed"))
