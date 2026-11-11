@@ -1,13 +1,30 @@
+# ========== CORE ==========
 aiogram==3.4.1
-Pillow==10.1.0
+
+# ========== HTTP / NETWORK ==========
 httpx==0.25.2
+aiohttp==3.9.5
+requests==2.32.3
+
+# ========== IMAGE / DOCX ==========
+Pillow==10.1.0
 python-docx==1.1.0
+
+# ========== SYSTEM / UTILS ==========
 psutil==5.9.6
-aiohttp
-yt-dlp==2024.8.6
-cryptography==43.0.0
 pytz==2024.1
 geopy==2.4.1
+
+# ========== MEDIA ==========
+yt-dlp>=2024.10.1
+gTTS==2.5.1
+
+# ========== CRYPTO / STORAGE ==========
+cryptography>=43.0.1
+
+# ========== AI / TRANSLATION ==========
 groq>=1.6.0
-requests>=2.31.0
+deep-translator==1.11.4
+
+# ========== DB ==========
 aiosqlite>=0.19.0
