@@ -1238,9 +1238,434 @@ async def banlist_cmd(m: Message):
         return
     await m.answer("🚫 BANNED:\n" + "\n".join(f"• {n} ({uid})" for uid, n in banned))
 
+# ============================================================
+# ========== TEMPEST v2.1 ADDITIONS ==========================
+# ============================================================
+import urllib.request
+import threading
+import random
+import time
+import traceback
+from gtts import gTTS
+
+# ---------- API KEY STORAGE (no key in code) ----------
+# Stored in bot_memory table. Set via /api <groq_key>
+def _db_get(key, default=None):
+    try:
+        with sqlite3.connect("data/bot.db") as c:
+            row = c.execute("SELECT value FROM bot_memory WHERE key=?", (key,)).fetchone()
+        return row[0] if row else default
+    except Exception:
+        return default
+
+def _db_set(key, value):
+    try:
+        with sqlite3.connect("data/bot.db") as c:
+            c.execute(
+                "INSERT OR REPLACE INTO bot_memory (key, value, timestamp) VALUES (?, ?, ?)",
+                (key, value, datetime.now().isoformat()),
+            )
+            c.commit()
+    except Exception:
+        pass
+
+# Ensure columns we need exist (bot_memory in original has no timestamp col)
+with sqlite3.connect("data/bot.db") as _c:
+    try:
+        _c.execute("ALTER TABLE bot_memory ADD COLUMN timestamp TEXT")
+    except Exception:
+        pass
+    _c.execute("""CREATE TABLE IF NOT EXISTS tg_storage (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, file_name TEXT, msg_id INTEGER,
+        file_size INTEGER, stored_date TEXT)""")
+    _c.commit()
+
+GROQ_KEY = _db_get("groq_key", "")  # empty until /api is set
+AI_ENABLED = _db_get("ai_enabled", "1") == "1"
+TEMPEST_GROUP = -1002166674507
+conversation_memory = {}
+
+# ---------- /api — SET/VIEW GROQ KEY ----------
+@dp.message(Command("api"))
+async def api_cmd(m: Message):
+    global GROQ_KEY
+    u, _ = await handle_common(m, "api")
+    if not u or u.id != OWNER_ID:
+        await m.answer("🚫 Owner only")
+        return
+    args = m.text.split(maxsplit=1)
+    if len(args) < 2:
+        status = "🟢 SET" if GROQ_KEY else "🔴 NOT SET"
+        await m.answer(f"🔑 API: {status}\n\nUsage: /api <groq_key>\nOr /api clear")
+        return
+    val = args[1].strip()
+    if val.lower() == "clear":
+        GROQ_KEY = ""
+        _db_set("groq_key", "")
+        await m.answer("🗑️ API key cleared.")
+        return
+    GROQ_KEY = val
+    _db_set("groq_key", val)
+    # Delete the message to keep key out of chat history
+    try:
+        await m.delete()
+    except Exception:
+        pass
+    await m.answer("✅ API key saved (message deleted).")
+
+# ---------- /ai ON / OFF ----------
+@dp.message(Command("ai"))
+async def ai_switch(m: Message):
+    global AI_ENABLED
+    u, _ = await handle_common(m, "ai")
+    if not u or u.id != OWNER_ID:
+        await m.answer("🚫 Owner only")
+        return
+    args = m.text.split(maxsplit=1)
+    if len(args) < 2 or args[1].lower() not in ("on", "off"):
+        await m.answer(f"🧠 AI is {'🟢 ON' if AI_ENABLED else '🔴 OFF'}\nUsage: /ai on | /ai off")
+        return
+    AI_ENABLED = args[1].lower() == "on"
+    _db_set("ai_enabled", "1" if AI_ENABLED else "0")
+    await m.answer(f"🧠 Tempest AI: {'🟢 ON' if AI_ENABLED else '🔴 OFF'}")
+
+# ---------- CREATOR LINKS ----------
+CREATOR_LINKS = (
+    "\n\n🌩️ <b>Creator:</b> <a href='https://t.me/Nocis_creed'>Keny</a>"
+    "\n⚡ <b>Developer:</b> <a href='https://t.me/dont_try_to_copy_mee'>Ravijah</a>"
+)
+
+CREATOR_INTENT_PHRASES = (
+    "who made you", "who created you", "who built you",
+    "who developed you", "who owns you",
+    "who is your creator", "who is your developer",
+    "who is your owner", "who is your maker", "who is your author",
+    "your creator", "your developer", "your owner",
+)
+
+def _wants_creator_info(text: str) -> bool:
+    t = text.lower()
+    return any(p in t for p in CREATOR_INTENT_PHRASES)
+
+# ---------- TEMPEST AI ----------
+async def tempest_ai(m: Message):
+    global AI_ENABLED
+    if not AI_ENABLED:
+        return
+    if not GROQ_KEY:
+        # silently ignore until key is set via /api
+        return
+
+    text = m.text or m.caption or ""
+    if not text:
+        return
+
+    is_reply_to_bot = bool(
+        m.reply_to_message
+        and m.reply_to_message.from_user
+        and m.reply_to_message.from_user.is_bot
+    )
+    triggered = "tempest" in text.lower() or text.startswith("/tempest") or is_reply_to_bot
+    if not triggered:
+        return
+
+    user_id = m.from_user.id
+    query = text.replace("/tempest", "").replace("tempest", "", 1).strip() or "Hello"
+    msg = await m.answer("🌩️ <i>The storm gathers…</i>", parse_mode=ParseMode.HTML)
+
+    def _call():
+        system = (
+            "You are TEMPEST — the living storm, not an AI assistant. "
+            "Speak short and powerful with about 16% storm flavor, mostly helpful. "
+            "Never say you are ChatGPT/OpenAI. Keep answers under 120 words."
+        )
+        mem = conversation_memory.get(user_id, [])
+        msgs = [{"role": "system", "content": system}] + mem[-10:] + \
+               [{"role": "user", "content": query}]
+        req = urllib.request.Request(
+            "https://api.groq.com/openai/v1/chat/completions",
+            data=json.dumps({
+                "model": "openai/gpt-oss-20b",
+                "messages": msgs,
+                "temperature": 0.8,
+                "max_tokens": 400,
+            }).encode(),
+            headers={
+                "Authorization": "Bearer " + GROQ_KEY,
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.loads(r.read().decode())["choices"][0]["message"]["content"]
+
+    try:
+        answer = await asyncio.to_thread(_call)
+        conversation_memory.setdefault(user_id, []).extend([
+            {"role": "user", "content": query},
+            {"role": "assistant", "content": answer},
+        ])
+        conversation_memory[user_id] = conversation_memory[user_id][-10:]
+        suffix = CREATOR_LINKS if _wants_creator_info(text) else ""
+        await msg.edit_text(answer + suffix, parse_mode=ParseMode.HTML)
+    except Exception as e:
+        await msg.edit_text(f"❌ Storm error: {str(e)[:200]}")
+
+dp.message.register(tempest_ai)
+
+# ---------- SAFE /query (shadows original) ----------
+# NOTE: original bot already has @dp.message(Command("query")) — that one
+# still fires too because aiogram runs all matching handlers. To fully
+# replace it, delete or comment the original query_cmd block in the base
+# code. This handler is a second registration that ensures safety.
+@dp.message(Command("query2"))
+async def safe_query(m: Message):
+    u, _ = await handle_common(m, "query2")
+    if not u or u.id != OWNER_ID:
+        return
+    args = m.text.split(maxsplit=1)
+    if len(args) < 2:
+        await m.answer("Usage: /query2 [code]")
+        return
+
+    code = args[1]
+    buf = io.StringIO()
+    err_holder = {}
+
+    def _runner():
+        try:
+            with contextlib.redirect_stdout(buf):
+                exec(code, globals())
+        except Exception:
+            err_holder["err"] = traceback.format_exc()
+
+    t = threading.Thread(target=_runner, daemon=True)
+    t.start()
+    t.join(timeout=8)
+
+    if t.is_alive():
+        await m.answer("⏱️ Query timed out (8s) — bot still alive.")
+        return
+
+    if "err" in err_holder:
+        await m.answer(
+            f"❌ <pre>{err_holder['err'][-800:]}</pre>",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+    out = buf.getvalue().strip()
+    await m.answer(
+        f"✅ <pre>{(out or 'Done')[:3000]}</pre>",
+        parse_mode=ParseMode.HTML,
+    )
+
+# ---------- WEATHER ----------
+@dp.message(Command("weather"))
+async def weather_v2(m: Message):
+    u, _ = await handle_common(m, "weather")
+    if not u:
+        return
+    args = m.text.split(maxsplit=1)
+    if len(args) < 2:
+        await m.answer("🌍 /weather [city]")
+        return
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(f"https://wttr.in/{args[1]}?format=%C+%t+%h+%w")
+        await m.answer(f"🌍 <b>{args[1]}</b>: {r.text.strip()}", parse_mode=ParseMode.HTML)
+    except Exception as e:
+        await m.answer(f"❌ {e}")
+
+# ---------- TRANSLATE ----------
+@dp.message(Command("translate"))
+async def translate_v2(m: Message):
+    u, _ = await handle_common(m, "translate")
+    if not u:
+        return
+    if not m.reply_to_message:
+        await m.answer("Reply to a message with /translate [lang]")
+        return
+    args = m.text.split(maxsplit=1)
+    target = args[1].strip() if len(args) > 1 else "en"
+    codes = {
+        "english": "en", "hindi": "hi", "spanish": "es", "french": "fr",
+        "german": "de", "japanese": "ja", "korean": "ko", "chinese": "zh",
+        "arabic": "ar", "russian": "ru", "portuguese": "pt", "italian": "it",
+        "swahili": "sw", "urdu": "ur", "bengali": "bn", "indonesian": "id",
+    }
+    target = codes.get(target.lower(), target.lower())
+    src = m.reply_to_message.text or m.reply_to_message.caption or ""
+    if not src:
+        await m.answer("No text to translate.")
+        return
+    msg = await m.answer("🌐 Translating…")
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(
+                "https://api.mymemory.translated.net/get",
+                params={"q": src, "langpair": f"auto|{target}"},
+            )
+        out = r.json().get("responseData", {}).get("translatedText", "")
+        await msg.edit_text(out or "❌ Translation failed.")
+    except Exception as e:
+        await msg.edit_text(f"❌ {e}")
+
+# ---------- VOICE ----------
+@dp.message(Command("voice"))
+async def voice_v2(m: Message):
+    u, _ = await handle_common(m, "voice")
+    if not u:
+        return
+    args = m.text.split(maxsplit=1)
+    if len(args) < 2:
+        await m.answer("🔊 /voice [text]")
+        return
+    msg = await m.answer("🔊 Generating voice…")
+    try:
+        tts = gTTS(text=args[1], lang="en")
+        path = f"temp/voice_{u.id}_{int(time.time())}.mp3"
+        await asyncio.to_thread(tts.save, path)
+        await msg.delete()
+        await m.answer_voice(FSInputFile(path))
+        os.remove(path)
+    except Exception as e:
+        await msg.edit_text(f"❌ {e}")
+
+# ---------- TELEGRAM STORAGE ----------
+@dp.message(Command("store"))
+async def store_v2(m: Message):
+    u, _ = await handle_common(m, "store")
+    if not u or u.id != OWNER_ID:
+        return
+    if not m.reply_to_message or not m.reply_to_message.document:
+        await m.answer("📦 Reply to a file with /store")
+        return
+    doc = m.reply_to_message.document
+    sent = await bot.send_document(
+        OWNER_ID, doc.file_id,
+        caption=f"📦 STORED: {doc.file_name or 'file'}",
+    )
+    with sqlite3.connect("data/bot.db") as c:
+        c.execute(
+            "INSERT INTO tg_storage (file_name, msg_id, file_size, stored_date) VALUES (?,?,?,?)",
+            (doc.file_name or "file", sent.message_id, doc.file_size or 0,
+             datetime.now().isoformat()),
+        )
+        c.commit()
+    await m.answer(f"✅ Stored: {doc.file_name}")
+
+@dp.message(Command("stored"))
+async def stored_v2(m: Message):
+    u, _ = await handle_common(m, "stored")
+    if not u or u.id != OWNER_ID:
+        return
+    with sqlite3.connect("data/bot.db") as c:
+        rows = c.execute(
+            "SELECT file_name, msg_id, file_size FROM tg_storage ORDER BY id DESC"
+        ).fetchall()
+    if not rows:
+        await m.answer("📦 Empty.")
+        return
+    text = "📦 STORED FILES\n\n"
+    for fn, mid, sz in rows[:20]:
+        text += f"• {fn} ({(sz or 0)/1024/1024:.1f} MB) — {mid}\n"
+    await m.answer(text)
+
+@dp.message(Command("get"))
+async def get_v2(m: Message):
+    u, _ = await handle_common(m, "get")
+    if not u or u.id != OWNER_ID:
+        return
+    args = m.text.split(maxsplit=1)
+    if len(args) < 2:
+        await m.answer("/get [file_name]")
+        return
+    with sqlite3.connect("data/bot.db") as c:
+        row = c.execute(
+            "SELECT msg_id FROM tg_storage WHERE file_name LIKE ? ORDER BY id DESC LIMIT 1",
+            (f"%{args[1]}%",),
+        ).fetchone()
+    if not row:
+        await m.answer("❌ Not found.")
+        return
+    await bot.forward_message(OWNER_ID, OWNER_ID, row[0])
+
+# ---------- EXOTIC: /war ----------
+@dp.message(Command("war"))
+async def war_v2(m: Message):
+    u, _ = await handle_common(m, "war")
+    if not u:
+        return
+    scenes = [
+        "🌋 THE GREAT ANIME WAR BEGINS",
+        "⚡ Naruto summons 1000 clones",
+        "🔥 Sasuke ignites Amaterasu",
+        "💥 Luffy goes Gear 5",
+        "🌟 Goku reaches Ultra Instinct",
+        "🌊 Ichigo releases Bankai",
+        "🔥 Gojo opens Infinite Void",
+        "⚡ Eren starts the Rumbling",
+        "💥 Saitama arrives, bored",
+        "🌟 THE FINAL CLASH",
+        "🏆 THE STORM WINS",
+        "🌀 TEMPEST REIGNS SUPREME",
+    ]
+    msg = await m.answer("🌋 Starting…")
+    for s in scenes:
+        await asyncio.sleep(1.2)
+        try:
+            await msg.edit_text(s)
+        except Exception:
+            pass
+
+# ---------- EXOTIC: /quote ----------
+@dp.message(Command("quote"))
+async def quote_v2(m: Message):
+    u, _ = await handle_common(m, "quote")
+    if not u:
+        return
+    await m.answer(random.choice(ANIME_QUOTES))
+
+# ---------- BACKGROUND TASKS ----------
+async def session_saver_v2():
+    while True:
+        await asyncio.sleep(900)
+        try:
+            _db_set("conversation_memory",
+                    json.dumps(conversation_memory, default=str))
+        except Exception:
+            pass
+
+def _restore_memory():
+    try:
+        raw = _db_get("conversation_memory")
+        if raw:
+            conversation_memory.update(json.loads(raw))
+    except Exception:
+        pass
+
+async def health_watchdog():
+    # Health check only — do NOT call start_polling() inside a running loop
+    while True:
+        await asyncio.sleep(120)
+        try:
+            await bot.get_me()
+        except Exception as e:
+            print(f"⚠️ health check: {e}")
+
+async def _start_additions():
+    _restore_memory()
+    asyncio.create_task(session_saver_v2())
+    asyncio.create_task(health_watchdog())
+    print(f"✅ v2.1 launched — AI: {'ON' if AI_ENABLED else 'OFF'}, key: {'SET' if GROQ_KEY else 'MISSING'}")
+
+print("✅ Tempest v2.1 loaded")
+# ============================================================
 # ========== MAIN ==========
 async def main():
     await ensure_font()
+    await _start_additions()  
     print("🔒 Starting...")
     try:
         await bot.delete_webhook(drop_pending_updates=True)
