@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ========== TEMPEST GUIDER - v10.0 ABSOLUTE FINAL ==========
+# ========== TEMPEST GUIDER - v11.0 FINAL STABLE ==========
 import os
 import asyncio
 import time
@@ -33,7 +33,7 @@ from aiohttp import web
 logging.basicConfig(level=logging.INFO, force=True)
 
 print("=" * 60)
-print("🔒 TEMPEST GUIDER - v10.0 ABSOLUTE FINAL")
+print("🔒 TEMPEST GUIDER - v11.0 FINAL STABLE")
 print("=" * 60)
 
 # ========== CONFIG ==========
@@ -80,20 +80,20 @@ conversation_memory = {}
 active_duels = {}
 store_waiting = {}
 
-# ========== DUEL ROSTER ==========
+# ========== DUEL ROSTER & STATUS ==========
 FIGHTER_ROSTER = {
-    "gojo": {"name": "Gojo", "hp": 115, "atk": 22, "passive": "Infinity (35% miss chance)"},
-    "saitama": {"name": "Saitama", "hp": 130, "atk": 26, "passive": "Unfazed (Immune to stun)"},
-    "luffy": {"name": "Luffy", "hp": 120, "atk": 21, "passive": "Rubber Body (-25% dmg)"},
-    "sukuna": {"name": "Sukuna", "hp": 115, "atk": 24, "passive": "King of Curses (+15% dmg)"},
-    "madara": {"name": "Madara", "hp": 120, "atk": 23, "passive": "Uchiha Reflection (25% counter)"},
-    "goku": {"name": "Goku", "hp": 125, "atk": 25, "passive": "Saiyan Zenkai (Heals 10/turn)"},
-    "ichigo": {"name": "Ichigo", "hp": 118, "atk": 23, "passive": "Soul Reaper (Crit +20%)"},
-    "naruto": {"name": "Naruto", "hp": 122, "atk": 22, "passive": "Nine Tails (Regen 5/turn)"},
-    "levi": {"name": "Levi", "hp": 105, "atk": 27, "passive": "Ackerman (Double hit chance)"},
-    "eren": {"name": "Eren", "hp": 125, "atk": 24, "passive": "Titan Shift (Heals 15/turn)"},
-    "light": {"name": "Light", "hp": 100, "atk": 30, "passive": "Death Note (Instakill 10%)"},
-    "ainz": {"name": "Ainz", "hp": 128, "atk": 23, "passive": "Undead (Immune to bleed)"},
+    "gojo": {"name": "Gojo", "hp": 115, "atk": 22, "ult": "Hollow Purple", "ult_dmg": 45, "effect": "stun"},
+    "saitama": {"name": "Saitama", "hp": 130, "atk": 26, "ult": "Serious Punch", "ult_dmg": 60, "effect": "stun"},
+    "luffy": {"name": "Luffy", "hp": 120, "atk": 21, "ult": "Bajrang Gun", "ult_dmg": 40, "effect": "burn"},
+    "sukuna": {"name": "Sukuna", "hp": 115, "atk": 24, "ult": "Malevolent Shrine", "ult_dmg": 42, "effect": "bleed"},
+    "madara": {"name": "Madara", "hp": 120, "atk": 23, "ult": "Tengai Shinsei", "ult_dmg": 48, "effect": "burn"},
+    "goku": {"name": "Goku", "hp": 125, "atk": 25, "ult": "Ultra Instinct", "ult_dmg": 50, "effect": "stun"},
+    "ichigo": {"name": "Ichigo", "hp": 118, "atk": 23, "ult": "Mugetsu", "ult_dmg": 55, "effect": "bleed"},
+    "naruto": {"name": "Naruto", "hp": 122, "atk": 22, "ult": "Baryon Mode", "ult_dmg": 46, "effect": "burn"},
+    "levi": {"name": "Levi", "hp": 105, "atk": 27, "ult": "Thunder Spear", "ult_dmg": 38, "effect": "bleed"},
+    "eren": {"name": "Eren", "hp": 125, "atk": 24, "ult": "The Rumbling", "ult_dmg": 47, "effect": "stun"},
+    "light": {"name": "Light", "hp": 100, "atk": 30, "ult": "Name Written", "ult_dmg": 70, "effect": "stun"},
+    "ainz": {"name": "Ainz", "hp": 128, "atk": 23, "ult": "Goal of All Life", "ult_dmg": 52, "effect": "bleed"},
 }
 
 # ========== DATABASE ==========
@@ -157,10 +157,6 @@ def save_memory():
     except Exception: pass
 
 # ========== HELPERS ==========
-async def send_log(msg):
-    try: await bot.send_message(LOG_CHANNEL_ID, msg[:4000])
-    except Exception: pass
-
 def track_group_member(chat_id: int, user):
     if not user or user.is_bot: return
     try:
@@ -253,7 +249,7 @@ def draw_visible_text(draw, pos, text, font, fill, outline=(0, 0, 0), w=3, ancho
             if ox != 0 or oy != 0: draw.text((x + ox, y + oy), text, font=font, fill=outline, **kw)
     draw.text((x, y), text, font=font, fill=fill, **kw)
 
-async def fetch_user_avatar(uid, name="User", size=720):
+async def fetch_user_avatar(uid, name="User", size=400):
     try:
         photos = await bot.get_user_profile_photos(uid, limit=1)
         if photos.total_count > 0:
@@ -277,6 +273,43 @@ async def fetch_user_avatar(uid, name="User", size=720):
     draw_visible_text(d, (size // 2, size // 2), name[0].upper() if name else "T", f, (0, 255, 200), w=4, anchor="mm")
     return fb
 
+def gen_profile_card(username, uid, rank, shards, wins, losses, av):
+    w, h = 1920, 1080
+    img = Image.new("RGBA", (w, h), (8, 12, 24, 255))
+    try:
+        bg = ImageOps.fit(av.convert("RGB"), (w, h), Image.Resampling.LANCZOS).filter(ImageFilter.GaussianBlur(40))
+        img = Image.alpha_composite(img, bg.convert("RGBA"))
+        img = Image.alpha_composite(img, Image.new("RGBA", (w, h), (8, 12, 24, 200)))
+    except Exception: pass
+    
+    overlay = Image.new("RGBA", (w-80, h-80), (20, 30, 50, 180))
+    img.paste(overlay, (40, 40), mask=overlay)
+    d = ImageDraw.Draw(img)
+    d.rectangle([40, 40, w-40, h-40], outline=(0, 255, 200), width=4)
+    
+    av_x, av_y = 140, (h - 400) // 2
+    d.ellipse((av_x-8, av_y-8, av_x+408, av_y+408), outline=(0, 255, 200), width=8)
+    img.paste(av.resize((400, 400), Image.Resampling.LANCZOS), (av_x, av_y), mask=av.resize((400, 400), Image.Resampling.LANCZOS))
+    
+    f_title = get_safe_font(120); f_sub = get_safe_font(70); f_stat = get_safe_font(60)
+    tx = 600
+    draw_visible_text(d, (tx, 180), str(username)[:18], f_title, (255, 255, 255), w=6)
+    draw_visible_text(d, (tx, 340), f"ID: {uid}   •   RANK: {str(rank).upper()}", f_sub, (0, 255, 200), w=4)
+    draw_visible_text(d, (tx, 480), f"SHARDS: {shards:,}", f_stat, (255, 215, 0), w=4)
+    
+    bar_x1, bar_y1, bar_x2, bar_y2 = tx, 580, w - 150, 630
+    d.rounded_rectangle([bar_x1, bar_y1, bar_x2, bar_y2], radius=25, fill=(35, 45, 70, 255))
+    fill_w = int(min(shards, 1000) / 1000 * (bar_x2 - bar_x1))
+    if fill_w > 40: d.rounded_rectangle([bar_x1, bar_y1, bar_x1 + fill_w, bar_y2], radius=25, fill=(255, 215, 0, 255))
+    
+    winrate = int((wins / (wins + losses) * 100)) if (wins + losses) > 0 else 0
+    draw_visible_text(d, (tx, 720), f"WINS: {wins}    |    LOSSES: {losses}", f_stat, (230, 235, 245), w=4)
+    draw_visible_text(d, (tx, 850), f"WIN RATE: {winrate}%", f_stat, (0, 255, 200), w=4)
+    draw_visible_text(d, (w - 100, h - 100), "TEMPEST OVERMIND", f_sub, (130, 150, 180), w=3, anchor="ra")
+    
+    b = io.BytesIO(); img.convert("RGB").save(b, format="PNG", optimize=True); b.seek(0)
+    return b.getvalue()
+
 # ========== AI ==========
 async def tempest_ai(m: Message):
     if not AI_ENABLED or not GROQ_KEY: return
@@ -299,10 +332,13 @@ async def tempest_ai(m: Message):
 
     try:
         ans = await asyncio.to_thread(_call)
+        if not ans or not ans.strip(): ans = "🌩️ *The storm was silent...*"
         conversation_memory.setdefault(user_id, []).extend([{"role": "user", "content": query}, {"role": "assistant", "content": ans}])
         conversation_memory[user_id] = conversation_memory[user_id][-15:]
         await msg.edit_text(ans[:4000], parse_mode=None)
-    except Exception as e: await msg.edit_text(f"❌ {str(e)[:100]}")
+    except Exception as e: 
+        try: await msg.edit_text(f"❌ Storm error: {str(e)[:100]}")
+        except: pass
 
 # ========== COMMANDS ==========
 @dp.message(CommandStart())
@@ -315,37 +351,20 @@ async def help_cmd(m: Message):
     await handle_common(m, "help")
     text = (
         "◤━━━━━━━━━━━━━━━━━━━━◥\n"
-        "◇ 📚 TEMPEST GUIDELINES ◇\n"
+        "◇ 📚 USER COMMANDS ◇\n"
         "◣━━━━━━━━━━━━━━━━━━━━◢\n\n"
-        "**USER COMMANDS**\n"
         "👤 /profile - View your Cyber-ID\n"
         "🎭 /fate - Calculate group love\n"
         "⚔️ /duel [anime] - Fight a member\n"
-        "✨ /wish [text] - Make a wish\n"
-        "🔮 /fortune - Read your future\n"
-        "🎮 /dice | 🪙 /flip - Games\n"
-        "🌍 /time [country] - World time\n"
-        "🌦️ /weather [city] - Live weather\n"
-        "🔊 /voice [text] - Text to Speech\n\n"
-        "**STORAGE**\n"
-        "🗄️ /store - Reply to a file to save\n"
-        "📂 /files - View your saved files\n"
-        "🔎 /get [name] - Retrieve a file\n"
-        "🗑️ /del [id] - Delete a file\n\n"
+        "✨ /wish | 🔮 /fortune | 🎮 /dice\n"
+        "🌍 /time | 🌦️ /weather | 🔊 /voice\n\n"
+        "**STORAGE & TOOLS**\n"
+        "🗄️ /store | 📂 /files | 🔎 /get | 🗑️ /del\n"
+        "🔐 /encrypt | 🔓 /decrypt | 📥 /convert\n\n"
         "**CULT OF TEMPEST**\n"
-        "🌀 /tempest_join - Join the cult\n"
-        "📖 /tempest_story - Read the lore\n"
-        "👑 /tempest_creed - View top members\n"
-        "⛩️ /shrine - View your power\n"
-        "⚡ /curse - Reply to curse someone\n"
-        "✅ /remove_curse - Reply to uncurse\n\n"
-        "**TOOLS**\n"
-        "🔐 /encrypt [text] - Encrypt text\n"
-        "🔓 /decrypt [text] - Decrypt text\n"
-        "📥 /convert [url] - Download video\n"
-        "📝 /word [text] - Create a DOCX\n\n"
-        "**ADMIN ONLY**\n"
-        "🛡️ /admin_help - View admin commands"
+        "🌀 /tempest_join | 📖 /tempest_story\n"
+        "👑 /tempest_creed | ⛩️ /shrine | ⚡ /curse\n\n"
+        "🛡️ *Admins use /admin_help*"
     )
     await m.answer(text, parse_mode=ParseMode.MARKDOWN)
 
@@ -353,32 +372,34 @@ async def help_cmd(m: Message):
 async def admin_help_cmd(m: Message):
     u, _ = await handle_common(m, "admin_help")
     if not u or (u.id != OWNER_ID and not await is_admin(u.id)): return await m.answer("🚫 Admin only.")
-    
     text = (
         "◤━━━━━━━━━━━━━━━━━━━━◥\n"
         "◇ 👑 ADMIN ARSENAL ◇\n"
         "◣━━━━━━━━━━━━━━━━━━━━◢\n\n"
-        "📊 /ping - Check bot latency\n"
-        "📈 /stats - View bot statistics\n"
-        "🔍 /scan - Deep system scan\n"
-        "👥 /users - Export user list\n"
-        "📢 /broadcast - Message all users\n"
-        "🚫 /ban | /unban | /banlist\n"
-        "⛔ /disable [cmd] - Turn off a command\n"
-        "⚙️ /cm - Command center\n\n"
+        "📊 /ping | 📈 /stats | 🔍 /scan\n"
+        "👥 /users | 📢 /broadcast | ⛔ /disable\n"
+        "🚫 /ban | /unban | /banlist\n\n"
         "**OWNER ONLY**\n"
-        "⚡ /query [code] - Execute Python\n"
-        "🧠 /ai [on/off] - Toggle AI\n"
-        "🔑 /api [key] - Set Groq API key\n"
-        "🔄 /restart - Restart the bot\n"
-        "🔧 /maintenance - Toggle maintenance\n"
-        "👑 /pro [id] - Promote to admin\n"
-        "💾 /backup - Download database\n"
-        "📥 /rem - Restore database\n"
-        "🧹 /clearlogs - Clear command logs\n"
-        "📜 /logs - Download command logs"
+        "⚡ /query | 🧠 /ai | 🔑 /api\n"
+        "🔄 /restart | 🔧 /maintenance\n"
+        "💾 /backup | 📥 /rem | 🧹 /clearlogs"
     )
     await m.answer(text, parse_mode=ParseMode.MARKDOWN)
+
+@dp.message(Command("profile"))
+async def profile_cmd(m: Message):
+    u, _ = await handle_common(m, "profile")
+    if not u: return
+    msg = await m.answer("⚡ Generating ID...")
+    with sqlite3.connect("data/bot.db", timeout=15.0) as conn:
+        r = conn.execute("SELECT cult_rank, shards, wins, losses FROM users WHERE user_id = ?", (u.id,)).fetchone()
+    rank, shards, wins, losses = r if r else ("Mortal", 0, 0, 0)
+    if not rank or rank == 'none': rank = "Mortal"
+    av = await fetch_user_avatar(u.id, u.first_name)
+    card = await asyncio.to_thread(gen_profile_card, u.first_name, u.id, rank, shards or 0, wins or 0, losses or 0, av)
+    try: await msg.delete()
+    except Exception: pass
+    await m.answer_photo(photo=BufferedInputFile(card, filename="profile.png"), caption=f"👤 {u.first_name}'s Cyber-ID")
 
 @dp.message(Command("wish"))
 async def wish_cmd(m: Message):
@@ -634,48 +655,123 @@ async def duel_cmd(m: Message):
     f2 = FIGHTER_ROSTER[p2_fighter]
     
     active_duels[ch.id] = {
-        "p1": [u.id, f1["name"], f1["hp"]],
-        "p2": [t.id, f2["name"], f2["hp"]],
+        "p1": {"id": u.id, "name": u.first_name, "char": f1, "hp": f1["hp"], "energy": 0, "status": None},
+        "p2": {"id": t.id, "name": t.first_name, "char": f2, "hp": f2["hp"], "energy": 0, "status": None},
         "turn": u.id
     }
     try: await msg.delete()
     except Exception: pass
     
+    await send_duel_card(ch.id)
+
+async def send_duel_card(chat_id):
+    duel = active_duels.get(chat_id)
+    if not duel: return
+    
+    p1, p2 = duel["p1"], duel["p2"]
+    
     w, h = 1920, 1080
     img = Image.new("RGB", (w, h), (15, 15, 25))
     d = ImageDraw.Draw(img)
-    draw_visible_text(d, (w//2, 100), f"{f1['name']} vs {f2['name']}", get_safe_font(80), (255, 255, 255), anchor="mm")
+    
+    d.rectangle([100, 100, 800, 150], fill=(50, 50, 50), outline=(255, 0, 0), width=4)
+    d.rectangle([100, 100, 100 + int(700 * (max(0, p1["hp"]) / p1["char"]["hp"])), 150], fill=(255, 0, 0))
+    draw_visible_text(d, (450, 125), f"{p1['char']['name']}: {max(0, p1['hp'])}/{p1['char']['hp']} HP", get_safe_font(40), (255,255,255), anchor="mm")
+    
+    d.rectangle([100, 170, 800, 190], fill=(30, 30, 30))
+    d.rectangle([100, 170, 100 + int(700 * (p1["energy"] / 100)), 190], fill=(0, 200, 255))
+    
+    d.rectangle([1120, 100, 1820, 150], fill=(50, 50, 50), outline=(255, 0, 0), width=4)
+    d.rectangle([1120, 100, 1120 + int(700 * (max(0, p2["hp"]) / p2["char"]["hp"])), 150], fill=(255, 0, 0))
+    draw_visible_text(d, (1470, 125), f"{p2['char']['name']}: {max(0, p2['hp'])}/{p2['char']['hp']} HP", get_safe_font(40), (255,255,255), anchor="mm")
+    
+    d.rectangle([1120, 170, 1820, 190], fill=(30, 30, 30))
+    d.rectangle([1120, 170, 1120 + int(700 * (p2["energy"] / 100)), 190], fill=(0, 200, 255))
+    
+    draw_visible_text(d, (w//2, h//2), "VS", get_safe_font(150), (255, 215, 0), anchor="mm")
+    
     b = io.BytesIO(); img.save(b, format="PNG"); b.seek(0)
     
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⚔️ Attack", callback_data="duel_atk")]])
-    await m.answer_photo(photo=BufferedInputFile(b.getvalue(), filename="duel.png"), caption=f"⚔️ {f1['name']} vs {f2['name']}\n👉 {u.first_name}'s turn.", reply_markup=kb)
+    turn_name = p1["name"] if duel["turn"] == p1["id"] else p2["name"]
+    turn_player = p1 if duel["turn"] == p1["id"] else p2
+    
+    kb_buttons = [
+        [InlineKeyboardButton(text="⚔️ Strike", callback_data="duel_atk"), InlineKeyboardButton(text="🛡️ Guard", callback_data="duel_guard")],
+    ]
+    
+    if turn_player["energy"] >= 100:
+        kb_buttons.append([InlineKeyboardButton(text=f"🔥 ULTIMATE: {turn_player['char']['ult']}", callback_data="duel_ult")])
+        
+    kb = InlineKeyboardMarkup(inline_keyboard=kb_buttons)
+    
+    await bot.send_photo(chat_id, photo=BufferedInputFile(b.getvalue(), filename="duel.png"), caption=f"⚔️ **{p1['name']} ({p1['char']['name']})** vs **{p2['name']} ({p2['char']['name']})**\n\n👉 It is **{turn_name}'s** turn!\n⚡ Energy: {turn_player['energy']}/100", reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
 
-@dp.callback_query(lambda c: c.data == "duel_atk")
+@dp.callback_query(lambda c: c.data.startswith("duel_"))
 async def process_duel(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     user_id = callback.from_user.id
     duel = active_duels.get(chat_id)
-    if not duel or user_id != duel["turn"]: return await callback.answer("Not your turn!", show_alert=True)
     
-    dmg = random.randint(15, 30)
-    if user_id == duel["p1"][0]:
-        duel["p2"][2] -= dmg
-        duel["turn"] = duel["p2"][0]
-    else:
-        duel["p1"][2] -= dmg
-        duel["turn"] = duel["p1"][0]
+    if not duel: return await callback.answer("No active duel here.", show_alert=True)
+    if user_id != duel["turn"]: return await callback.answer("It's not your turn!", show_alert=True)
+    
+    action = callback.data.split("_")[1]
+    p1, p2 = duel["p1"], duel["p2"]
+    
+    attacker = p1 if user_id == p1["id"] else p2
+    defender = p2 if user_id == p1["id"] else p1
+    log_text = ""
+    
+    if attacker.get("status") == "stun":
+        log_text = f"💫 {attacker['name']} is STUNNED and skips their turn!"
+        attacker["status"] = None
+    elif attacker.get("status") == "burn":
+        attacker["hp"] -= 10
+        log_text = f"🔥 {attacker['name']} suffers 10 BURN damage!"
+        attacker["status"] = None
+    elif attacker.get("status") == "bleed":
+        attacker["hp"] -= 8
+        log_text = f"🩸 {attacker['name']} suffers 8 BLEED damage!"
+        attacker["status"] = None
         
-    if duel["p1"][2] <= 0 or duel["p2"][2] <= 0:
-        winner = duel["p1"][1] if duel["p1"][2] > 0 else duel["p2"][1]
+    if "STUNNED" in log_text:
+        duel["turn"] = defender["id"]
+        await callback.message.answer(log_text)
+        await send_duel_card(chat_id)
+        return await callback.answer()
+
+    if action == "atk":
+        dmg = random.randint(10, attacker["char"]["atk"])
+        defender["hp"] -= dmg
+        attacker["energy"] = min(100, attacker["energy"] + 25)
+        log_text = f"⚔️ {attacker['name']} hit {defender['name']} for {dmg} damage!"
+    elif action == "guard":
+        attacker["energy"] = min(100, attacker["energy"] + 35)
+        log_text = f"🛡️ {attacker['name']} guarded."
+    elif action == "ult":
+        if attacker["energy"] < 100: return await callback.answer("Not enough Energy!", show_alert=True)
+        dmg = attacker["char"]["ult_dmg"]
+        defender["hp"] -= dmg
+        attacker["energy"] = 0
+        log_text = f"🔥 {attacker['name']} unleashed **{attacker['char']['ult']}** for {dmg} damage!"
+        if attacker["char"].get("effect"):
+            defender["status"] = attacker["char"]["effect"]
+            log_text += f"\n☠️ {defender['name']} is now affected by {attacker['char']['effect'].upper()}!"
+    
+    duel["turn"] = defender["id"]
+    
+    if p1["hp"] <= 0 or p2["hp"] <= 0:
+        winner = p1 if p1["hp"] > 0 else p2
         del active_duels[chat_id]
         try: await callback.message.delete()
         except Exception: pass
-        return await callback.message.answer(f"🏆 {winner} wins!")
+        return await callback.message.answer(f"{log_text}\n\n🏆 **{winner['name']} ({winner['char']['name']}) WINS!**")
         
     try: await callback.message.delete()
     except Exception: pass
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⚔️ Attack", callback_data="duel_atk")]])
-    await callback.message.answer(f"⚔️ {duel['p1'][1]} HP: {max(0, duel['p1'][2])} | {duel['p2'][1]} HP: {max(0, duel['p2'][2])}\n👉 Next turn!", reply_markup=kb)
+    
+    await send_duel_card(chat_id)
+    await callback.message.answer(log_text, parse_mode=ParseMode.MARKDOWN)
     await callback.answer()
 
 @dp.message(Command("fate"))
@@ -748,7 +844,7 @@ async def del_cmd(m: Message):
     except Exception: pass
     await m.answer(f"🗑️ Deleted #{vid}")
 
-# ========== ADMIN ==========
+# ========== ADMIN COMMANDS ==========
 @dp.message(Command("ping"))
 async def ping_cmd(m: Message):
     u, _ = await handle_common(m, "ping")
